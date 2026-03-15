@@ -1,0 +1,12 @@
+interface r2fft_istream_in
+  #(parameter FFT_DW=18)
+  ();
+  
+  logic 			               sact_istream_i,
+  logic signed [FFT_DW-1:0]  sdw_istream_real_i,
+  logic signed [FFT_DW-1:0]  sdw_istream_imag_i,
+
+  modport r2fft (input sact_istream_i, sdw_istream_real_i, sdw_istream_imag_i);
+  modport i2s (output sact_istream_i, sdw_istream_real_i, sdw_istream_imag_i);
+
+endinterface
