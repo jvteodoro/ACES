@@ -1,4 +1,24 @@
-module aces(input clk, input rst);
+module aces(input clk, 
+            input rst, 
+            input mic_in,
+            output dmaa,
+            output dmadr_real
+            );
+
+    module i2s_rx #(
+    .OUT_WIDTH(18)        // FFT input width (max 24)
+    )(
+    .sck,                // I2S bit clock
+    .ws,                 // word select (LRCLK)
+    .sd,                 // serial data
+    .reset(rst),
+
+    .sample,
+    .sample_valid
+    );
+
+
+
 
 
     logic run, ifft;
