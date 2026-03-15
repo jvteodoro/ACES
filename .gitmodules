@@ -1,0 +1,3 @@
+[submodule "submodules/R2FFT"]
+	path = submodules/R2FFT
+	url = git@github.com:jvteodoro/R2FFT.git
