@@ -1,0 +1,58 @@
+n_points=512
+sample_bits=24
+sample_rate_hz=48828
+output_format=mif
+window_policy=pad_zero
+quantization_mode=full_scale
+audio_channel_mode=mono_mix
+n_examples=8
+
+[example 0]
+name=sine_1k
+kind=sine
+freq_hz=1000.0
+amplitude=0.9
+phase_rad=0.0
+
+[example 1]
+name=sine_3k
+kind=sine
+freq_hz=3000.0
+amplitude=0.9
+phase_rad=0.0
+
+[example 2]
+name=sum_1k_2p5k_7k
+kind=sum_of_sines
+components=[{'freq_hz': 1000.0, 'amplitude': 0.55, 'phase_rad': 0.0}, {'freq_hz': 2500.0, 'amplitude': 0.25, 'phase_rad': 0.0}, {'freq_hz': 7000.0, 'amplitude': 0.15, 'phase_rad': 0.0}]
+
+[example 3]
+name=chirp_500_8k
+kind=chirp_linear
+f0_hz=500.0
+f1_hz=8000.0
+amplitude=0.8
+
+[example 4]
+name=square_1k
+kind=square
+freq_hz=1000.0
+amplitude=0.7
+duty=0.5
+
+[example 5]
+name=triangle_1p5k
+kind=triangle
+freq_hz=1500.0
+amplitude=0.7
+
+[example 6]
+name=impulse_0
+kind=impulse
+amplitude=1.0
+index=0
+
+[example 7]
+name=dc_0p25
+kind=dc
+level=0.25

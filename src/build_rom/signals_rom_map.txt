@@ -1,0 +1,8 @@
+example 0: [0 .. 511] -> sine_1k
+example 1: [512 .. 1023] -> sine_3k
+example 2: [1024 .. 1535] -> sum_1k_2p5k_7k
+example 3: [1536 .. 2047] -> chirp_500_8k
+example 4: [2048 .. 2559] -> square_1k
+example 5: [2560 .. 3071] -> triangle_1p5k
+example 6: [3072 .. 3583] -> impulse_0
+example 7: [3584 .. 4095] -> dc_0p25
