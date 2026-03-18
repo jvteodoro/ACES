@@ -4,12 +4,15 @@ module i2s_stimulus_manager_rom #(
     parameter int N_EXAMPLES           = 8,
     parameter int STARTUP_SCK_CYCLES   = 8,
     parameter bit INACTIVE_ZERO_SYNTH  = 0,
-    localparam int TOTAL_SAMPLES = N_POINTS * N_EXAMPLES,
-    localparam int ROM_ADDR_W    = (TOTAL_SAMPLES <= 1) ? 1 : $clog2(TOTAL_SAMPLES),
-    localparam int EXAMPLE_SEL_W = (N_EXAMPLES   <= 1) ? 1 : $clog2(N_EXAMPLES),
-    localparam int POINT_IDX_W   = (N_POINTS     <= 1) ? 1 : $clog2(N_POINTS),
-    localparam int STARTUP_W     = (STARTUP_SCK_CYCLES <= 1) ? 1 : $clog2(STARTUP_SCK_CYCLES + 1)
+    parameter int TOTAL_SAMPLES = N_POINTS * N_EXAMPLES,
+    parameter int ROM_ADDR_W    = (TOTAL_SAMPLES <= 1) ? 1 : $clog2(TOTAL_SAMPLES),
+    parameter int EXAMPLE_SEL_W = (N_EXAMPLES   <= 1) ? 1 : $clog2(N_EXAMPLES),
+    parameter int POINT_IDX_W   = (N_POINTS     <= 1) ? 1 : $clog2(N_POINTS),
+    parameter int STARTUP_W     = (STARTUP_SCK_CYCLES <= 1) ? 1 : $clog2(STARTUP_SCK_CYCLES + 1)
+    
 )(
+
+
     input  logic clk,
     input  logic rst,
 
