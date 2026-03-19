@@ -1,0 +1,43 @@
+onerror {resume}
+quietly WaveActivateNextPane {} 0
+add wave -noupdate -divider Clocks
+add wave -noupdate /tb_sample_bridge_and_ingest/u_bridge/mic_sck_i
+add wave -noupdate /tb_sample_bridge_and_ingest/u_ingest/clk
+add wave -noupdate -divider Bridge
+add wave -noupdate /tb_sample_bridge_and_ingest/u_bridge/sample_toggle
+add wave -noupdate /tb_sample_bridge_and_ingest/u_bridge/rst
+add wave -noupdate -divider {Bridge Input}
+add wave -noupdate -color Yellow /tb_sample_bridge_and_ingest/u_bridge/sample_valid_i
+add wave -noupdate -color Yellow /tb_sample_bridge_and_ingest/u_bridge/sample_i
+add wave -noupdate -divider {Brige Output}
+add wave -noupdate -color Cyan /tb_sample_bridge_and_ingest/u_bridge/fft_sample_valid_o
+add wave -noupdate -color Cyan /tb_sample_bridge_and_ingest/u_bridge/fft_sample_o
+add wave -noupdate -divider Ingest
+add wave -noupdate /tb_sample_bridge_and_ingest/u_ingest/rst
+add wave -noupdate /tb_sample_bridge_and_ingest/u_ingest/fft_sample_valid_i
+add wave -noupdate /tb_sample_bridge_and_ingest/u_ingest/fft_sample_i
+add wave -noupdate -divider {To FFT Input}
+add wave -noupdate /tb_sample_bridge_and_ingest/u_bridge/mic_sck_i
+add wave -noupdate /tb_sample_bridge_and_ingest/u_ingest/clk
+add wave -noupdate -color {Violet Red} /tb_sample_bridge_and_ingest/u_ingest/sact_istream_o
+add wave -noupdate -color {Violet Red} /tb_sample_bridge_and_ingest/u_ingest/sdw_istream_real_o
+add wave -noupdate -color {Violet Red} /tb_sample_bridge_and_ingest/u_ingest/sdw_istream_imag_o
+TreeUpdate [SetDefaultTree]
+WaveRestoreCursors {{Cursor 1} {113241 ps} 0} {{Cursor 2} {732636 ps} 0}
+quietly wave cursor active 1
+configure wave -namecolwidth 262
+configure wave -valuecolwidth 100
+configure wave -justifyvalue left
+configure wave -signalnamewidth 1
+configure wave -snapdistance 10
+configure wave -datasetprefix 0
+configure wave -rowmargin 4
+configure wave -childrowmargin 2
+configure wave -gridoffset 0
+configure wave -gridperiod 1
+configure wave -griddelta 40
+configure wave -timeline 0
+configure wave -timelineunits ps
+update
+WaveRestoreZoom {0 ps} {746362 ps}
+bookmark add wave bookmark0 {{0 ps} {16958550 ps}} 0

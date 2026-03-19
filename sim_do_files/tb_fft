@@ -1,0 +1,65 @@
+onerror {resume}
+quietly WaveActivateNextPane {} 0
+add wave -noupdate /testbench/clk
+add wave -noupdate /testbench/rst
+add wave -noupdate /testbench/autorun
+add wave -noupdate /testbench/run
+add wave -noupdate /testbench/fin
+add wave -noupdate /testbench/done
+add wave -noupdate /testbench/status
+add wave -noupdate /testbench/bfpexp
+add wave -noupdate -divider {Input Stream}
+add wave -noupdate /testbench/sact_istream
+add wave -noupdate /testbench/sdw_istream_real
+add wave -noupdate /testbench/sdw_istream_imag
+add wave -noupdate -divider {Data Memory}
+add wave -noupdate /testbench/dmaact
+add wave -noupdate /testbench/dmaa
+add wave -noupdate /testbench/dmadr_real
+add wave -noupdate /testbench/dmadr_imag
+add wave -noupdate -divider {Twiddle Factor}
+add wave -noupdate /testbench/twact
+add wave -noupdate /testbench/twa
+add wave -noupdate /testbench/twdr_cos
+add wave -noupdate -divider RAM
+add wave -noupdate /testbench/ract_ram0
+add wave -noupdate /testbench/ra_ram0
+add wave -noupdate /testbench/rdr_ram0
+add wave -noupdate /testbench/wact_ram0
+add wave -noupdate /testbench/wa_ram0
+add wave -noupdate /testbench/wdw_ram0
+add wave -noupdate /testbench/ract_ram1
+add wave -noupdate /testbench/ra_ram1
+add wave -noupdate /testbench/rdr_ram1
+add wave -noupdate /testbench/wact_ram1
+add wave -noupdate /testbench/wa_ram1
+add wave -noupdate /testbench/wdw_ram1
+add wave -noupdate /testbench/clk_period
+add wave -noupdate /testbench/clk_strobe
+add wave -noupdate /testbench/strobe
+add wave -noupdate /testbench/strobeOutputData
+add wave -noupdate /testbench/fftbin
+add wave -noupdate /testbench/resultReal
+add wave -noupdate /testbench/resultImag
+add wave -noupdate /testbench/i
+add wave -noupdate /testbench/inputReal
+add wave -noupdate /testbench/inputImag
+add wave -noupdate /testbench/fftBfpExp
+TreeUpdate [SetDefaultTree]
+WaveRestoreCursors {{Cursor 1} {2723699 ps} 0} {{Cursor 2} {2723699 ps} 0}
+quietly wave cursor active 1
+configure wave -namecolwidth 150
+configure wave -valuecolwidth 100
+configure wave -justifyvalue left
+configure wave -signalnamewidth 1
+configure wave -snapdistance 10
+configure wave -datasetprefix 0
+configure wave -rowmargin 4
+configure wave -childrowmargin 2
+configure wave -gridoffset 0
+configure wave -gridperiod 1
+configure wave -griddelta 40
+configure wave -timeline 0
+configure wave -timelineunits ps
+update
+WaveRestoreZoom {0 ps} {16308976 ps}
