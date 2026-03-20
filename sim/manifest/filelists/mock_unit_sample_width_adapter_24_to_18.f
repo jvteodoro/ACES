@@ -1,0 +1,2 @@
+rtl/common/sample_width_adapter_24_to_18.sv
+tb/unit/tb_sample_width_adapter_24_to_18.sv
