@@ -13,6 +13,27 @@ proc first_existing {root candidates} {
     return ""
 }
 
+proc write_absolute_filelist {root source_path output_path} {
+    set in [open $source_path r]
+    set out [open $output_path w]
+
+    try {
+        while {[gets $in line] >= 0} {
+            set trimmed [string trim $line]
+            if {$trimmed eq "" || [string match "#*" $trimmed]} {
+                puts $out $line
+            } elseif {[file pathtype $trimmed] eq "relative"} {
+                puts $out [file normalize [file join $root $trimmed]]
+            } else {
+                puts $out $trimmed
+            }
+        }
+    } finally {
+        close $in
+        close $out
+    }
+}
+
 set repo_root $::env(ACES_REPO_ROOT)
 set local_dir $::env(ACES_LOCAL_DIR)
 set test_name $::env(ACES_TEST_NAME)
@@ -63,14 +84,20 @@ if {[file exists work]} {vdel -lib work -all}
 vlib work
 vmap work work
 
-set compile_cmd [list vlog -sv -work work -f $filelist_path]
+set local_filelist_path [file join $local_dir compiled_files.f]
+write_absolute_filelist $repo_root $filelist_path $local_filelist_path
+
+set compile_cmd [list vlog -sv -work work -f $local_filelist_path]
 puts "Compiling: $compile_cmd"
 if {[catch {eval $compile_cmd} result]} {
     fail "Compile failed: $result"
 }
 
 if {$extra_filelist ne ""} {
-    set extra_cmd [list vlog -sv -work work -f $extra_filelist]
+    set local_extra_filelist_path [file join $local_dir compiled_extra_files.f]
+    write_absolute_filelist $repo_root $extra_filelist $local_extra_filelist_path
+
+    set extra_cmd [list vlog -sv -work work -f $local_extra_filelist_path]
     puts "Compiling extra filelist: $extra_cmd"
     if {[catch {eval $extra_cmd} result]} {
         fail "Extra filelist compile failed: $result"
