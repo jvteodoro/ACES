@@ -74,10 +74,24 @@ For a mock regression pass:
 sim/manifest/scripts/regression_mock.sh
 ```
 
+Windows PowerShell equivalents:
+
+```powershell
+.\sim\manifest\scripts\run_questa.ps1 i2s_rx_adapter_24
+.\sim\manifest\scripts\regression_mock.ps1
+$env:EXTRA_FILELIST='C:\path\to\r2fft_real.f'; .\sim\manifest\scripts\run_questa.ps1 top_level_test real
+```
+
 For an interactive GUI bring-up using a specific filelist and top module:
 
 ```bash
 sim/manifest/scripts/open_questa_gui.sh sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test_real
+```
+
+PowerShell:
+
+```powershell
+.\sim\manifest\scripts\open_questa_gui.ps1 sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test_real
 ```
 
 ## Portable package workflow
@@ -86,6 +100,12 @@ Generate the portable package with:
 
 ```bash
 sim/manifest/scripts/package_portable.sh
+```
+
+PowerShell:
+
+```powershell
+.\sim\manifest\scripts\package_portable.ps1
 ```
 
 That populates `sim/portable/questa_package/` and produces `sim/portable/aces_questa_portable.zip`.

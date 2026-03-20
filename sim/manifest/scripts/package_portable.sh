@@ -26,9 +26,10 @@ ACES portable Questa package
 ============================
 
 1. Unzip anywhere.
-2. Run scripts/run_questa.sh <test_name> [mock|real] from the package root.
-3. Mock flow is self-contained.
-4. Real flow expects any external FFT implementation filelist to be supplied through EXTRA_FILELIST.
+2. On Linux/macOS, run scripts/run_questa.sh <test_name> [mock|real] from the package root.
+3. On Windows PowerShell, run .\scripts\run_questa.ps1 <test_name> [mock|real] from the package root.
+4. Mock flow is self-contained.
+5. Real flow expects any external FFT implementation filelist to be supplied through EXTRA_FILELIST.
 TXT
 
 (

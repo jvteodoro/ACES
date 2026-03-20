@@ -8,8 +8,8 @@
 - filelist paths not matching the package/repo root you are using.
 
 ### What to do
-- prefer `sim/manifest/scripts/run_questa.sh <test> [mock|real]`,
-- if using a portable package, run from the package root and use `scripts/run_questa.sh ...`,
+- prefer `sim/manifest/scripts/run_questa.sh <test> [mock|real]` on POSIX shells or `sim/manifest/scripts/run_questa.ps1 <test> [mock|real]` on PowerShell,
+- if using a portable package, run from the package root and use either `scripts/run_questa.sh ...` or `.\scripts\run_questa.ps1 ...`,
 - verify the filelist path you selected matches the intended flow.
 
 ## I get an IP-not-found or module-not-found error
@@ -21,7 +21,7 @@
 
 ### What to do
 - for self-contained runs, use a mock-flow filelist,
-- for real-IP-oriented top-level runs, provide `EXTRA_FILELIST=/path/to/r2fft_real.f`,
+- for real-IP-oriented top-level runs, provide `EXTRA_FILELIST=/path/to/r2fft_real.f` on POSIX shells or `$env:EXTRA_FILELIST='C:\path\to\r2fft_real.f'` on PowerShell,
 - verify that the ROM or FFT module name being bound matches the chosen flow.
 
 ## What about `msim_setup.tcl`?

@@ -23,10 +23,10 @@
 
 ## Primary scripts
 
-- `scripts/run_questa.sh`: batch entry point for named tests.
-- `scripts/open_questa_gui.sh`: convenience helper for interactive GUI launches.
-- `scripts/regression_mock.sh`: batch mock regression helper.
-- `scripts/package_portable.sh`: portable package generator.
+- `scripts/run_questa.sh` / `scripts/run_questa.ps1`: batch entry points for named tests.
+- `scripts/open_questa_gui.sh` / `scripts/open_questa_gui.ps1`: convenience helpers for interactive GUI launches.
+- `scripts/regression_mock.sh` / `scripts/regression_mock.ps1`: batch mock regression helpers.
+- `scripts/package_portable.sh` / `scripts/package_portable.ps1`: portable package generators.
 
 ## Running locally with Questa
 
@@ -36,12 +36,26 @@ sim/manifest/scripts/run_questa.sh top_level_test mock
 sim/manifest/scripts/regression_mock.sh
 ```
 
+Windows PowerShell:
+
+```powershell
+.\sim\manifest\scripts\run_questa.ps1 top_level_test mock
+.\sim\manifest\scripts\regression_mock.ps1
+```
+
 ## Real-IP-oriented flow
 
 The repository includes the real Quartus ROM IP wrappers under `rtl/ip/rom/`, but the true FFT implementation is still expected from external collateral. Use:
 
 ```bash
 EXTRA_FILELIST=/abs/path/to/r2fft_real.f sim/manifest/scripts/run_questa.sh top_level_test real
+```
+
+PowerShell:
+
+```powershell
+$env:EXTRA_FILELIST = 'C:\path\to\r2fft_real.f'
+.\sim\manifest\scripts\run_questa.ps1 top_level_test real
 ```
 
 That keeps the mock and real flows explicit and reproducible.

@@ -27,13 +27,13 @@ Examples:
 ### Tcl launch logic
 `sim/manifest/scripts/run_questa.tcl` maps a named test target to the correct filelist and top module.
 
-### Shell launch entry point
-`sim/manifest/scripts/run_questa.sh` is the main local entry point. It:
+### Shell and PowerShell launch entry points
+`sim/manifest/scripts/run_questa.sh` and `sim/manifest/scripts/run_questa.ps1` are the main local batch entry points. They:
 
-- locates the repository root,
-- creates a local run directory under `sim/local/questa/`,
-- exports environment variables used by the Tcl launcher,
-- launches Questa in batch mode.
+- locate the repository root,
+- create a local run directory under `sim/local/questa/`,
+- export environment variables used by the Tcl launcher,
+- launch Questa in batch mode.
 
 ### Waveform setups
 Waveform `.do` files live under `sim/manifest/waves/`.
@@ -51,6 +51,14 @@ sim/manifest/scripts/run_questa.sh sample_bridge_and_ingest
 sim/manifest/scripts/run_questa.sh top_level_test mock
 ```
 
+Windows PowerShell equivalents:
+
+```powershell
+.\sim\manifest\scripts\run_questa.ps1 i2s_rx_adapter_24
+.\sim\manifest\scripts\run_questa.ps1 sample_bridge_and_ingest
+.\sim\manifest\scripts\run_questa.ps1 top_level_test mock
+```
+
 ## Real-IP-Oriented Top-Level Run
 
 The real-IP-oriented flow is currently defined for `top_level_test` and assumes the real FFT implementation is provided separately.
@@ -59,6 +67,13 @@ Example:
 
 ```bash
 EXTRA_FILELIST=/abs/path/to/r2fft_real.f sim/manifest/scripts/run_questa.sh top_level_test real
+```
+
+PowerShell:
+
+```powershell
+$env:EXTRA_FILELIST = 'C:\path\to\r2fft_real.f'
+.\sim\manifest\scripts\run_questa.ps1 top_level_test real
 ```
 
 Use this when:
@@ -89,6 +104,16 @@ do ../../../manifest/waves/tb_audio_frontend_integration
 run -all
 ```
 
+Convenience wrappers:
+
+```bash
+sim/manifest/scripts/open_questa_gui.sh sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test_real
+```
+
+```powershell
+.\sim\manifest\scripts\open_questa_gui.ps1 sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test_real
+```
+
 For unit and integration tests, substitute the matching filelist and wave file.
 
 ## How Regression Works
@@ -98,7 +123,7 @@ In ACES, “regression” means running a defined set of named test targets from
 A practical regression pattern is:
 
 1. select the supported mock-flow tests,
-2. run each through `run_questa.sh`,
+2. run each through `run_questa.sh` or `run_questa.ps1`,
 3. review failures by test name and run directory under `sim/local/questa/`.
 
 Because all compile inputs are versioned, a regression failure should be attributable to source changes rather than hidden simulator state.

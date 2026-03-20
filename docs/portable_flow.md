@@ -44,6 +44,12 @@ From the repository root:
 sim/manifest/scripts/package_portable.sh
 ```
 
+Windows PowerShell:
+
+```powershell
+.\sim\manifest\scripts\package_portable.ps1
+```
+
 Outputs:
 
 - package directory: `sim/portable/questa_package/`
@@ -68,11 +74,25 @@ scripts/run_questa.sh i2s_rx_adapter_24
 scripts/run_questa.sh top_level_test mock
 ```
 
+Windows PowerShell:
+
+```powershell
+.\scripts\run_questa.ps1 i2s_rx_adapter_24
+.\scripts\run_questa.ps1 top_level_test mock
+```
+
 ### Step 5: run a real-IP-oriented top-level test if needed
 Example:
 
 ```bash
 EXTRA_FILELIST=/abs/path/to/r2fft_real.f scripts/run_questa.sh top_level_test real
+```
+
+Windows PowerShell:
+
+```powershell
+$env:EXTRA_FILELIST = 'C:\path\to\r2fft_real.f'
+.\scripts\run_questa.ps1 top_level_test real
 ```
 
 ## Step-by-Step Handoff Guidance
@@ -86,6 +106,7 @@ EXTRA_FILELIST=/abs/path/to/r2fft_real.f scripts/run_questa.sh top_level_test re
 ## Limitations
 
 - The portable package still requires Questa to be installed on the target machine.
+- On Windows hosts, users should run the provided `.ps1` script variants from PowerShell.
 - The real-IP-oriented flow still requires the real FFT implementation to be supplied separately.
 - A portable package is a generated snapshot; contributors should make source changes in the repository, not inside the package.
 
