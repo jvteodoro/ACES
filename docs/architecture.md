@@ -167,11 +167,13 @@ When adding or changing blocks:
 
 ## Top-Level Debug Strategy
 
-The active board-oriented top-level, `top_level_test_mux_clear_hex_based_on_uploaded`, now uses a staged debug strategy with three ideas:
+The active board-oriented top-level, `top_level_test_mux_clear_hex_based_on_uploaded`, uses a staged debug strategy with three ideas:
 
 1. **separate control from observation**, so stimulus-manager controls do not fight with debug selection,
 2. **group debug by pipeline stage**, so each selection exposes a coherent subset of signals,
 3. **capture outputs into registers**, so fast internal events can be snapshotted onto LEDs, HEX displays, and GPIO debug pins with external enable pulses.
+
+The intended operator flow is now centered on the external GPIO header instead of the on-board FPGA keys. This allows an Analog Discovery or similar logic tool to both select the debug view and generate precise capture pulses.
 
 ### Control Inputs
 
@@ -185,18 +187,27 @@ The active board-oriented top-level, `top_level_test_mux_clear_hex_based_on_uplo
 | `SW6` | `stim_lr_sel_i`: selects the LR channel presented to ACES. |
 | `SW9:SW7` | currently reserved for future top-level control expansion. |
 
-#### Keys (`KEY`)
+#### GPIO-based debug selection
 
-The keys are used only for debug multiplexing.
+The debug selector should no longer depend on the DE0-CV push-buttons. Instead, the stage/page selection is expected to come from GPIO pins driven by the Analog Discovery.
 
-Because the DE0-CV keys are active-low on hardware, the top-level interprets **pressed = 1** after inversion.
+Recommended logical mapping:
 
-| Key field | Meaning |
+| GPIO input | Meaning |
 | --- | --- |
-| `KEY3:KEY2` | debug stage selector (`dbg_stage_sel`). |
-| `KEY1:KEY0` | page selector inside the chosen stage (`dbg_page_sel`). |
+| `GPIO_DBG_STAGE0` | debug stage selector bit 0. |
+| `GPIO_DBG_STAGE1` | debug stage selector bit 1. |
+| `GPIO_DBG_PAGE0` | page selector bit 0 inside the chosen stage. |
+| `GPIO_DBG_PAGE1` | page selector bit 1 inside the chosen stage. |
 
-### GPIO Capture Enables
+With that mapping, the active selector fields are:
+
+- `dbg_stage_sel = {GPIO_DBG_STAGE1, GPIO_DBG_STAGE0}`
+- `dbg_page_sel  = {GPIO_DBG_PAGE1, GPIO_DBG_PAGE0}`
+
+This keeps the whole debug flow scriptable from the external instrument: select a stage, select a page, wait for the internal event, then pulse the capture line that corresponds to the physical output of interest.
+
+### GPIO capture and external control pins
 
 The displayed outputs are not purely live wires anymore. They are captured into output registers when an external enable pulse arrives on GPIO.
 
@@ -209,9 +220,11 @@ The displayed outputs are not purely live wires anymore. They are captured into 
 | `GPIO_0_D5` | capture-enable for the GPIO debug snapshot register. |
 | `GPIO_0_D6` | clears all captured debug registers. |
 
+If a concrete pinout is defined for the four selector bits, it should be documented next to the capture pins above so the Analog Discovery wiring is fully explicit.
+
 This means the workflow is:
 
-1. choose the stage/page with `KEY[3:0]`,
+1. choose the stage/page with the dedicated GPIO debug-select pins,
 2. wait for the internal event of interest,
 3. pulse the matching GPIO capture enable,
 4. inspect the captured values at human-speed on LEDs/HEX/GPIO outputs.
@@ -220,35 +233,35 @@ This means the workflow is:
 
 #### Stage `00` — Stimulus manager
 
-| `KEY1:KEY0` page | LEDs | HEX | GPIO debug outputs |
+| Page | LEDs | HEX display mapping | GPIO debug outputs |
 | --- | --- | --- | --- |
-| `00` | `ready`, `busy`, `done`, `window_done`, selected example, loop mode, LR select | current example, current point, ROM address | `{window_done, done, busy, ready}` |
-| `01` | same stage status | bit index, FSM state, loop mode, selected example, LR select | `{state[0], state[1], state[2], mic_sd_internal}` |
-| `10` or `11` | same stage status | current 24-bit stimulus sample | sample bits `[23:20]` |
+| `00` | `ready`, `busy`, `done`, `window_done`, selected example, loop mode, LR select | `HEX0`=`stim_current_example_o[2:0]`; `HEX1`=`stim_current_point_o[3:0]`; `HEX2`=`stim_current_point_o[7:4]`; `HEX3`=`stim_current_point_o[8]`; `HEX4`=`stim_rom_addr_dbg_o[3:0]`; `HEX5`=`stim_rom_addr_dbg_o[7:4]` | `{window_done, done, busy, ready}` |
+| `01` | same stage status | `HEX0`=`stim_bit_index_o[3:0]`; `HEX1`=`stim_bit_index_o[5:4]`; `HEX2`=`stim_state_dbg_o`; `HEX3`=`stim_loop_mode_i`; `HEX4`=`stim_example_sel_i`; `HEX5`=`stim_lr_sel_i` | `{state[0], state[1], state[2], mic_sd_internal}` |
+| `10` or `11` | same stage status | `HEX0`=`stim_current_sample_dbg_o[3:0]`; `HEX1`=`[7:4]`; `HEX2`=`[11:8]`; `HEX3`=`[15:12]`; `HEX4`=`[19:16]`; `HEX5`=`[23:20]` | sample bits `[23:20]` |
 
 #### Stage `01` — I2S pins and recovered samples
 
-| `KEY1:KEY0` page | LEDs | HEX | GPIO debug outputs |
+| Page | LEDs | HEX display mapping | GPIO debug outputs |
 | --- | --- | --- | --- |
-| `00` | `sck`, `ws`, `chipen`, `lr_sel`, `sd`, `sample_valid`, `fft_sample_valid`, `sact`, `fft_run`, `fft_done` | reconstructed 24-bit sample (`sample_24_dbg_o`) | `{lr_sel, chipen, ws, sck}` |
-| `01` | same stage status | 18-bit microphone sample (`sample_mic_o`) | `{sample_valid, sd, ws, sck}` |
-| `10` or `11` | same stage status | FFT-width sample (`fft_sample_o`) | `{sact, fft_sample_valid, ws, sck}` |
+| `00` | `sck`, `ws`, `chipen`, `lr_sel`, `sd`, `sample_valid`, `fft_sample_valid`, `sact`, `fft_run`, `fft_done` | `HEX0`=`sample_24_dbg_o[3:0]`; `HEX1`=`[7:4]`; `HEX2`=`[11:8]`; `HEX3`=`[15:12]`; `HEX4`=`[19:16]`; `HEX5`=`[23:20]` | `{lr_sel, chipen, ws, sck}` |
+| `01` | same stage status | `HEX0`=`sample_mic_o[3:0]`; `HEX1`=`[7:4]`; `HEX2`=`[11:8]`; `HEX3`=`[15:12]`; `HEX4`=`[17:16]`; `HEX5`=`0` | `{sample_valid, sd, ws, sck}` |
+| `10` or `11` | same stage status | `HEX0`=`fft_sample_o[3:0]`; `HEX1`=`[7:4]`; `HEX2`=`[11:8]`; `HEX3`=`[15:12]`; `HEX4`=`[17:16]`; `HEX5`=`0` | `{sact, fft_sample_valid, ws, sck}` |
 
 #### Stage `10` — FFT ingest/control
 
-| `KEY1:KEY0` page | LEDs | HEX | GPIO debug outputs |
+| Page | LEDs | HEX display mapping | GPIO debug outputs |
 | --- | --- | --- | --- |
-| `00` | sample-valid, FFT-sample-valid, ingest strobe, `run`, `done`, input-buffer status, FFT status | `sdw_istream_real_o` | `{fft_done, fft_run, fft_sample_valid, sact}` |
-| `01` | same stage status | `sdw_istream_imag_o` | `{fft_done, fft_run, fft_sample_valid, sact}` |
-| `10` or `11` | same stage status | `bfpexp`, FFT status, input-buffer status | `{status[0], status[1], status[2], fft_done}` |
+| `00` | sample-valid, FFT-sample-valid, ingest strobe, `run`, `done`, input-buffer status, FFT status | `HEX0`=`sdw_istream_real_o[3:0]`; `HEX1`=`[7:4]`; `HEX2`=`[11:8]`; `HEX3`=`[15:12]`; `HEX4`=`[17:16]`; `HEX5`=`0` | `{fft_done, fft_run, fft_sample_valid, sact}` |
+| `01` | same stage status | `HEX0`=`sdw_istream_imag_o[3:0]`; `HEX1`=`[7:4]`; `HEX2`=`[11:8]`; `HEX3`=`[15:12]`; `HEX4`=`[17:16]`; `HEX5`=`0` | `{fft_done, fft_run, fft_sample_valid, sact}` |
+| `10` or `11` | same stage status | `HEX0`=`bfpexp_o[3:0]`; `HEX1`=`bfpexp_o[7:4]`; `HEX2`=`fft_status_o`; `HEX3`=`fft_input_buffer_status_o`; `HEX4`=`0`; `HEX5`=`0` | `{status[0], status[1], status[2], fft_done}` |
 
 #### Stage `11` — FFT output bins
 
-| `KEY1:KEY0` page | LEDs | HEX | GPIO debug outputs |
+| Page | LEDs | HEX display mapping | GPIO debug outputs |
 | --- | --- | --- | --- |
-| `00` | `fft_tx_valid`, `fft_tx_last`, `fft_done`, `fft_run` | `fft_tx_index_o` | `{fft_tx_last, fft_tx_valid, fft_done, fft_run}` |
-| `01` | same stage status | `fft_tx_real_o` | `{fft_tx_real_o[17], fft_tx_valid, fft_tx_last, fft_done}` |
-| `10` or `11` | same stage status | `fft_tx_imag_o` | `{fft_tx_imag_o[17], fft_tx_valid, fft_tx_last, fft_done}` |
+| `00` | `fft_tx_valid`, `fft_tx_last`, `fft_done`, `fft_run` | `HEX0`=`fft_tx_index_o[3:0]`; `HEX1`=`fft_tx_index_o[7:4]`; `HEX2`=`fft_tx_index_o[8]`; `HEX3`=`0`; `HEX4`=`0`; `HEX5`=`0` | `{fft_tx_last, fft_tx_valid, fft_done, fft_run}` |
+| `01` | same stage status | `HEX0`=`fft_tx_real_o[3:0]`; `HEX1`=`[7:4]`; `HEX2`=`[11:8]`; `HEX3`=`[15:12]`; `HEX4`=`[17:16]`; `HEX5`=`0` | `{fft_tx_real_o[17], fft_tx_valid, fft_tx_last, fft_done}` |
+| `10` or `11` | same stage status | `HEX0`=`fft_tx_imag_o[3:0]`; `HEX1`=`[7:4]`; `HEX2`=`[11:8]`; `HEX3`=`[15:12]`; `HEX4`=`[17:16]`; `HEX5`=`0` | `{fft_tx_imag_o[17], fft_tx_valid, fft_tx_last, fft_done}` |
 
 ### Physical Output Mapping
 
@@ -257,11 +270,18 @@ The selected-and-captured debug information is routed to these board-visible dev
 | Device | Source |
 | --- | --- |
 | `LEDR9:0` | LED snapshot register loaded from the currently selected stage/page. |
-| `HEX5..HEX0` | 24-bit HEX snapshot register, four bits per display. |
+| `HEX0` | `dbg_hex_capture_r[3:0]` (least-significant nibble of the captured HEX payload). |
+| `HEX1` | `dbg_hex_capture_r[7:4]`. |
+| `HEX2` | `dbg_hex_capture_r[11:8]`. |
+| `HEX3` | `dbg_hex_capture_r[15:12]`. |
+| `HEX4` | `dbg_hex_capture_r[19:16]`. |
+| `HEX5` | `dbg_hex_capture_r[23:20]` (most-significant nibble of the captured HEX payload). |
 | `GPIO_0_D3` | GPIO debug snapshot bit `0`. |
 | `GPIO_1_D2` | GPIO debug snapshot bit `1`. |
 | `GPIO_1_D3` | GPIO debug snapshot bit `2`. |
 | `GPIO_1_D4` | GPIO debug snapshot bit `3`. |
+
+That explicit nibble ordering is important when the Analog Discovery script reconstructs a multi-digit value from the seven-segment displays: `HEX0` is always the least-significant nibble and `HEX5` is always the most-significant nibble.
 
 This organization makes the top-level debug less confusing because the operator always answers the same questions in the same order:
 
@@ -269,6 +289,7 @@ This organization makes the top-level debug less confusing because the operator 
 - which page of that stage is selected?
 - did I capture LEDs, HEX, or GPIO outputs yet?
 - which physical device should now contain the snapshot?
+
 
 ## Cross-References
 
