@@ -42,6 +42,7 @@ set gui_mode [expr {[info exists ::env(ACES_GUI)] && $::env(ACES_GUI) eq "1"}]
 set extra_filelist [expr {[info exists ::env(EXTRA_FILELIST)] ? $::env(EXTRA_FILELIST) : ""}]
 
 array set filelists {
+    hexa7seg                       mock_unit_hexa7seg.f
     i2s_rx_adapter_24              mock_unit_i2s_rx_adapter_24.f
     sample_width_adapter_24_to_18  mock_unit_sample_width_adapter_24_to_18.f
     i2s_master_clock_gen           mock_unit_i2s_master_clock_gen.f
@@ -54,6 +55,7 @@ array set filelists {
 }
 
 array set tops {
+    hexa7seg                       tb_hexa7seg
     i2s_rx_adapter_24              tb_i2s_rx_adapter_24
     sample_width_adapter_24_to_18  tb_sample_width_adapter_24_to_18
     i2s_master_clock_gen           tb_i2s_master_clock_gen
