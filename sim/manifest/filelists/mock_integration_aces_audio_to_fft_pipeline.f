@@ -1,0 +1,4 @@
+rtl/frontend/i2s_rx_adapter_24.sv
+rtl/common/sample_width_adapter_24_to_18.sv
+rtl/core/aces_audio_to_fft_pipeline.sv
+tb/integration/tb_aces_audio_to_fft_pipeline.sv
