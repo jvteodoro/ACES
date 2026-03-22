@@ -112,3 +112,4 @@ Good wave files reduce rework during collaborative debug because everyone starts
 - [simulation.md](simulation.md)
 - [verification_methodology.md](verification_methodology.md)
 - [coding_guidelines.md](coding_guidelines.md)
+- [testbench_report_tables.md](testbench_report_tables.md)

@@ -165,6 +165,111 @@ When adding or changing blocks:
 - add or extend testbenches at the smallest sensible scope,
 - document any change to timing, width, or control contracts.
 
+## Top-Level Debug Strategy
+
+The active board-oriented top-level, `top_level_test_mux_clear_hex_based_on_uploaded`, now uses a staged debug strategy with three ideas:
+
+1. **separate control from observation**, so stimulus-manager controls do not fight with debug selection,
+2. **group debug by pipeline stage**, so each selection exposes a coherent subset of signals,
+3. **capture outputs into registers**, so fast internal events can be snapshotted onto LEDs, HEX displays, and GPIO debug pins with external enable pulses.
+
+### Control Inputs
+
+#### Switches (`SW`)
+
+| Control | Meaning |
+| --- | --- |
+| `SW0` | `stim_start_i`: starts the stimulus manager. |
+| `SW3:SW1` | `stim_example_sel_i[2:0]`: selects which ROM example is played. |
+| `SW5:SW4` | `stim_loop_mode_i[1:0]`: selects stimulus looping mode. |
+| `SW6` | `stim_lr_sel_i`: selects the LR channel presented to ACES. |
+| `SW9:SW7` | currently reserved for future top-level control expansion. |
+
+#### Keys (`KEY`)
+
+The keys are used only for debug multiplexing.
+
+Because the DE0-CV keys are active-low on hardware, the top-level interprets **pressed = 1** after inversion.
+
+| Key field | Meaning |
+| --- | --- |
+| `KEY3:KEY2` | debug stage selector (`dbg_stage_sel`). |
+| `KEY1:KEY0` | page selector inside the chosen stage (`dbg_page_sel`). |
+
+### GPIO Capture Enables
+
+The displayed outputs are not purely live wires anymore. They are captured into output registers when an external enable pulse arrives on GPIO.
+
+| GPIO input | Function |
+| --- | --- |
+| `GPIO_0_D0` | system clock input used by the top-level test wrapper. |
+| `GPIO_0_D1` | reset input used by the top-level test wrapper. |
+| `GPIO_0_D2` | capture-enable for the LED snapshot register. |
+| `GPIO_0_D4` | capture-enable for the HEX snapshot register. |
+| `GPIO_0_D5` | capture-enable for the GPIO debug snapshot register. |
+| `GPIO_0_D6` | clears all captured debug registers. |
+
+This means the workflow is:
+
+1. choose the stage/page with `KEY[3:0]`,
+2. wait for the internal event of interest,
+3. pulse the matching GPIO capture enable,
+4. inspect the captured values at human-speed on LEDs/HEX/GPIO outputs.
+
+### Debug Stage/Page Matrix
+
+#### Stage `00` — Stimulus manager
+
+| `KEY1:KEY0` page | LEDs | HEX | GPIO debug outputs |
+| --- | --- | --- | --- |
+| `00` | `ready`, `busy`, `done`, `window_done`, selected example, loop mode, LR select | current example, current point, ROM address | `{window_done, done, busy, ready}` |
+| `01` | same stage status | bit index, FSM state, loop mode, selected example, LR select | `{state[0], state[1], state[2], mic_sd_internal}` |
+| `10` or `11` | same stage status | current 24-bit stimulus sample | sample bits `[23:20]` |
+
+#### Stage `01` — I2S pins and recovered samples
+
+| `KEY1:KEY0` page | LEDs | HEX | GPIO debug outputs |
+| --- | --- | --- | --- |
+| `00` | `sck`, `ws`, `chipen`, `lr_sel`, `sd`, `sample_valid`, `fft_sample_valid`, `sact`, `fft_run`, `fft_done` | reconstructed 24-bit sample (`sample_24_dbg_o`) | `{lr_sel, chipen, ws, sck}` |
+| `01` | same stage status | 18-bit microphone sample (`sample_mic_o`) | `{sample_valid, sd, ws, sck}` |
+| `10` or `11` | same stage status | FFT-width sample (`fft_sample_o`) | `{sact, fft_sample_valid, ws, sck}` |
+
+#### Stage `10` — FFT ingest/control
+
+| `KEY1:KEY0` page | LEDs | HEX | GPIO debug outputs |
+| --- | --- | --- | --- |
+| `00` | sample-valid, FFT-sample-valid, ingest strobe, `run`, `done`, input-buffer status, FFT status | `sdw_istream_real_o` | `{fft_done, fft_run, fft_sample_valid, sact}` |
+| `01` | same stage status | `sdw_istream_imag_o` | `{fft_done, fft_run, fft_sample_valid, sact}` |
+| `10` or `11` | same stage status | `bfpexp`, FFT status, input-buffer status | `{status[0], status[1], status[2], fft_done}` |
+
+#### Stage `11` — FFT output bins
+
+| `KEY1:KEY0` page | LEDs | HEX | GPIO debug outputs |
+| --- | --- | --- | --- |
+| `00` | `fft_tx_valid`, `fft_tx_last`, `fft_done`, `fft_run` | `fft_tx_index_o` | `{fft_tx_last, fft_tx_valid, fft_done, fft_run}` |
+| `01` | same stage status | `fft_tx_real_o` | `{fft_tx_real_o[17], fft_tx_valid, fft_tx_last, fft_done}` |
+| `10` or `11` | same stage status | `fft_tx_imag_o` | `{fft_tx_imag_o[17], fft_tx_valid, fft_tx_last, fft_done}` |
+
+### Physical Output Mapping
+
+The selected-and-captured debug information is routed to these board-visible devices:
+
+| Device | Source |
+| --- | --- |
+| `LEDR9:0` | LED snapshot register loaded from the currently selected stage/page. |
+| `HEX5..HEX0` | 24-bit HEX snapshot register, four bits per display. |
+| `GPIO_0_D3` | GPIO debug snapshot bit `0`. |
+| `GPIO_1_D2` | GPIO debug snapshot bit `1`. |
+| `GPIO_1_D3` | GPIO debug snapshot bit `2`. |
+| `GPIO_1_D4` | GPIO debug snapshot bit `3`. |
+
+This organization makes the top-level debug less confusing because the operator always answers the same questions in the same order:
+
+- which stage am I looking at?
+- which page of that stage is selected?
+- did I capture LEDs, HEX, or GPIO outputs yet?
+- which physical device should now contain the snapshot?
+
 ## Cross-References
 
 - See [overview.md](overview.md) for the project-level purpose.
