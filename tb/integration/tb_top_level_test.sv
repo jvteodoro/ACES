@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module tb_top_level_test_mux_clear_hex_based_on_uploaded;
+module tb_top_level_test;
 
     localparam int FFT_LENGTH = 4;
     localparam int FFT_DW     = 18;
@@ -52,7 +52,7 @@ module tb_top_level_test_mux_clear_hex_based_on_uploaded;
         end
     endtask
 
-    top_level_test_mux_clear_hex_based_on_uploaded #(
+    top_level_test #(
         .FFT_LENGTH(FFT_LENGTH),
         .FFT_DW(FFT_DW),
         .N_POINTS(512),
@@ -139,7 +139,7 @@ module tb_top_level_test_mux_clear_hex_based_on_uploaded;
                 {dut.mic_lr_sel_o, dut.mic_chipen_o, dut.i2s_ws_o, dut.i2s_sck_o})
         else $error("Snapshot GPIO da pagina I2S nao bate com o DUT");
 
-        $display("tb_top_level_test_mux_clear_hex_based_on_uploaded PASSED");
+        $display("tb_top_level_test PASSED");
         $finish;
     end
 

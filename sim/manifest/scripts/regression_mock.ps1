@@ -9,7 +9,7 @@ $tests = @(
     'fft_dma_reader',
     'aces_audio_to_fft_pipeline',
     'aces',
-    'top_level_test_mux_clear_hex_based_on_uploaded'
+    'top_level_test'
 )
 
 foreach ($testName in $tests) {
