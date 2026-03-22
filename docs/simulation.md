@@ -129,7 +129,7 @@ sim/manifest/scripts/open_questa_gui.sh sim/manifest/filelists/mock_integration_
 
 For unit and integration tests, substitute the matching filelist and wave file.
 
-For FPGA build bring-up, the repository also includes a Quartus project entry point at `quartus/top_level_test.qpf`; its companion source manifest `quartus/top_level_test_sources.tcl` adds the active top-level RTL plus the required ROM/FFT `.qip` files.
+For FPGA build bring-up, the repository also includes a Quartus project entry point at `quartus/top_level_test.qpf`; its companion source manifest `quartus/top_level_test_sources.tcl` adds the active top-level RTL plus the required ROM/FFT `.qip` files and memory assignments.
 
 ## How Regression Works
 

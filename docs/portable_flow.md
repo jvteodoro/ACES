@@ -98,7 +98,7 @@ $env:EXTRA_FILELIST = 'C:\path\to\r2fft_real.f'
 ```
 
 ### Step 6: open the Quartus project if FPGA build bring-up is needed
-Open `quartus/top_level_test.qpf`. The project loads `quartus/top_level_test.qsf`, which in turn imports `quartus/top_level_test_sources.tcl` so Quartus adds the active RTL plus the required FFT/ROM `.qip` files.
+Open `quartus/top_level_test.qpf`. The project loads `quartus/top_level_test.qsf`, which in turn imports `quartus/top_level_test_sources.tcl` so Quartus adds the active RTL plus the required FFT/ROM `.qip` files and memory images.
 
 ## Step-by-Step Handoff Guidance
 

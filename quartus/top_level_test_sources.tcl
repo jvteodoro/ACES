@@ -38,3 +38,20 @@ foreach relpath {
 } {
     add_repo_file $repo_root $relpath QIP_FILE
 }
+
+
+proc add_repo_mif {repo_root relpath} {
+    set abs_path [file normalize [file join $repo_root $relpath]]
+    if {![file exists $abs_path]} {
+        post_message -type error "Missing required memory file: $relpath"
+        return -code error
+    }
+    set_global_assignment -name MIF_FILE $abs_path
+}
+
+foreach relpath {
+    tools/signals_rom.mif
+    rtl/ip/fft/twrom.mif
+} {
+    add_repo_mif $repo_root $relpath
+}
