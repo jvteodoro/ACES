@@ -36,6 +36,6 @@ This is generated output for handoff. The packaging script copies the minimum ru
 The repository now treats mock and real-IP simulation as first-class but separate flows.
 
 - **Mock flow** is fully self-contained and ideal for bring-up.
-- **Real-IP flow** uses checked-in Quartus ROM wrappers and expects the real FFT core to be supplied explicitly through an extra filelist.
+- **Real-IP flow** uses checked-in Quartus ROM wrappers together with the checked-in `submodules/R2FFT` sources.
 
 That explicit boundary avoids a common failure mode where a simulation accidentally mixes mock and real assets without documentation.

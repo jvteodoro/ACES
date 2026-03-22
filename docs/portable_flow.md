@@ -13,6 +13,7 @@ The portable package is intended to contain:
 - wave setups,
 - scripts,
 - quartus project collateral,
+- initialized submodule sources required by the real FFT flow,
 - supporting tools/assets needed by the documented simulation workflow.
 
 ## What the Portable Package Is For
@@ -34,6 +35,7 @@ The packaging script assembles a package containing:
 - `scripts/`
 - `quartus/`
 - `quartus_ip/`
+- `submodules/`
 - `tools/`
 - `docs/`
 - package-level readme files
@@ -66,7 +68,7 @@ Receive `aces_questa_portable.zip` or the unpacked `questa_package/` directory.
 Unzip the package anywhere on a machine with Questa installed.
 
 ### Step 3: enter the package root
-The package is intended to be run from the package root containing `rtl/`, `tb/`, `filelists/`, `scripts/`, and `quartus/`.
+The package is intended to be run from the package root containing `rtl/`, `tb/`, `filelists/`, `scripts/`, `quartus/`, and `submodules/`.
 
 ### Step 4: run a mock-flow test
 Example:
@@ -87,24 +89,23 @@ Windows PowerShell:
 Example:
 
 ```bash
-EXTRA_FILELIST=/abs/path/to/r2fft_real.f scripts/run_questa.sh top_level_test real
+scripts/run_questa.sh top_level_test real
 ```
 
 Windows PowerShell:
 
 ```powershell
-$env:EXTRA_FILELIST = 'C:\path\to\r2fft_real.f'
 .\scripts\run_questa.ps1 top_level_test real
 ```
 
 ### Step 6: open the Quartus project if FPGA build bring-up is needed
-Open `quartus/top_level_test.qpf`. The project loads `quartus/top_level_test.qsf`, which in turn imports `quartus/top_level_test_sources.tcl` so Quartus adds the active RTL plus the required FFT/ROM `.qip` files and memory images.
+Open `quartus/top_level_test.qpf`. The project loads `quartus/top_level_test.qsf`, which in turn imports `quartus/top_level_test_sources.tcl` so Quartus adds the active RTL, the checked-in R2FFT submodule sources, and the required FFT/ROM `.qip` files and memory images.
 
 ## Step-by-Step Handoff Guidance
 
 1. Generate the package from a clean repository state.
 2. Verify the package contents exist.
-3. Send the ZIP plus any separately required real FFT filelists or vendor collateral instructions.
+3. Send the ZIP with the initialized `submodules/R2FFT` sources included in the package.
 4. Tell the recipient whether they should use mock or real-IP-oriented flow.
 5. If GUI inspection is expected, tell them which wave `.do` file matches the scenario.
 
@@ -112,7 +113,7 @@ Open `quartus/top_level_test.qpf`. The project loads `quartus/top_level_test.qsf
 
 - The portable package still requires Questa to be installed on the target machine.
 - On Windows hosts, users should run the provided `.ps1` script variants from PowerShell.
-- The real-IP-oriented flow still requires the real FFT implementation to be supplied separately.
+- The real-IP-oriented flow expects the `submodules/R2FFT` checkout to be present in the package or working tree.
 - A portable package is a generated snapshot; contributors should make source changes in the repository, not inside the package.
 
 ## Best Practices

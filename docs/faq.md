@@ -16,12 +16,12 @@
 
 ### Likely causes
 - mock filelist used without the required mock file,
-- real-IP filelist used without extra FFT collateral,
+- real-IP filelist used without the `submodules/R2FFT` checkout initialized,
 - vendor/IP wrapper expected but not compiled.
 
 ### What to do
 - for self-contained runs, use a mock-flow filelist,
-- for real-IP-oriented top-level runs, provide `EXTRA_FILELIST=/path/to/r2fft_real.f` on POSIX shells or `$env:EXTRA_FILELIST='C:\path\to\r2fft_real.f'` on PowerShell,
+- for real-IP-oriented top-level runs, make sure `submodules/R2FFT` is initialized and then run the standard `top_level_test real` launcher,
 - verify that the ROM or FFT module name being bound matches the chosen flow.
 
 ## What about `msim_setup.tcl`?
@@ -83,7 +83,7 @@ Check:
 ### What to do
 - confirm the recipient is running from the unpacked package root,
 - have them try a mock-flow test first,
-- if they need real-IP-oriented simulation, send the extra FFT collateral instructions explicitly.
+- if they need real-IP-oriented simulation, make sure the package includes the initialized `submodules/R2FFT` checkout.
 
 ## Which docs should a new engineer read first?
 

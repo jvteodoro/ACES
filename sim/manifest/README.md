@@ -55,16 +55,15 @@ Windows PowerShell:
 
 ## Real-IP-oriented flow
 
-The repository includes the real Quartus ROM/twiddle/DPRAM IP wrappers under `rtl/ip/rom/` and `rtl/ip/fft/`, but the true `r2fft_tribuf_impl` implementation is still expected from external collateral. The Questa launcher stages the required `.mif` memory files into the local run directory automatically. Use:
+The repository includes the real Quartus ROM wrapper under `rtl/ip/rom/` plus the checked-in `submodules/R2FFT` sources for the true FFT implementation. The Questa launcher stages the required `.mif` memory files into the local run directory automatically. Use:
 
 ```bash
-EXTRA_FILELIST=/abs/path/to/r2fft_real.f sim/manifest/scripts/run_questa.sh top_level_test real
+sim/manifest/scripts/run_questa.sh top_level_test real
 ```
 
 PowerShell:
 
 ```powershell
-$env:EXTRA_FILELIST = 'C:\path\to\r2fft_real.f'
 .\sim\manifest\scripts\run_questa.ps1 top_level_test real
 ```
 

@@ -10,4 +10,6 @@ set_global_assignment -name SEARCH_PATH ../rtl/frontend
 set_global_assignment -name SEARCH_PATH ../rtl/stimulus
 set_global_assignment -name SEARCH_PATH ../rtl/ip/fft
 set_global_assignment -name SEARCH_PATH ../rtl/ip/rom
+set_global_assignment -name SEARCH_PATH ../submodules/R2FFT/quartus
+set_global_assignment -name SEARCH_PATH ../submodules/R2FFT/hdl
 set_global_assignment -name SOURCE_TCL_SCRIPT_FILE top_level_test_sources.tcl

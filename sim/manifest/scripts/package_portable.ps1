@@ -8,7 +8,7 @@ if (Test-Path $portableRoot) {
     Remove-Item -Recurse -Force $portableRoot
 }
 
-$dirs = @('questa','quartus','quartus_ip','filelists','waves','scripts','rtl','tb','docs','tools')
+$dirs = @('questa','quartus','quartus_ip','filelists','waves','scripts','rtl','tb','docs','tools','submodules')
 foreach ($dir in $dirs) {
     New-Item -ItemType Directory -Path (Join-Path $portableRoot $dir) -Force | Out-Null
 }
@@ -20,6 +20,7 @@ Copy-Item -Recurse -Force (Join-Path $repoRoot 'sim/manifest/waves/*') (Join-Pat
 Copy-Item -Recurse -Force (Join-Path $repoRoot 'sim/manifest/scripts/*') (Join-Path $portableRoot 'scripts')
 Copy-Item -Recurse -Force (Join-Path $repoRoot 'docs/*') (Join-Path $portableRoot 'docs')
 Copy-Item -Recurse -Force (Join-Path $repoRoot 'tools/*') (Join-Path $portableRoot 'tools')
+Copy-Item -Recurse -Force (Join-Path $repoRoot 'submodules/*') (Join-Path $portableRoot 'submodules')
 Copy-Item -Recurse -Force (Join-Path $repoRoot 'rtl/ip/*') (Join-Path $portableRoot 'quartus_ip')
 Copy-Item -Recurse -Force (Join-Path $repoRoot 'quartus/*') (Join-Path $portableRoot 'quartus')
 Copy-Item -Force (Join-Path $repoRoot 'README.md') (Join-Path $portableRoot 'README.md')
@@ -33,8 +34,8 @@ ACES portable Questa package
 2. On Linux/macOS, run scripts/run_questa.sh <test_name> [mock|real] from the package root.
 3. On Windows PowerShell, run .\scripts\run_questa.ps1 <test_name> [mock|real] from the package root.
 4. Mock flow is self-contained.
-5. Real flow expects any external FFT implementation filelist to be supplied through EXTRA_FILELIST.
-6. For FPGA build bring-up, open quartus/top_level_test.qpf from the package root; the project includes the ROM/twiddle memory images used by the real-IP flow.
+5. Real flow uses the checked-in `submodules/R2FFT` sources together with the staged ROM/twiddle memory images.
+6. For FPGA build bring-up, open quartus/top_level_test.qpf from the package root; the project includes the R2FFT submodule sources and ROM/twiddle memory images.
 '@ | Set-Content -Path (Join-Path $portableRoot 'README.txt')
 
 if (Test-Path $zipPath) {

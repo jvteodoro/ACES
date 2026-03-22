@@ -49,7 +49,7 @@ ACES supports two complementary simulation flows:
 
 2. **Real-IP-oriented flow**
    - uses the checked-in Quartus ROM wrapper,
-   - leaves room for attaching the real FFT implementation through an extra filelist,
+   - uses the checked-in `submodules/R2FFT` implementation together with the repository-owned ROM/IP collateral,
    - keeps the external dependency explicit instead of silently mixing mock and real assets.
 
 ## Local Questa usage
@@ -68,7 +68,7 @@ sim/manifest/scripts/run_questa.sh top_level_test
 For a real-IP-oriented top-level run:
 
 ```bash
-EXTRA_FILELIST=/abs/path/to/r2fft_real.f sim/manifest/scripts/run_questa.sh top_level_test real
+sim/manifest/scripts/run_questa.sh top_level_test real
 ```
 
 For a mock regression pass:
@@ -83,7 +83,7 @@ Windows PowerShell equivalents:
 .\sim\manifest\scripts\run_questa.ps1 i2s_rx_adapter_24
 .\sim\manifest\scripts\run_questa.ps1 fft_dma_reader
 .\sim\manifest\scripts\regression_mock.ps1
-$env:EXTRA_FILELIST='C:\path\to\r2fft_real.f'; .\sim\manifest\scripts\run_questa.ps1 top_level_test real
+.\sim\manifest\scripts\run_questa.ps1 top_level_test real
 ```
 
 For an interactive GUI bring-up using a specific filelist and top module:
@@ -98,7 +98,7 @@ PowerShell:
 .\sim\manifest\scripts\open_questa_gui.ps1 sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test
 ```
 
-For Quartus project bring-up of the active board top-level, open `quartus/top_level_test.qpf`. The companion `quartus/top_level_test.qsf` loads `quartus/top_level_test_sources.tcl`, which adds the RTL, required IP `.qip` files, and the ROM/twiddle memory assignments for `top_level_test`.
+For Quartus project bring-up of the active board top-level, open `quartus/top_level_test.qpf`. The companion `quartus/top_level_test.qsf` loads `quartus/top_level_test_sources.tcl`, which adds the RTL, the checked-in R2FFT submodule sources, the required IP `.qip` files, and the ROM/twiddle memory assignments for `top_level_test`.
 
 ## Portable package workflow
 

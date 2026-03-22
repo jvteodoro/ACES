@@ -45,11 +45,11 @@ proc write_absolute_filelist {root local_dir source_path output_path} {
 
     set staged_signals_rom [normalize_for_hdl [stage_runtime_asset         [file join $root tools signals_rom.mif]         [file join $local_dir signals_rom.mif]]]
     set staged_signals_hex [normalize_for_hdl [stage_runtime_asset         [file join $root tools signals_rom_mirror.hex]         [file join $local_dir signals_rom_mirror.hex]]]
-    set staged_twrom_mif [normalize_for_hdl [stage_runtime_asset         [file join $root rtl ip fft twrom.mif]         [file join $local_dir twrom.mif]]]
+    set staged_twrom_mif [normalize_for_hdl [stage_runtime_asset         [file join $root submodules R2FFT quartus twrom.mif]         [file join $local_dir twrom.mif]]]
 
     set staged_signals_rom_ip [normalize_for_hdl [stage_ip_wrapper         [file join $root rtl ip rom signals_rom_ip.v]         [file join $local_dir staged_ip signals_rom_ip.v]         [list "../../../tools/signals_rom.mif" $staged_signals_rom]]]
 
-    set staged_twrom_v [normalize_for_hdl [stage_ip_wrapper         [file join $root rtl ip fft twrom.v]         [file join $local_dir staged_ip twrom.v]         [list "twrom.mif" $staged_twrom_mif]]]
+    set staged_twrom_v [normalize_for_hdl [stage_ip_wrapper         [file join $root submodules R2FFT quartus twrom.v]         [file join $local_dir staged_ip twrom.v]         [list "twrom.mif" $staged_twrom_mif]]]
 
     try {
         while {[gets $in line] >= 0} {
@@ -58,7 +58,7 @@ proc write_absolute_filelist {root local_dir source_path output_path} {
                 puts $out $line
             } elseif {$trimmed eq "rtl/ip/rom/signals_rom_ip.v"} {
                 puts $out $staged_signals_rom_ip
-            } elseif {$trimmed eq "rtl/ip/fft/twrom.v"} {
+            } elseif {$trimmed eq "rtl/ip/fft/twrom.v" || $trimmed eq "submodules/R2FFT/quartus/twrom.v"} {
                 puts $out $staged_twrom_v
             } elseif {[file pathtype $trimmed] eq "relative"} {
                 puts $out [file normalize [file join $root $trimmed]]
@@ -115,6 +115,9 @@ array set wave_dos {
 if {$flow eq "real"} {
     if {$test_name ne "top_level_test"} {
         fail "Real flow is currently defined only for top_level_test."
+    }
+    if {![file exists [file join $repo_root submodules R2FFT quartus r2fft_tribuf_impl.sv]]} {
+        fail "Real flow requires initialized submodules/R2FFT sources. Run 'git submodule update --init --recursive' before launching the real top-level test."
     }
     set filelist_name real_ip_top_level_test.f
 } elseif {[info exists filelists($test_name)]} {

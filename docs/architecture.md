@@ -81,9 +81,9 @@ Responsibilities:
 The repository supports two conceptual FFT execution modes:
 
 - **mock FFT flow** for local reproducible simulation,
-- **real-IP-oriented flow** where the real FFT implementation is supplied explicitly.
+- **real-IP-oriented flow** where the checked-in `submodules/R2FFT` implementation is used.
 
-The active ACES integration module instantiates `r2fft_tribuf_impl`, but the repository intentionally treats the actual FFT implementation as swappable collateral depending on the simulation flow.
+The active ACES integration module instantiates `r2fft_tribuf_impl`; in the real flow that implementation is resolved from the checked-in `submodules/R2FFT` sources, while the mock flow binds the local mock implementation.
 
 ### 7. DMA-style FFT reader
 `fft_dma_reader` converts FFT completion into a structured bin-readout sequence.

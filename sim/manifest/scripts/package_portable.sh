@@ -8,7 +8,7 @@ ZIP_PATH="${REPO_ROOT}/sim/portable/aces_questa_portable.zip"
 rm -rf "${PORTABLE_ROOT}"
 mkdir -p "${PORTABLE_ROOT}/questa" "${PORTABLE_ROOT}/quartus" "${PORTABLE_ROOT}/quartus_ip" "${PORTABLE_ROOT}/filelists" \
          "${PORTABLE_ROOT}/waves" "${PORTABLE_ROOT}/scripts" "${PORTABLE_ROOT}/rtl" \
-         "${PORTABLE_ROOT}/tb" "${PORTABLE_ROOT}/docs" "${PORTABLE_ROOT}/tools"
+         "${PORTABLE_ROOT}/tb" "${PORTABLE_ROOT}/docs" "${PORTABLE_ROOT}/tools" "${PORTABLE_ROOT}/submodules"
 
 cp -R "${REPO_ROOT}/rtl/." "${PORTABLE_ROOT}/rtl/"
 cp -R "${REPO_ROOT}/tb/." "${PORTABLE_ROOT}/tb/"
@@ -17,6 +17,7 @@ cp -R "${REPO_ROOT}/sim/manifest/waves/." "${PORTABLE_ROOT}/waves/"
 cp -R "${REPO_ROOT}/sim/manifest/scripts/." "${PORTABLE_ROOT}/scripts/"
 cp -R "${REPO_ROOT}/docs/." "${PORTABLE_ROOT}/docs/"
 cp -R "${REPO_ROOT}/tools/." "${PORTABLE_ROOT}/tools/"
+cp -R "${REPO_ROOT}/submodules/." "${PORTABLE_ROOT}/submodules/"
 cp -R "${REPO_ROOT}/rtl/ip/." "${PORTABLE_ROOT}/quartus_ip/"
 cp -R "${REPO_ROOT}/quartus/." "${PORTABLE_ROOT}/quartus/"
 cp "${REPO_ROOT}/README.md" "${PORTABLE_ROOT}/README.md"
@@ -30,8 +31,8 @@ ACES portable Questa package
 2. On Linux/macOS, run scripts/run_questa.sh <test_name> [mock|real] from the package root.
 3. On Windows PowerShell, run .\scripts\run_questa.ps1 <test_name> [mock|real] from the package root.
 4. Mock flow is self-contained.
-5. Real flow expects any external FFT implementation filelist to be supplied through EXTRA_FILELIST.
-6. For FPGA build bring-up, open quartus/top_level_test.qpf from the package root; the project includes the ROM/twiddle memory images used by the real-IP flow.
+5. Real flow uses the checked-in `submodules/R2FFT` sources together with the staged ROM/twiddle memory images.
+6. For FPGA build bring-up, open quartus/top_level_test.qpf from the package root; the project includes the R2FFT submodule sources and ROM/twiddle memory images.
 TXT
 
 (
