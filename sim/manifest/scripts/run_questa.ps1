@@ -4,7 +4,9 @@ param(
 
     [Parameter(Position = 1)]
     [ValidateSet('mock', 'real')]
-    [string]$Flow = 'mock'
+    [string]$Flow = 'mock',
+
+    [switch]$Gui
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,10 +38,16 @@ $env:ACES_TEST_NAME = $TestName
 $env:ACES_FLOW = $Flow
 $env:ACES_REPO_ROOT = $repoRoot
 $env:ACES_LOCAL_DIR = $localDir
+$env:ACES_GUI = if ($Gui) { '1' } else { '0' }
 
 Push-Location $repoRoot
 try {
-    & vsim -c -do "do {$tclScriptPath}"
+    $vsimArgs = @('-do', "do {$tclScriptPath}")
+    if (-not $Gui) {
+        $vsimArgs = @('-c') + $vsimArgs
+    }
+
+    & vsim @vsimArgs
     if ($LASTEXITCODE -ne 0) {
         throw "vsim exited with code $LASTEXITCODE."
     }
