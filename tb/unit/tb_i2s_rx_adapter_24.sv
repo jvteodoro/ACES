@@ -14,6 +14,8 @@ module tb_i2s_rx_adapter_24;
     logic signed [23:0] sample_24_o;
 
     logic signed [23:0] rom [0:ROM_DEPTH-1];
+    logic signed [23:0] captured_samples[$];
+    logic signed [23:0] captured_sample;
 
     integer i;
 
@@ -48,59 +50,74 @@ module tb_i2s_rx_adapter_24;
         input logic signed [23:0] sample_in
     );
         integer bit_idx;
-        bit saw_valid;
         begin
-            saw_valid = 1'b0;
+            // canal direito antes
+            ws_i = 1'b1;
+            sd_i = 1'b0;
+            repeat (32) begin
+                sck_pulse();
+            end
+
+            // transição 1 -> 0 inicia canal esquerdo
+            ws_i = 1'b0;
+
+            // atraso de 1 bit do I2S
+            sd_i = 1'b0;
+            sck_pulse();
+
+            // 24 bits MSB-first
+            for (bit_idx = 23; bit_idx >= 0; bit_idx--) begin
+                sd_i = sample_in[bit_idx];
+                sck_pulse();
+            end
+
+            // padding
+            repeat (7) begin
+                sd_i = 1'b0;
+                sck_pulse();
+            end
+        end
+    endtask
+
+    task automatic wait_for_captured_sample(
+        output logic signed [23:0] sample_out,
+        input  logic signed [23:0] expected_sample
+    );
+        bit got_sample;
+        begin
+            got_sample = 1'b0;
 
             fork
-                begin : wait_valid_block
-                    @(posedge sample_valid_o);
-                    saw_valid = 1'b1;
-                end
-
-                begin : drive_i2s_block
-                    // canal direito antes
-                    ws_i = 1'b1;
-                    sd_i = 1'b0;
-                    repeat (32) begin
-                        sck_pulse();
-                    end
-
-                    // transição 1 -> 0 inicia canal esquerdo
-                    ws_i = 1'b0;
-
-                    // atraso de 1 bit do I2S
-                    sd_i = 1'b0;
-                    sck_pulse();
-
-                    // 24 bits MSB-first
-                    for (bit_idx = 23; bit_idx >= 0; bit_idx--) begin
-                        sd_i = sample_in[bit_idx];
-                        sck_pulse();
-                    end
-
-                    // padding
-                    repeat (7) begin
-                        sd_i = 1'b0;
-                        sck_pulse();
-                    end
+                begin : wait_sample_block
+                    wait (captured_samples.size() > 0);
+                    sample_out = captured_samples.pop_front();
+                    got_sample = 1'b1;
                 end
 
                 begin : timeout_block
                     #100_000ns;
-                    $error("Timeout esperando sample_valid_o para sample 0x%06h", sample_in[23:0]);
+                    $error("Timeout esperando sample_valid_o para sample 0x%06h", expected_sample[23:0]);
                 end
             join_any
 
-            disable wait_valid_block;
-            disable drive_i2s_block;
+            disable wait_sample_block;
             disable timeout_block;
 
-            if (!saw_valid) begin
-                $error("sample_valid_o nao foi observado para sample 0x%06h", sample_in[23:0]);
+            if (!got_sample) begin
+                $error("sample_valid_o nao foi observado para sample 0x%06h", expected_sample[23:0]);
             end
         end
     endtask
+
+    // Monitora a saída no negedge de SCK, quando o pulso de sample_valid_o e
+    // sample_24_o já estão estáveis após as NBAs do DUT.
+    always @(negedge sck_i or posedge rst) begin
+        if (rst) begin
+            captured_samples.delete();
+        end else if (sample_valid_o) begin
+            captured_samples.push_back(sample_24_o);
+        end
+    end
 
     initial begin
         rst   = 1'b1;
@@ -117,14 +134,20 @@ module tb_i2s_rx_adapter_24;
         for (i = 0; i < ROM_DEPTH; i++) begin
             $display("Enviando ROM[%0d] = 0x%06h (%0d)", i, rom[i][23:0], rom[i]);
 
-            send_one_sample(rom[i]);
+            if (captured_samples.size() != 0) begin
+                $error("Fila de samples monitorados nao esvaziou antes do idx=%0d", i);
+                captured_samples.delete();
+            end
 
-            if (sample_24_o !== rom[i]) begin
+            send_one_sample(rom[i]);
+            wait_for_captured_sample(captured_sample, rom[i]);
+
+            if (captured_sample !== rom[i]) begin
                 $error("ERRO idx=%0d esperado=0x%06h obtido=0x%06h",
-                       i, rom[i][23:0], sample_24_o[23:0]);
+                       i, rom[i][23:0], captured_sample[23:0]);
             end else begin
                 $display("OK idx=%0d recebido=0x%06h (%0d)",
-                         i, sample_24_o[23:0], sample_24_o);
+                         i, captured_sample[23:0], captured_sample);
             end
 
             #200ns;
