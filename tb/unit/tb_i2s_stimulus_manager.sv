@@ -1,113 +1,150 @@
 `timescale 1ns/1ps
 
 module tb_i2s_stimulus_manager;
-    localparam int SAMPLE_BITS = 24;
-    localparam int ROM_ADDR_W  = 4;
-    localparam int N_SAMPLES   = 4;
 
-    logic clk = 0;
+    localparam int SAMPLE_BITS        = 24;
+    localparam int ROM_DEPTH          = 4;
+    localparam int ROM_ADDR_W         = 4;
+    localparam int STARTUP_SCK_CYCLES = 4;
+    localparam time CLK_HALF          = 5ns;
+    localparam time SCK_HALF          = 20ns;
+
+    logic clk;
     logic rst;
-    logic start;
-    logic loop_enable;
-    logic chipen_i;
-    logic lr_i;
-    logic sck_i, ws_i;
-    logic sck_o, ws_o, sd_o;
+    logic sck_i;
+    logic ws_i;
+
+    logic start_i;
+    logic loop_enable_i;
+    logic [ROM_ADDR_W-1:0] base_addr_i;
+    logic [ROM_ADDR_W-1:0] signal_length_i;
+    tri   sd_o;
+
     logic [ROM_ADDR_W-1:0] rom_addr_o;
     logic signed [SAMPLE_BITS-1:0] rom_data_i;
-    logic [ROM_ADDR_W-1:0] signal_length_i;
-    logic busy, done;
+    logic busy_o;
+    logic done_o;
+    logic ready_o;
     logic [ROM_ADDR_W-1:0] sample_index_o;
     logic [5:0] bit_index_o;
     logic signed [SAMPLE_BITS-1:0] current_sample_dbg_o;
 
-    logic signed [SAMPLE_BITS-1:0] rom_mem [0:N_SAMPLES-1];
-    logic [ROM_ADDR_W-1:0] rom_addr_q;
+    logic signed [SAMPLE_BITS-1:0] rom_mem [0:ROM_DEPTH-1];
+    logic signed [23:0] rx_sample;
+    logic rx_valid;
+    int rx_count;
+    bit saw_z_on_inactive;
 
-    i2s_stimulus_manager #(
-        .SAMPLE_BITS(SAMPLE_BITS),
-        .ROM_ADDR_W(ROM_ADDR_W),
-        .GENERATE_CLOCKS(1),
-        .CLOCK_DIV(2)
-    ) dut (
-        .clk,
-        .rst,
-        .start,
-        .loop_enable,
-        .chipen_i,
-        .lr_i,
-        .sck_i(1'b0),
-        .ws_i(1'b0),
-        .sck_o,
-        .ws_o,
-        .sd_o,
-        .rom_addr_o,
-        .rom_data_i,
-        .signal_length_i,
-        .busy,
-        .done,
-        .sample_index_o,
-        .bit_index_o,
-        .current_sample_dbg_o
-    );
-
-    always #5 clk = ~clk;
-
-    // synchronous ROM model
-    always_ff @(posedge clk) begin
-        rom_addr_q <= rom_addr_o;
-        rom_data_i <= rom_mem[rom_addr_q];
-    end
+    always #CLK_HALF clk = ~clk;
+    always #SCK_HALF sck_i = ~sck_i;
 
     initial begin
-        rom_mem[0] = 24'sh123456;
-        rom_mem[1] = -24'sh012345;
-        rom_mem[2] = 24'sh654321;
-        rom_mem[3] = -24'sh000111;
-    end
-
-    integer left_driven_bits;
-    integer right_z_bits;
-
-    always @(negedge sck_o) begin
-        if (busy) begin
-            if (ws_o == 1'b0 && bit_index_o >= 1 && bit_index_o <= 24) begin
-                left_driven_bits = left_driven_bits + 1;
-            end
-            if (ws_o == 1'b1 && sd_o === 1'bz) begin
-                right_z_bits = right_z_bits + 1;
-            end
+        ws_i = 1'b1;
+        forever begin
+            repeat (32) @(negedge sck_i);
+            ws_i = ~ws_i;
         end
     end
 
     initial begin
-        rst = 1'b1;
-        start = 1'b0;
-        loop_enable = 1'b0;
-        chipen_i = 1'b1;
-        lr_i = 1'b0;
-        signal_length_i = N_SAMPLES;
-        rom_data_i = '0;
-        rom_addr_q = '0;
-        left_driven_bits = 0;
-        right_z_bits = 0;
+        rom_mem[0] = 24'h123456;
+        rom_mem[1] = -24'sh012345;
+        rom_mem[2] = 24'h654321;
+        rom_mem[3] = -24'sh000111;
+    end
 
-        repeat (5) @(posedge clk);
+    always_ff @(posedge clk) begin
+        rom_data_i <= rom_mem[rom_addr_o];
+    end
+
+    i2s_stimulus_manager #(
+        .SAMPLE_BITS(SAMPLE_BITS),
+        .ROM_ADDR_W(ROM_ADDR_W),
+        .GENERATE_CLOCKS(0),
+        .STARTUP_SCK_CYCLES(STARTUP_SCK_CYCLES),
+        .INACTIVE_ZERO_SYNTH(0)
+    ) dut (
+        .clk(clk),
+        .rst(rst),
+        .start_i(start_i),
+        .loop_enable_i(loop_enable_i),
+        .base_addr_i(base_addr_i),
+        .signal_length_i(signal_length_i),
+        .chipen_i(1'b1),
+        .lr_i(1'b0),
+        .sck_i(sck_i),
+        .ws_i(ws_i),
+        .sck_o(),
+        .ws_o(),
+        .sd_o(sd_o),
+        .rom_addr_o(rom_addr_o),
+        .rom_data_i(rom_data_i),
+        .busy_o(busy_o),
+        .done_o(done_o),
+        .ready_o(ready_o),
+        .sample_index_o(sample_index_o),
+        .bit_index_o(bit_index_o),
+        .current_sample_dbg_o(current_sample_dbg_o)
+    );
+
+    i2s_rx_adapter_24 u_rx (
+        .rst(rst),
+        .sck_i(sck_i),
+        .ws_i(ws_i),
+        .sd_i(sd_o),
+        .sample_valid_o(rx_valid),
+        .sample_24_o(rx_sample)
+    );
+
+    always @(posedge rx_valid) begin
+        assert (rx_count < ROM_DEPTH)
+        else $error("Recebidas mais amostras do que o esperado");
+
+        assert (rx_sample === rom_mem[rx_count])
+        else $error("Mismatch I2S loopback idx=%0d exp=0x%06h got=0x%06h",
+                    rx_count, rom_mem[rx_count][23:0], rx_sample[23:0]);
+
+        rx_count = rx_count + 1;
+    end
+
+    always @(negedge sck_i) begin
+        if (busy_o && (ws_i == 1'b1) && (sd_o === 1'bz))
+            saw_z_on_inactive = 1'b1;
+    end
+
+    initial begin
+        clk               = 1'b0;
+        sck_i             = 1'b0;
+        rst               = 1'b1;
+        start_i           = 1'b0;
+        loop_enable_i     = 1'b0;
+        base_addr_i       = '0;
+        signal_length_i   = ROM_DEPTH;
+        rom_data_i        = '0;
+        rx_count          = 0;
+        saw_z_on_inactive = 1'b0;
+
+        repeat (4) @(posedge clk);
         rst = 1'b0;
-        repeat (3) @(posedge clk);
-        start = 1'b1;
+
+        wait (ready_o == 1'b1);
+        repeat (2) @(posedge clk);
+
+        start_i = 1'b1;
         @(posedge clk);
-        start = 1'b0;
+        start_i = 1'b0;
 
-        wait(done === 1'b1);
-        repeat (5) @(posedge clk);
+        wait (done_o == 1'b1);
+        repeat (8) @(posedge clk);
 
-        if (left_driven_bits < N_SAMPLES*24)
-            $error("manager did not drive expected number of left-channel data bits");
-        if (right_z_bits == 0)
-            $error("manager did not present Z on inactive channel during simulation");
+        assert (rx_count == ROM_DEPTH)
+        else $error("Esperadas %0d amostras, obtidas %0d", ROM_DEPTH, rx_count);
+
+        assert (saw_z_on_inactive)
+        else $error("Nao foi observado Z no semi-frame inativo");
 
         $display("tb_i2s_stimulus_manager PASSED");
         $finish;
     end
+
 endmodule
