@@ -1,4 +1,4 @@
-module top_level_test_mux_clear_hex_based_on_uploaded #(
+module top_level_test #(
     parameter int FFT_LENGTH    = 512,
     parameter int FFT_DW        = 18,
     parameter int N_POINTS      = 512,

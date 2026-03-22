@@ -54,7 +54,7 @@ Mock flow typically compiles:
 Use real-IP-oriented flow when you want:
 
 - the checked-in Quartus ROM wrapper,
-- explicit binding to external FFT collateral,
+- explicit binding to the checked-in `submodules/R2FFT` implementation,
 - a stronger approximation of the vendor-IP-facing simulation environment.
 
 ## Naming Conventions

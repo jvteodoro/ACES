@@ -72,7 +72,7 @@ Use ROM-backed deterministic inputs to inject known signals and observe how FFT-
 Use the mock flow to bring up control logic, testbench structure, and waveform review without depending on vendor libraries or external FFT collateral.
 
 ### Real-IP-oriented simulation
-Use the real-IP-oriented flow when you want to keep the repository’s RTL/testbench structure but bind the real Quartus ROM wrapper and supply a real FFT implementation through an external filelist.
+Use the real-IP-oriented flow when you want to keep the repository’s RTL/testbench structure while binding the real Quartus ROM wrapper and the checked-in `submodules/R2FFT` implementation.
 
 ### Onboarding and AI-assisted maintenance
 Use the repository layout and docs suite to understand where active RTL lives, which tests are meant to run, and where generated simulator artifacts should be kept.

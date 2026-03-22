@@ -81,9 +81,9 @@ Responsibilities:
 The repository supports two conceptual FFT execution modes:
 
 - **mock FFT flow** for local reproducible simulation,
-- **real-IP-oriented flow** where the real FFT implementation is supplied explicitly.
+- **real-IP-oriented flow** where the checked-in `submodules/R2FFT` implementation is used.
 
-The active ACES integration module instantiates `r2fft_tribuf_impl`, but the repository intentionally treats the actual FFT implementation as swappable collateral depending on the simulation flow.
+The active ACES integration module instantiates `r2fft_tribuf_impl`; in the real flow that implementation is resolved from the checked-in `submodules/R2FFT` sources, while the mock flow binds the local mock implementation.
 
 ### 7. DMA-style FFT reader
 `fft_dma_reader` converts FFT completion into a structured bin-readout sequence.
@@ -167,7 +167,7 @@ When adding or changing blocks:
 
 ## Top-Level Debug Strategy
 
-The active board-oriented top-level, `top_level_test_mux_clear_hex_based_on_uploaded`, uses a staged debug strategy with three ideas:
+The active board-oriented top-level, `top_level_test`, uses a staged debug strategy with three ideas:
 
 1. **separate control from observation**, so stimulus-manager controls do not fight with debug selection,
 2. **group debug by pipeline stage**, so each selection exposes a coherent subset of signals,
@@ -206,6 +206,8 @@ With that mapping, the active selector fields are:
 - `dbg_page_sel  = {GPIO_DBG_PAGE1, GPIO_DBG_PAGE0}`
 
 This keeps the whole debug flow scriptable from the external instrument: select a stage, select a page, wait for the internal event, then pulse the capture line that corresponds to the physical output of interest.
+
+The `tb_top_level_test` wave setup is intended to mirror that laboratory flow: it shows the external control inputs, the live muxed debug buses, the captured board-facing outputs, and the internal signals that feed each stage/page selection.
 
 ### GPIO capture and external control pins
 

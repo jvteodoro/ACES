@@ -1,0 +1,35 @@
+# Real-IP-oriented manifest for the board top-level using the checked-in R2FFT submodule.
+# Ensure `submodules/R2FFT` is initialized before running the real flow.
+rtl/ip/rom/signals_rom_ip.v
+submodules/R2FFT/quartus/twrom.v
+submodules/R2FFT/quartus/dpram.v
+rtl/common/hexa7seg.v
+rtl/frontend/i2s_master_clock_gen.sv
+rtl/frontend/i2s_rx_adapter_24.sv
+rtl/common/sample_width_adapter_24_to_18.sv
+rtl/common/fft_control.sv
+rtl/common/fft_dma_reader.sv
+rtl/core/aces_audio_to_fft_pipeline.sv
+rtl/core/aces.sv
+rtl/stimulus/i2s_stimulus_manager_rom.sv
+submodules/R2FFT/hdl/R2FFT.sv
+submodules/R2FFT/hdl/R2FFT_tribuf.sv
+submodules/R2FFT/hdl/bfp_Shifter.sv
+submodules/R2FFT/hdl/bfp_bitWidthAcc.sv
+submodules/R2FFT/hdl/bfp_bitWidthDetector.sv
+submodules/R2FFT/hdl/bfp_maxBitWidth.sv
+submodules/R2FFT/hdl/bitReverseCounter.sv
+submodules/R2FFT/hdl/butterflyCore.sv
+submodules/R2FFT/hdl/butterflyUnit.sv
+submodules/R2FFT/hdl/fftAddressGenerator.sv
+submodules/R2FFT/hdl/radix2Butterfly.sv
+submodules/R2FFT/hdl/ramPipelineBridge.sv
+submodules/R2FFT/hdl/readBusMux.sv
+submodules/R2FFT/hdl/readBusMux_tribuf.sv
+submodules/R2FFT/hdl/twiddleFactorRomBridge.sv
+submodules/R2FFT/hdl/writeBusMux.sv
+submodules/R2FFT/hdl/writeBusMux_tribuf.sv
+submodules/R2FFT/quartus/r2fft_impl.sv
+submodules/R2FFT/quartus/r2fft_tribuf_impl.sv
+rtl/top/top_level_test.sv
+tb/integration/tb_top_level_test.sv
