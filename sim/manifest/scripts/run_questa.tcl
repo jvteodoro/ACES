@@ -63,6 +63,10 @@ array set tops {
     top_level_test                 tb_top_level_test_real
 }
 
+array set wave_dos {
+    i2s_rx_adapter_24              i2s_rx_adapter_24.do
+}
+
 if {$flow eq "real"} {
     if {$test_name ne "top_level_test"} {
         fail "Real flow is currently defined only for top_level_test."
@@ -107,7 +111,31 @@ if {$extra_filelist ne ""} {
 
 set top $tops($test_name)
 if {$gui_mode} {
-    set sim_do "view wave; log -r sim:/*; add wave -r sim:/*; run -all"
+    set wave_candidates [list]
+
+    if {[info exists wave_dos($test_name)]} {
+        lappend wave_candidates [file join sim manifest waves $wave_dos($test_name)]
+    }
+
+    foreach candidate [list \
+        [file join sim manifest waves "${test_name}.do"] \
+        [file join sim manifest waves $test_name] \
+        [file join sim manifest waves "${top}.do"] \
+        [file join sim manifest waves $top] \
+        [file join sim manifest waves legacy_questa $top] \
+    ] {
+        lappend wave_candidates $candidate
+    }
+
+    set wave_do_path [first_existing $repo_root $wave_candidates]
+
+    if {$wave_do_path ne "" && [file exists $wave_do_path]} {
+        puts "Loading wave setup: $wave_do_path"
+        set sim_do "do {$wave_do_path}; run -all"
+    } else {
+        set sim_do "view wave; log -r sim:/*; add wave -r sim:/*; run -all"
+    }
+
     set sim_cmd [list vsim work.$top -do $sim_do]
 } else {
     set sim_do "run -all; quit -code 0"
