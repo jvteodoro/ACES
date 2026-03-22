@@ -27,47 +27,16 @@ module tb_top_level_test_mux_clear_hex_based_on_uploaded;
 
     logic tb_clk_drive;
     logic tb_rst_drive;
-    logic tb_mic_sd_drive;
-
     assign gpio_0_d0 = tb_clk_drive;
     assign gpio_0_d1 = tb_rst_drive;
-    assign gpio_1_d0 = tb_mic_sd_drive;
-    assign gpio_1_d1 = 1'b0;
 
     always #5 tb_clk_drive = ~tb_clk_drive;
-
-    task automatic sck_pulse;
-        begin
-            wait (gpio_1_d2 === 1'b0);
-            @(posedge gpio_1_d2);
-            @(negedge gpio_1_d2);
-        end
-    endtask
-
-    task automatic send_left_sample(input logic signed [23:0] sample_in);
-        integer bit_idx;
-        begin
-            wait (gpio_1_d3 === 1'b1);
-            wait (gpio_1_d3 === 1'b0);
-
-            tb_mic_sd_drive = 1'b0;
-            sck_pulse();
-
-            for (bit_idx = 23; bit_idx >= 0; bit_idx--) begin
-                tb_mic_sd_drive = sample_in[bit_idx];
-                sck_pulse();
-            end
-
-            repeat (7) begin
-                tb_mic_sd_drive = 1'b0;
-                sck_pulse();
-            end
-        end
-    endtask
 
     top_level_test_mux_clear_hex_based_on_uploaded #(
         .FFT_LENGTH(FFT_LENGTH),
         .FFT_DW(FFT_DW),
+        .N_POINTS(512),
+        .N_EXAMPLES(8),
         .I2S_CLOCK_DIV(4)
     ) dut (
         .key0(key0), .key1(key1), .key2(key2), .key3(key3), .reset_n(reset_n),
@@ -101,16 +70,24 @@ module tb_top_level_test_mux_clear_hex_based_on_uploaded;
         clock_50 = 1'b0; clock2_50 = 1'b0; clock3_50 = 1'b0; clock4_50 = 1'b0;
         tb_clk_drive = 1'b0;
         tb_rst_drive = 1'b1;
-        tb_mic_sd_drive = 1'b0;
+        sw0 = 1'b0;
 
         repeat (8) @(posedge tb_clk_drive);
         tb_rst_drive = 1'b0;
 
-        send_left_sample(24'h123456);
+        wait (dut.stim_ready_o == 1'b1);
+        sw0 = 1'b1;
+        @(posedge tb_clk_drive);
+        sw0 = 1'b0;
+
+        wait (dut.sample_valid_mic_o == 1'b1);
         repeat (16) @(posedge tb_clk_drive);
 
-        assert (dut.sample_valid_mic_o == 1'b1 || dut.sample_mic_o == 18'h48d1)
-        else $error("Top-level nao propagou sample truncado esperado");
+        assert (dut.stim_busy_o == 1'b1 || dut.stim_done_o == 1'b1)
+        else $error("Top-level nao iniciou o stimulus manager ROM");
+
+        assert (dut.sample_valid_mic_o == 1'b1)
+        else $error("Top-level nao propagou amostra valida do stimulus manager");
 
         assert (gpio_1_d4 === 1'b0)
         else $error("gpio_1_d4 deveria refletir LR selecionado");

@@ -4,14 +4,13 @@ module tb_aces;
 
     localparam int FFT_LENGTH = 4;
     localparam int FFT_DW     = 18;
-    localparam int ROM_ADDR_W = 4;
+    localparam int N_POINTS   = 8;
+    localparam int N_EXAMPLES = 4;
     localparam time CLK_HALF  = 5ns;
-    localparam time SCK_HALF  = 20ns;
+    localparam int EXAMPLE_SEL_W = (N_EXAMPLES <= 1) ? 1 : $clog2(N_EXAMPLES);
 
     logic clk;
     logic rst;
-    logic sck_i;
-    logic ws_i;
     tri   sd_i;
 
     logic mic_sck_o;
@@ -38,76 +37,60 @@ module tb_aces;
     logic fft_tx_last_o;
 
     logic start_i;
-    logic loop_enable_i;
-    logic [ROM_ADDR_W-1:0] base_addr_i;
-    logic [ROM_ADDR_W-1:0] signal_length_i;
-    logic [ROM_ADDR_W-1:0] rom_addr_o;
-    logic signed [23:0] rom_data_i;
+    logic [EXAMPLE_SEL_W-1:0] example_sel_i;
+    logic [1:0] loop_mode_i;
     logic stim_busy_o;
     logic stim_done_o;
     logic stim_ready_o;
+    logic stim_window_done_o;
+    logic [EXAMPLE_SEL_W-1:0] stim_current_example_o;
+    logic [$clog2(N_POINTS)-1:0] stim_current_point_o;
+    logic [$clog2(N_POINTS*N_EXAMPLES)-1:0] stim_rom_addr_dbg_o;
+    logic signed [23:0] stim_current_sample_dbg_o;
+    logic [5:0] stim_bit_index_o;
+    logic [2:0] stim_state_dbg_o;
 
-    logic signed [23:0] rom_mem [0:FFT_LENGTH-1];
     logic signed [FFT_DW-1:0] expected18 [0:FFT_LENGTH-1];
 
     int mic_count;
     int fft_bin_count;
 
     always #CLK_HALF clk = ~clk;
-    always #SCK_HALF sck_i = ~sck_i;
 
     initial begin
-        ws_i = 1'b1;
-        forever begin
-            repeat (32) @(negedge sck_i);
-            ws_i = ~ws_i;
-        end
+        expected18[0] = 24'h000001[23:6];
+        expected18[1] = 24'h000002[23:6];
+        expected18[2] = 24'h000003[23:6];
+        expected18[3] = 24'h000004[23:6];
     end
 
-    initial begin
-        rom_mem[0] = 24'h000001;
-        rom_mem[1] = 24'h123456;
-        rom_mem[2] = -24'sh400000;
-        rom_mem[3] = 24'h7ABCDE;
-
-        expected18[0] = rom_mem[0][23:6];
-        expected18[1] = rom_mem[1][23:6];
-        expected18[2] = rom_mem[2][23:6];
-        expected18[3] = rom_mem[3][23:6];
-    end
-
-    always_ff @(posedge clk) begin
-        rom_data_i <= rom_mem[rom_addr_o];
-    end
-
-    i2s_stimulus_manager #(
+    i2s_stimulus_manager_rom #(
         .SAMPLE_BITS(24),
-        .ROM_ADDR_W(ROM_ADDR_W),
-        .GENERATE_CLOCKS(0),
+        .N_POINTS(N_POINTS),
+        .N_EXAMPLES(N_EXAMPLES),
         .STARTUP_SCK_CYCLES(8),
         .INACTIVE_ZERO_SYNTH(0)
     ) u_stim (
         .clk(clk),
         .rst(rst),
         .start_i(start_i),
-        .loop_enable_i(loop_enable_i),
-        .base_addr_i(base_addr_i),
-        .signal_length_i(signal_length_i),
+        .example_sel_i(example_sel_i),
+        .loop_mode_i(loop_mode_i),
         .chipen_i(mic_chipen_o),
         .lr_i(1'b0),
-        .sck_i(sck_i),
-        .ws_i(ws_i),
-        .sck_o(),
-        .ws_o(),
+        .sck_i(mic_sck_o),
+        .ws_i(mic_ws_o),
         .sd_o(sd_i),
-        .rom_addr_o(rom_addr_o),
-        .rom_data_i(rom_data_i),
+        .ready_o(stim_ready_o),
         .busy_o(stim_busy_o),
         .done_o(stim_done_o),
-        .ready_o(stim_ready_o),
-        .sample_index_o(),
-        .bit_index_o(),
-        .current_sample_dbg_o()
+        .window_done_o(stim_window_done_o),
+        .current_example_o(stim_current_example_o),
+        .current_point_o(stim_current_point_o),
+        .rom_addr_dbg_o(stim_rom_addr_dbg_o),
+        .current_sample_dbg_o(stim_current_sample_dbg_o),
+        .bit_index_o(stim_bit_index_o),
+        .state_dbg_o(stim_state_dbg_o)
     );
 
     aces #(
@@ -173,16 +156,13 @@ module tb_aces;
     end
 
     initial begin
-        clk             = 1'b0;
-        sck_i           = 1'b0;
-        rst             = 1'b1;
-        start_i         = 1'b0;
-        loop_enable_i   = 1'b0;
-        base_addr_i     = '0;
-        signal_length_i = FFT_LENGTH;
-        rom_data_i      = '0;
-        mic_count       = 0;
-        fft_bin_count   = 0;
+        clk           = 1'b0;
+        rst           = 1'b1;
+        start_i       = 1'b0;
+        example_sel_i = '0;
+        loop_mode_i   = 2'b00;
+        mic_count     = 0;
+        fft_bin_count = 0;
 
         repeat (4) @(posedge clk);
         rst = 1'b0;
