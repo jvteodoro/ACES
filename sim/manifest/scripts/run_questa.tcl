@@ -13,10 +13,32 @@ proc first_existing {root candidates} {
     return ""
 }
 
+proc write_absolute_filelist {root source_path output_path} {
+    set in [open $source_path r]
+    set out [open $output_path w]
+
+    try {
+        while {[gets $in line] >= 0} {
+            set trimmed [string trim $line]
+            if {$trimmed eq "" || [string match "#*" $trimmed]} {
+                puts $out $line
+            } elseif {[file pathtype $trimmed] eq "relative"} {
+                puts $out [file normalize [file join $root $trimmed]]
+            } else {
+                puts $out $trimmed
+            }
+        }
+    } finally {
+        close $in
+        close $out
+    }
+}
+
 set repo_root $::env(ACES_REPO_ROOT)
 set local_dir $::env(ACES_LOCAL_DIR)
 set test_name $::env(ACES_TEST_NAME)
 set flow $::env(ACES_FLOW)
+set gui_mode [expr {[info exists ::env(ACES_GUI)] && $::env(ACES_GUI) eq "1"}]
 set extra_filelist [expr {[info exists ::env(EXTRA_FILELIST)] ? $::env(EXTRA_FILELIST) : ""}]
 
 array set filelists {
@@ -41,6 +63,10 @@ array set tops {
     top_level_test                 tb_top_level_test_real
 }
 
+array set wave_dos {
+    i2s_rx_adapter_24              i2s_rx_adapter_24.do
+}
+
 if {$flow eq "real"} {
     if {$test_name ne "top_level_test"} {
         fail "Real flow is currently defined only for top_level_test."
@@ -63,14 +89,20 @@ if {[file exists work]} {vdel -lib work -all}
 vlib work
 vmap work work
 
-set compile_cmd [list vlog -sv -work work -f $filelist_path]
+set local_filelist_path [file join $local_dir compiled_files.f]
+write_absolute_filelist $repo_root $filelist_path $local_filelist_path
+
+set compile_cmd [list vlog -sv -work work -f $local_filelist_path]
 puts "Compiling: $compile_cmd"
 if {[catch {eval $compile_cmd} result]} {
     fail "Compile failed: $result"
 }
 
 if {$extra_filelist ne ""} {
-    set extra_cmd [list vlog -sv -work work -f $extra_filelist]
+    set local_extra_filelist_path [file join $local_dir compiled_extra_files.f]
+    write_absolute_filelist $repo_root $extra_filelist $local_extra_filelist_path
+
+    set extra_cmd [list vlog -sv -work work -f $local_extra_filelist_path]
     puts "Compiling extra filelist: $extra_cmd"
     if {[catch {eval $extra_cmd} result]} {
         fail "Extra filelist compile failed: $result"
@@ -78,7 +110,37 @@ if {$extra_filelist ne ""} {
 }
 
 set top $tops($test_name)
-set sim_cmd [list vsim -c work.$top -do "run -all; quit -code 0"]
+if {$gui_mode} {
+    set wave_candidates [list]
+
+    if {[info exists wave_dos($test_name)]} {
+        lappend wave_candidates [file join sim manifest waves $wave_dos($test_name)]
+    }
+
+    foreach candidate [list \
+        [file join sim manifest waves "${test_name}.do"] \
+        [file join sim manifest waves $test_name] \
+        [file join sim manifest waves "${top}.do"] \
+        [file join sim manifest waves $top] \
+        [file join sim manifest waves legacy_questa $top] \
+    ] {
+        lappend wave_candidates $candidate
+    }
+
+    set wave_do_path [first_existing $repo_root $wave_candidates]
+
+    if {$wave_do_path ne "" && [file exists $wave_do_path]} {
+        puts "Loading wave setup: $wave_do_path"
+        set sim_do "do {$wave_do_path}; run -all"
+    } else {
+        set sim_do "view wave; log -r sim:/*; add wave -r sim:/*; run -all"
+    }
+
+    set sim_cmd [list vsim -voptargs=+acc work.$top -do $sim_do]
+} else {
+    set sim_do "run -all; quit -code 0"
+    set sim_cmd [list vsim -c work.$top -do $sim_do]
+}
 puts "Launching: $sim_cmd"
 if {[catch {eval $sim_cmd} result]} {
     fail "Simulation failed: $result"

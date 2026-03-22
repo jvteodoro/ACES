@@ -4,7 +4,9 @@ param(
 
     [Parameter(Position = 1)]
     [ValidateSet('mock', 'real')]
-    [string]$Flow = 'mock'
+    [string]$Flow = 'mock',
+
+    [switch]$Gui
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,16 +31,23 @@ function Find-RepoRoot {
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Find-RepoRoot -StartDir $scriptDir
 $localDir = Join-Path $repoRoot (Join-Path 'sim/local/questa' ("{0}_{1}" -f $TestName, $Flow))
+$tclScriptPath = (Join-Path $repoRoot 'sim/manifest/scripts/run_questa.tcl') -replace '\\', '/'
 New-Item -ItemType Directory -Path $localDir -Force | Out-Null
 
 $env:ACES_TEST_NAME = $TestName
 $env:ACES_FLOW = $Flow
 $env:ACES_REPO_ROOT = $repoRoot
 $env:ACES_LOCAL_DIR = $localDir
+$env:ACES_GUI = if ($Gui) { '1' } else { '0' }
 
 Push-Location $repoRoot
 try {
-    & vsim -c -do "do [file normalize [file join $repoRoot sim manifest scripts run_questa.tcl]]"
+    $vsimArgs = @('-do', "do {$tclScriptPath}")
+    if (-not $Gui) {
+        $vsimArgs = @('-c') + $vsimArgs
+    }
+
+    & vsim @vsimArgs
     if ($LASTEXITCODE -ne 0) {
         throw "vsim exited with code $LASTEXITCODE."
     }
