@@ -136,7 +136,7 @@ if {$gui_mode} {
         set sim_do "view wave; log -r sim:/*; add wave -r sim:/*; run -all"
     }
 
-    set sim_cmd [list vsim work.$top -do $sim_do]
+    set sim_cmd [list vsim -voptargs=+acc work.$top -do $sim_do]
 } else {
     set sim_do "run -all; quit -code 0"
     set sim_cmd [list vsim -c work.$top -do $sim_do]
