@@ -207,6 +207,8 @@ With that mapping, the active selector fields are:
 
 This keeps the whole debug flow scriptable from the external instrument: select a stage, select a page, wait for the internal event, then pulse the capture line that corresponds to the physical output of interest.
 
+The `tb_top_level_test` wave setup is intended to mirror that laboratory flow: it shows the external control inputs, the live muxed debug buses, the captured board-facing outputs, and the internal signals that feed each stage/page selection.
+
 ### GPIO capture and external control pins
 
 The displayed outputs are not purely live wires anymore. They are captured into output registers when an external enable pulse arrives on GPIO.

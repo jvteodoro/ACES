@@ -98,6 +98,8 @@ PowerShell:
 .\sim\manifest\scripts\open_questa_gui.ps1 sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test
 ```
 
+For Quartus project bring-up of the active board top-level, open `quartus/top_level_test.qpf`. The companion `quartus/top_level_test.qsf` loads `quartus/top_level_test_sources.tcl`, which adds the RTL and required IP `.qip` files for `top_level_test`.
+
 ## Portable package workflow
 
 Generate the portable package with:
