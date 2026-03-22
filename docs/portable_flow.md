@@ -12,6 +12,7 @@ The portable package is intended to contain:
 - filelists,
 - wave setups,
 - scripts,
+- quartus project collateral,
 - supporting tools/assets needed by the documented simulation workflow.
 
 ## What the Portable Package Is For
@@ -31,6 +32,7 @@ The packaging script assembles a package containing:
 - `filelists/`
 - `waves/`
 - `scripts/`
+- `quartus/`
 - `quartus_ip/`
 - `tools/`
 - `docs/`
@@ -64,7 +66,7 @@ Receive `aces_questa_portable.zip` or the unpacked `questa_package/` directory.
 Unzip the package anywhere on a machine with Questa installed.
 
 ### Step 3: enter the package root
-The package is intended to be run from the package root containing `rtl/`, `tb/`, `filelists/`, and `scripts/`.
+The package is intended to be run from the package root containing `rtl/`, `tb/`, `filelists/`, `scripts/`, and `quartus/`.
 
 ### Step 4: run a mock-flow test
 Example:
@@ -94,6 +96,9 @@ Windows PowerShell:
 $env:EXTRA_FILELIST = 'C:\path\to\r2fft_real.f'
 .\scripts\run_questa.ps1 top_level_test real
 ```
+
+### Step 6: open the Quartus project if FPGA build bring-up is needed
+Open `quartus/top_level_test.qpf`. The project loads `quartus/top_level_test.qsf`, which in turn imports `quartus/top_level_test_sources.tcl` so Quartus adds the active RTL plus the required FFT/ROM `.qip` files.
 
 ## Step-by-Step Handoff Guidance
 

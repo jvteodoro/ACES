@@ -51,7 +51,7 @@ array set filelists {
     fft_dma_reader                 mock_unit_fft_dma_reader.f
     aces_audio_to_fft_pipeline     mock_integration_aces_audio_to_fft_pipeline.f
     aces                           mock_integration_aces.f
-    top_level_test_mux_clear_hex_based_on_uploaded mock_integration_top_level_test_mux_clear_hex_based_on_uploaded.f
+    top_level_test mock_integration_top_level_test.f
 }
 
 array set tops {
@@ -64,7 +64,7 @@ array set tops {
     fft_dma_reader                 tb_fft_dma_reader
     aces_audio_to_fft_pipeline     tb_aces_audio_to_fft_pipeline
     aces                           tb_aces
-    top_level_test_mux_clear_hex_based_on_uploaded tb_top_level_test_mux_clear_hex_based_on_uploaded
+    top_level_test tb_top_level_test
 }
 
 array set wave_dos {
@@ -72,10 +72,10 @@ array set wave_dos {
 }
 
 if {$flow eq "real"} {
-    if {$test_name ne "top_level_test_mux_clear_hex_based_on_uploaded"} {
-        fail "Real flow is currently defined only for top_level_test_mux_clear_hex_based_on_uploaded."
+    if {$test_name ne "top_level_test"} {
+        fail "Real flow is currently defined only for top_level_test."
     }
-    set filelist_name real_ip_top_level_test_mux_clear_hex_based_on_uploaded.f
+    set filelist_name real_ip_top_level_test.f
 } elseif {[info exists filelists($test_name)]} {
     set filelist_name $filelists($test_name)
 } else {

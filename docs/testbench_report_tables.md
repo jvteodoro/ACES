@@ -129,13 +129,13 @@ Por ser um teste de integração, ele cobre simultaneamente estímulo I2S, captu
 | Execução do caminho FFT mock | `fft_tx_index_o` deve avançar monotonicamente | Sim, se o índice acompanhar `fft_bin_count` | Registrar reordenação de bins |
 | Saída de bins real/imaginária | `fft_tx_real_o = idx+1`, `fft_tx_imag_o = -idx`, `fft_tx_last_o` no último bin | Sim, se todos os bins seguirem o contrato | Registrar valor real/imag ou `last` incorreto |
 
-## 4.3.10 Cenário de Teste 10 — `tb_top_level_test_mux_clear_hex_based_on_uploaded`
+## 4.3.10 Cenário de Teste 10 — `tb_top_level_test`
 
 Este cenário valida o top-level orientado à placa com ênfase na nova estratégia de debug capturado. O objetivo é confirmar que o stimulus manager realmente injeta amostras no sistema e que os snapshots de LEDs, HEX e GPIO refletem a página de debug selecionada.
 
 O teste também verifica a infraestrutura de captura via GPIO, importante para congelar sinais internos rápidos e transferi-los para dispositivos lentos de observação na FPGA.
 
-**Tabela 10 – Descrição e Resultados Simulados do `tb_top_level_test_mux_clear_hex_based_on_uploaded`**
+**Tabela 10 – Descrição e Resultados Simulados do `tb_top_level_test`**
 
 | Entradas | Saídas Esperadas | Resultado Simulado OK? | Análise de Não Conformidades |
 | --- | --- | --- | --- |
