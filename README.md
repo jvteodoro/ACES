@@ -62,7 +62,7 @@ sim/manifest/scripts/run_questa.sh fft_dma_reader
 sim/manifest/scripts/run_questa.sh sample_bridge_and_ingest
 sim/manifest/scripts/run_questa.sh aces_audio_to_fft_pipeline
 sim/manifest/scripts/run_questa.sh top_level_test mock
-sim/manifest/scripts/run_questa.sh top_level_test_mux_clear_hex_based_on_uploaded
+sim/manifest/scripts/run_questa.sh top_level_test
 ```
 
 For a real-IP-oriented top-level run:
@@ -89,14 +89,16 @@ $env:EXTRA_FILELIST='C:\path\to\r2fft_real.f'; .\sim\manifest\scripts\run_questa
 For an interactive GUI bring-up using a specific filelist and top module:
 
 ```bash
-sim/manifest/scripts/open_questa_gui.sh sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test_real
+sim/manifest/scripts/open_questa_gui.sh sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test
 ```
 
 PowerShell:
 
 ```powershell
-.\sim\manifest\scripts\open_questa_gui.ps1 sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test_real
+.\sim\manifest\scripts\open_questa_gui.ps1 sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test
 ```
+
+For Quartus project bring-up of the active board top-level, open `quartus/top_level_test.qpf`. The companion `quartus/top_level_test.qsf` loads `quartus/top_level_test_sources.tcl`, which adds the RTL, required IP `.qip` files, and the ROM/twiddle memory assignments for `top_level_test`.
 
 ## Portable package workflow
 

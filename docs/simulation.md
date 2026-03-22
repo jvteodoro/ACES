@@ -56,7 +56,7 @@ sim/manifest/scripts/run_questa.sh sample_bridge_and_ingest
 sim/manifest/scripts/run_questa.sh aces_audio_to_fft_pipeline
 sim/manifest/scripts/run_questa.sh aces
 sim/manifest/scripts/run_questa.sh top_level_test mock
-sim/manifest/scripts/run_questa.sh top_level_test_mux_clear_hex_based_on_uploaded
+sim/manifest/scripts/run_questa.sh top_level_test
 ```
 
 Windows PowerShell equivalents:
@@ -69,7 +69,7 @@ Windows PowerShell equivalents:
 .\sim\manifest\scripts\run_questa.ps1 sample_bridge_and_ingest
 .\sim\manifest\scripts\run_questa.ps1 aces_audio_to_fft_pipeline
 .\sim\manifest\scripts\run_questa.ps1 top_level_test mock
-.\sim\manifest\scripts\run_questa.ps1 top_level_test_mux_clear_hex_based_on_uploaded
+.\sim\manifest\scripts\run_questa.ps1 top_level_test
 ```
 
 ## Real-IP-Oriented Top-Level Run
@@ -107,7 +107,7 @@ cd sim/local/questa/manual_top_level
 vlib work
 vmap work work
 vlog -sv -f ../../../manifest/filelists/mock_integration_top_level_test.f
-vsim work.tb_top_level_test_real
+vsim work.tb_top_level_test
 ```
 
 Then load a wave file from the Questa console, for example:
@@ -120,14 +120,16 @@ run -all
 Convenience wrappers:
 
 ```bash
-sim/manifest/scripts/open_questa_gui.sh sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test_real
+sim/manifest/scripts/open_questa_gui.sh sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test
 ```
 
 ```powershell
-.\sim\manifest\scripts\open_questa_gui.ps1 sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test_real
+.\sim\manifest\scripts\open_questa_gui.ps1 sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test
 ```
 
 For unit and integration tests, substitute the matching filelist and wave file.
+
+For FPGA build bring-up, the repository also includes a Quartus project entry point at `quartus/top_level_test.qpf`; its companion source manifest `quartus/top_level_test_sources.tcl` adds the active top-level RTL plus the required ROM/FFT `.qip` files and memory assignments.
 
 ## How Regression Works
 

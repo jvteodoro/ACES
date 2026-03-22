@@ -25,7 +25,6 @@
 - `aces`
 - `aces_stimulus_manager`
 - `top_level_test`
-- `top_level_test_mux_clear_hex_based_on_uploaded`
 
 ## Primary scripts
 
@@ -41,7 +40,7 @@ sim/manifest/scripts/run_questa.sh i2s_rx_adapter_24
 sim/manifest/scripts/run_questa.sh fft_dma_reader
 sim/manifest/scripts/run_questa.sh aces_audio_to_fft_pipeline
 sim/manifest/scripts/run_questa.sh top_level_test mock
-sim/manifest/scripts/run_questa.sh top_level_test_mux_clear_hex_based_on_uploaded
+sim/manifest/scripts/run_questa.sh top_level_test
 sim/manifest/scripts/regression_mock.sh
 ```
 
@@ -50,13 +49,13 @@ Windows PowerShell:
 ```powershell
 .\sim\manifest\scripts\run_questa.ps1 fft_dma_reader
 .\sim\manifest\scripts\run_questa.ps1 top_level_test mock
-.\sim\manifest\scripts\run_questa.ps1 top_level_test_mux_clear_hex_based_on_uploaded
+.\sim\manifest\scripts\run_questa.ps1 top_level_test
 .\sim\manifest\scripts\regression_mock.ps1
 ```
 
 ## Real-IP-oriented flow
 
-The repository includes the real Quartus ROM IP wrappers under `rtl/ip/rom/`, but the true FFT implementation is still expected from external collateral. Use:
+The repository includes the real Quartus ROM/twiddle/DPRAM IP wrappers under `rtl/ip/rom/` and `rtl/ip/fft/`, but the true `r2fft_tribuf_impl` implementation is still expected from external collateral. The Questa launcher stages the required `.mif` memory files into the local run directory automatically. Use:
 
 ```bash
 EXTRA_FILELIST=/abs/path/to/r2fft_real.f sim/manifest/scripts/run_questa.sh top_level_test real

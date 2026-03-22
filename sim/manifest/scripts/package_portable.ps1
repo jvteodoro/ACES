@@ -8,7 +8,7 @@ if (Test-Path $portableRoot) {
     Remove-Item -Recurse -Force $portableRoot
 }
 
-$dirs = @('questa','quartus_ip','filelists','waves','scripts','rtl','tb','docs','tools')
+$dirs = @('questa','quartus','quartus_ip','filelists','waves','scripts','rtl','tb','docs','tools')
 foreach ($dir in $dirs) {
     New-Item -ItemType Directory -Path (Join-Path $portableRoot $dir) -Force | Out-Null
 }
@@ -21,6 +21,7 @@ Copy-Item -Recurse -Force (Join-Path $repoRoot 'sim/manifest/scripts/*') (Join-P
 Copy-Item -Recurse -Force (Join-Path $repoRoot 'docs/*') (Join-Path $portableRoot 'docs')
 Copy-Item -Recurse -Force (Join-Path $repoRoot 'tools/*') (Join-Path $portableRoot 'tools')
 Copy-Item -Recurse -Force (Join-Path $repoRoot 'rtl/ip/*') (Join-Path $portableRoot 'quartus_ip')
+Copy-Item -Recurse -Force (Join-Path $repoRoot 'quartus/*') (Join-Path $portableRoot 'quartus')
 Copy-Item -Force (Join-Path $repoRoot 'README.md') (Join-Path $portableRoot 'README.md')
 Copy-Item -Force (Join-Path $repoRoot 'sim/manifest/README.md') (Join-Path $portableRoot 'questa/README.md')
 
@@ -33,6 +34,7 @@ ACES portable Questa package
 3. On Windows PowerShell, run .\scripts\run_questa.ps1 <test_name> [mock|real] from the package root.
 4. Mock flow is self-contained.
 5. Real flow expects any external FFT implementation filelist to be supplied through EXTRA_FILELIST.
+6. For FPGA build bring-up, open quartus/top_level_test.qpf from the package root; the project includes the ROM/twiddle memory images used by the real-IP flow.
 '@ | Set-Content -Path (Join-Path $portableRoot 'README.txt')
 
 if (Test-Path $zipPath) {

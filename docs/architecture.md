@@ -167,7 +167,7 @@ When adding or changing blocks:
 
 ## Top-Level Debug Strategy
 
-The active board-oriented top-level, `top_level_test_mux_clear_hex_based_on_uploaded`, uses a staged debug strategy with three ideas:
+The active board-oriented top-level, `top_level_test`, uses a staged debug strategy with three ideas:
 
 1. **separate control from observation**, so stimulus-manager controls do not fight with debug selection,
 2. **group debug by pipeline stage**, so each selection exposes a coherent subset of signals,
@@ -206,6 +206,8 @@ With that mapping, the active selector fields are:
 - `dbg_page_sel  = {GPIO_DBG_PAGE1, GPIO_DBG_PAGE0}`
 
 This keeps the whole debug flow scriptable from the external instrument: select a stage, select a page, wait for the internal event, then pulse the capture line that corresponds to the physical output of interest.
+
+The `tb_top_level_test` wave setup is intended to mirror that laboratory flow: it shows the external control inputs, the live muxed debug buses, the captured board-facing outputs, and the internal signals that feed each stage/page selection.
 
 ### GPIO capture and external control pins
 
