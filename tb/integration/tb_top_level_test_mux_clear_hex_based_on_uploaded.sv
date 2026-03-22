@@ -27,10 +27,30 @@ module tb_top_level_test_mux_clear_hex_based_on_uploaded;
 
     logic tb_clk_drive;
     logic tb_rst_drive;
+    logic tb_capture_leds_drive;
+    logic tb_capture_hex_drive;
+    logic tb_capture_gpio_drive;
+    logic tb_capture_clear_drive;
     assign gpio_0_d0 = tb_clk_drive;
     assign gpio_0_d1 = tb_rst_drive;
+    assign gpio_0_d2 = tb_capture_leds_drive;
+    assign gpio_0_d4 = tb_capture_hex_drive;
+    assign gpio_0_d5 = tb_capture_gpio_drive;
+    assign gpio_0_d6 = tb_capture_clear_drive;
 
     always #5 tb_clk_drive = ~tb_clk_drive;
+
+    task automatic pulse_capture_all;
+        begin
+            tb_capture_leds_drive = 1'b1;
+            tb_capture_hex_drive  = 1'b1;
+            tb_capture_gpio_drive = 1'b1;
+            @(posedge tb_clk_drive);
+            tb_capture_leds_drive = 1'b0;
+            tb_capture_hex_drive  = 1'b0;
+            tb_capture_gpio_drive = 1'b0;
+        end
+    endtask
 
     top_level_test_mux_clear_hex_based_on_uploaded #(
         .FFT_LENGTH(FFT_LENGTH),
@@ -65,15 +85,22 @@ module tb_top_level_test_mux_clear_hex_based_on_uploaded;
     );
 
     initial begin
-        key0 = 1'b0; key1 = 1'b0; key2 = 1'b0; key3 = 1'b0; reset_n = 1'b1;
-        sw0 = 1'b0; sw1 = 1'b0; sw2 = 1'b0; sw3 = 1'b0; sw4 = 1'b0; sw5 = 1'b1; sw6 = 1'b1; sw7 = 1'b0; sw8 = 1'b0; sw9 = 1'b0;
+        key0 = 1'b1; key1 = 1'b1; key2 = 1'b1; key3 = 1'b1; reset_n = 1'b1;
+        sw0 = 1'b0; sw1 = 1'b0; sw2 = 1'b0; sw3 = 1'b0; sw4 = 1'b0; sw5 = 1'b0; sw6 = 1'b0; sw7 = 1'b0; sw8 = 1'b0; sw9 = 1'b0;
         clock_50 = 1'b0; clock2_50 = 1'b0; clock3_50 = 1'b0; clock4_50 = 1'b0;
         tb_clk_drive = 1'b0;
         tb_rst_drive = 1'b1;
-        sw0 = 1'b0;
+        tb_capture_leds_drive = 1'b0;
+        tb_capture_hex_drive  = 1'b0;
+        tb_capture_gpio_drive = 1'b0;
+        tb_capture_clear_drive = 1'b0;
 
         repeat (8) @(posedge tb_clk_drive);
         tb_rst_drive = 1'b0;
+
+        tb_capture_clear_drive = 1'b1;
+        @(posedge tb_clk_drive);
+        tb_capture_clear_drive = 1'b0;
 
         wait (dut.stim_ready_o == 1'b1);
         sw0 = 1'b1;
@@ -83,17 +110,34 @@ module tb_top_level_test_mux_clear_hex_based_on_uploaded;
         wait (dut.sample_valid_mic_o == 1'b1);
         repeat (16) @(posedge tb_clk_drive);
 
+        // Stage 0 / page 0 = stimulus manager overview
+        key3 = 1'b1; key2 = 1'b1; key1 = 1'b1; key0 = 1'b1;
+        pulse_capture_all();
+        @(posedge tb_clk_drive);
+
         assert (dut.stim_busy_o == 1'b1 || dut.stim_done_o == 1'b1)
         else $error("Top-level nao iniciou o stimulus manager ROM");
 
-        assert (dut.sample_valid_mic_o == 1'b1)
-        else $error("Top-level nao propagou amostra valida do stimulus manager");
+        assert ({ledr3, ledr2, ledr1, ledr0} ==
+                {dut.stim_window_done_o, dut.stim_done_o, dut.stim_busy_o, dut.stim_ready_o})
+        else $error("Snapshot dos LEDs do stimulus manager nao bate com o DUT");
 
-        assert (gpio_1_d4 === 1'b0)
-        else $error("gpio_1_d4 deveria refletir LR selecionado");
+        assert ({gpio_1_d4, gpio_1_d3, gpio_1_d2, gpio_0_d3} ==
+                {dut.stim_window_done_o, dut.stim_done_o, dut.stim_busy_o, dut.stim_ready_o})
+        else $error("Snapshot GPIO do stimulus manager nao bate com o DUT");
 
         assert (hex0_o !== 7'bxxxxxxx)
         else $error("HEX0 nao deveria ficar indefinido");
+
+        // Stage 1 / page 0 = I2S live pins
+        key2 = 1'b0; key3 = 1'b1; // stage 01
+        key1 = 1'b1; key0 = 1'b1; // page 00
+        pulse_capture_all();
+        @(posedge tb_clk_drive);
+
+        assert ({gpio_1_d4, gpio_1_d3, gpio_1_d2, gpio_0_d3} ==
+                {dut.mic_lr_sel_o, dut.mic_chipen_o, dut.i2s_ws_o, dut.i2s_sck_o})
+        else $error("Snapshot GPIO da pagina I2S nao bate com o DUT");
 
         $display("tb_top_level_test_mux_clear_hex_based_on_uploaded PASSED");
         $finish;

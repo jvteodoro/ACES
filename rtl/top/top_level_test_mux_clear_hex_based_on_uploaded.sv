@@ -144,15 +144,25 @@ module top_level_test_mux_clear_hex_based_on_uploaded #(
     logic stim_lr_sel_i;
 
     assign stim_start_i = sw0;
-    assign stim_example_sel_i = sw1;
-    assign stim_loop_mode_i = sw3;
-    assign stim_lr_sel_i = sw4;
+    assign stim_example_sel_i = {sw3, sw2, sw1};
+    assign stim_loop_mode_i = {sw5, sw4};
+    assign stim_lr_sel_i = sw6;
 
     logic clk;
     logic rst;
 
     assign clk = gpio_0_d0;
     assign rst = gpio_0_d1; 
+
+    logic dbg_capture_leds_i;
+    logic dbg_capture_hex_i;
+    logic dbg_capture_gpio_i;
+    logic dbg_capture_clear_i;
+
+    assign dbg_capture_leds_i  = gpio_0_d2;
+    assign dbg_capture_hex_i   = gpio_0_d4;
+    assign dbg_capture_gpio_i  = gpio_0_d5;
+    assign dbg_capture_clear_i = gpio_0_d6;
 
     // -----------------------------------------
     // debug do gerador
@@ -176,8 +186,6 @@ module top_level_test_mux_clear_hex_based_on_uploaded #(
     logic mic_chipen_o;
     logic mic_lr_sel_o;
     logic i2s_sd_o;
-
-    assign gpio_0_d3 = i2s_sd_o;
 
 
     // -----------------------------------------
@@ -213,16 +221,28 @@ module top_level_test_mux_clear_hex_based_on_uploaded #(
 
     // -----------------------------------------
     // multiplexação de debug
-    // sw2..sw5 continuam reservadas ao stimulus manager
-    // sw7:sw6 -> classe de debug
-    //   2'b01 = Stimulus Generator
-    //   2'b10 = I2S
-    //   2'b11 = ACES / Serial
-    // sw9:sw8:sw1 -> subgrupo dentro da classe
-    // sw0 fica livre para expansão futura
+    // chaves:
+    //   key3:key2 -> estágio de debug
+    //   key1:key0 -> página dentro do estágio
+    //   sw0       -> start do stimulus manager
+    //   sw3:sw1   -> seleção do exemplo
+    //   sw5:sw4   -> loop mode
+    //   sw6       -> seleção do canal LR
+    //
+    // saídas físicas:
+    //   LEDs / HEX / GPIO de debug recebem snapshots registradas
+    //   quando os enables vindos dos GPIOs são pulsados
     // -----------------------------------------
-    logic [1:0] dbg_mux1_sel;
-    logic [2:0] dbg_mux2_sel;
+    logic [1:0] dbg_stage_sel;
+    logic [1:0] dbg_page_sel;
+
+    logic [9:0] dbg_led_live;
+    logic [23:0] dbg_hex_live;
+    logic [3:0] dbg_gpio_live;
+
+    logic [9:0] dbg_led_capture_r;
+    logic [23:0] dbg_hex_capture_r;
+    logic [3:0] dbg_gpio_capture_r;
 
     logic [3:0] hex0_i;
     logic [3:0] hex1_i;
@@ -231,195 +251,250 @@ module top_level_test_mux_clear_hex_based_on_uploaded #(
     logic [3:0] hex4_i;
     logic [3:0] hex5_i;
 
-    assign dbg_mux1_sel = {sw6, sw5};
-    assign dbg_mux2_sel = {sw9, sw8, sw7};
+    assign dbg_stage_sel = {~key3, ~key2};
+    assign dbg_page_sel  = {~key1, ~key0};
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            dbg_led_capture_r  <= '0;
+            dbg_hex_capture_r  <= '0;
+            dbg_gpio_capture_r <= '0;
+        end
+        else if (dbg_capture_clear_i) begin
+            dbg_led_capture_r  <= '0;
+            dbg_hex_capture_r  <= '0;
+            dbg_gpio_capture_r <= '0;
+        end
+        else begin
+            if (dbg_capture_leds_i)
+                dbg_led_capture_r <= dbg_led_live;
+
+            if (dbg_capture_hex_i)
+                dbg_hex_capture_r <= dbg_hex_live;
+
+            if (dbg_capture_gpio_i)
+                dbg_gpio_capture_r <= dbg_gpio_live;
+        end
+    end
 
     always_comb begin
-        ledr0 = 1'b0;
-        ledr1 = 1'b0;
-        ledr2 = 1'b0;
-        ledr3 = 1'b0;
-        ledr4 = 1'b0;
-        ledr5 = 1'b0;
-        ledr6 = 1'b0;
-        ledr7 = 1'b0;
-        ledr8 = 1'b0;
-        ledr9 = 1'b0;
+        dbg_led_live  = '0;
+        dbg_hex_live  = '0;
+        dbg_gpio_live = '0;
 
-        hex0_i = 4'd0;
-        hex1_i = 4'd0;
-        hex2_i = 4'd0;
-        hex3_i = 4'd0;
-        hex4_i = 4'd0;
-        hex5_i = 4'd0;
+        unique case (dbg_stage_sel)
+            2'b00: begin
+                // Stimulus manager
+                dbg_led_live[0] = stim_ready_o;
+                dbg_led_live[1] = stim_busy_o;
+                dbg_led_live[2] = stim_done_o;
+                dbg_led_live[3] = stim_window_done_o;
+                dbg_led_live[6:4] = stim_example_sel_i[2:0];
+                dbg_led_live[8:7] = stim_loop_mode_i;
+                dbg_led_live[9] = stim_lr_sel_i;
 
-        unique case (dbg_mux1_sel)
+                unique case (dbg_page_sel)
+                    2'b00: begin
+                        dbg_hex_live[3:0]    = {1'b0, stim_current_example_o};
+                        dbg_hex_live[7:4]    = stim_current_point_o[3:0];
+                        dbg_hex_live[11:8]   = stim_current_point_o[7:4];
+                        dbg_hex_live[15:12]  = {3'b000, stim_current_point_o[8]};
+                        dbg_hex_live[19:16]  = stim_rom_addr_dbg_o[3:0];
+                        dbg_hex_live[23:20]  = stim_rom_addr_dbg_o[7:4];
+                        dbg_gpio_live        = {
+                            stim_window_done_o,
+                            stim_done_o,
+                            stim_busy_o,
+                            stim_ready_o
+                        };
+                    end
+
+                    2'b01: begin
+                        dbg_hex_live[3:0]    = stim_bit_index_o[3:0];
+                        dbg_hex_live[7:4]    = {2'b00, stim_bit_index_o[5:4]};
+                        dbg_hex_live[11:8]   = {1'b0, stim_state_dbg_o};
+                        dbg_hex_live[15:12]  = {2'b00, stim_loop_mode_i};
+                        dbg_hex_live[19:16]  = {1'b0, stim_example_sel_i[2:0]};
+                        dbg_hex_live[23:20]  = {3'b000, stim_lr_sel_i};
+                        dbg_gpio_live        = {
+                            stim_state_dbg_o[0],
+                            stim_state_dbg_o[1],
+                            stim_state_dbg_o[2],
+                            mic_sd_internal
+                        };
+                    end
+
+                    2'b10,
+                    2'b11: begin
+                        dbg_hex_live = stim_current_sample_dbg_o;
+                        dbg_gpio_live = {
+                            stim_current_sample_dbg_o[23],
+                            stim_current_sample_dbg_o[22],
+                            stim_current_sample_dbg_o[21],
+                            stim_current_sample_dbg_o[20]
+                        };
+                    end
+                endcase
+            end
+
             2'b01: begin
-                ledr0 = stim_ready_o;
-                ledr1 = stim_busy_o;
-                ledr2 = stim_done_o;
-                ledr3 = stim_window_done_o;
+                // Interface I2S
+                dbg_led_live[0] = i2s_sck_o;
+                dbg_led_live[1] = i2s_ws_o;
+                dbg_led_live[2] = mic_chipen_o;
+                dbg_led_live[3] = mic_lr_sel_o;
+                dbg_led_live[4] = i2s_sd_o;
+                dbg_led_live[5] = sample_valid_mic_o;
+                dbg_led_live[6] = fft_sample_valid_o;
+                dbg_led_live[7] = sact_istream_o;
+                dbg_led_live[8] = fft_run_o;
+                dbg_led_live[9] = fft_done_o;
 
-                unique case (dbg_mux2_sel)
-                    3'd0: begin
-                        // HEX0 = stim_current_example_o[2:0]
-                        // HEX1..HEX3 = stim_current_point_o
-                        // HEX4..HEX5 = stim_rom_addr_dbg_o[7:0]
-                        hex0_i = {1'b0, stim_current_example_o};
-                        hex1_i = stim_current_point_o[3:0];
-                        hex2_i = stim_current_point_o[7:4];
-                        hex3_i = {3'b000, stim_current_point_o[8]};
-                        hex4_i = stim_rom_addr_dbg_o[3:0];
-                        hex5_i = stim_rom_addr_dbg_o[7:4];
+                unique case (dbg_page_sel)
+                    2'b00: begin
+                        dbg_hex_live[3:0]   = sample_24_dbg_o[3:0];
+                        dbg_hex_live[7:4]   = sample_24_dbg_o[7:4];
+                        dbg_hex_live[11:8]  = sample_24_dbg_o[11:8];
+                        dbg_hex_live[15:12] = sample_24_dbg_o[15:12];
+                        dbg_hex_live[19:16] = sample_24_dbg_o[19:16];
+                        dbg_hex_live[23:20] = sample_24_dbg_o[23:20];
+                        dbg_gpio_live       = {
+                            mic_lr_sel_o,
+                            mic_chipen_o,
+                            i2s_ws_o,
+                            i2s_sck_o
+                        };
                     end
 
-                    3'd1: begin
-                        // HEX0..HEX1 = stim_bit_index_o
-                        // HEX2 = stim_state_dbg_o
-                        hex0_i = stim_bit_index_o[3:0];
-                        hex1_i = {2'b00, stim_bit_index_o[5:4]};
-                        hex2_i = {1'b0, stim_state_dbg_o};
+                    2'b01: begin
+                        dbg_hex_live[17:0]  = sample_mic_o;
+                        dbg_gpio_live       = {
+                            sample_valid_mic_o,
+                            i2s_sd_o,
+                            i2s_ws_o,
+                            i2s_sck_o
+                        };
                     end
 
-                    3'd2: begin
-                        // HEX0..HEX5 = stim_current_sample_dbg_o
-                        hex0_i = stim_current_sample_dbg_o[3:0];
-                        hex1_i = stim_current_sample_dbg_o[7:4];
-                        hex2_i = stim_current_sample_dbg_o[11:8];
-                        hex3_i = stim_current_sample_dbg_o[15:12];
-                        hex4_i = stim_current_sample_dbg_o[19:16];
-                        hex5_i = stim_current_sample_dbg_o[23:20];
-                    end
-
-                    default: begin
+                    2'b10,
+                    2'b11: begin
+                        dbg_hex_live[17:0]  = fft_sample_o;
+                        dbg_gpio_live       = {
+                            sact_istream_o,
+                            fft_sample_valid_o,
+                            i2s_ws_o,
+                            i2s_sck_o
+                        };
                     end
                 endcase
             end
 
             2'b10: begin
-                ledr0 = i2s_sck_o;
-                ledr1 = i2s_ws_o;
-                ledr2 = mic_chipen_o;
-                ledr3 = mic_lr_sel_o;
-                ledr4 = i2s_sd_o;
+                // Ingest / controle da FFT
+                dbg_led_live[0] = sample_valid_mic_o;
+                dbg_led_live[1] = fft_sample_valid_o;
+                dbg_led_live[2] = sact_istream_o;
+                dbg_led_live[3] = fft_run_o;
+                dbg_led_live[4] = fft_done_o;
+                dbg_led_live[6:5] = fft_input_buffer_status_o;
+                dbg_led_live[9:7] = fft_status_o;
 
-                // classe I2S: LEDs concentram o debug principal
-            end
-
-            2'b11: begin
-                unique case (dbg_mux2_sel)
-                    3'd0: begin
-                        // LED0 = sample_valid_mic_o
-                        // HEX0..HEX4 = sample_mic_o
-                        ledr0 = sample_valid_mic_o;
-                        hex0_i = sample_mic_o[3:0];
-                        hex1_i = sample_mic_o[7:4];
-                        hex2_i = sample_mic_o[11:8];
-                        hex3_i = sample_mic_o[15:12];
-                        hex4_i = {2'b00, sample_mic_o[17:16]};
+                unique case (dbg_page_sel)
+                    2'b00: begin
+                        dbg_hex_live[17:0]  = sdw_istream_real_o;
+                        dbg_gpio_live       = {
+                            fft_done_o,
+                            fft_run_o,
+                            fft_sample_valid_o,
+                            sact_istream_o
+                        };
                     end
 
-                    3'd1: begin
-                        // LED0 = sample_valid_mic_o
-                        // HEX0..HEX5 = sample_24_dbg_o
-                        ledr0 = sample_valid_mic_o;
-                        hex0_i = sample_24_dbg_o[3:0];
-                        hex1_i = sample_24_dbg_o[7:4];
-                        hex2_i = sample_24_dbg_o[11:8];
-                        hex3_i = sample_24_dbg_o[15:12];
-                        hex4_i = sample_24_dbg_o[19:16];
-                        hex5_i = sample_24_dbg_o[23:20];
+                    2'b01: begin
+                        dbg_hex_live[17:0]  = sdw_istream_imag_o;
+                        dbg_gpio_live       = {
+                            fft_done_o,
+                            fft_run_o,
+                            fft_sample_valid_o,
+                            sact_istream_o
+                        };
                     end
 
-                    3'd2: begin
-                        // LED1 = fft_sample_valid_o
-                        // HEX0..HEX4 = fft_sample_o
-                        ledr1 = fft_sample_valid_o;
-                        hex0_i = fft_sample_o[3:0];
-                        hex1_i = fft_sample_o[7:4];
-                        hex2_i = fft_sample_o[11:8];
-                        hex3_i = fft_sample_o[15:12];
-                        hex4_i = {2'b00, fft_sample_o[17:16]};
-                    end
-
-                    3'd3: begin
-                        // LED2 = sact_istream_o
-                        // HEX0..HEX4 = sdw_istream_real_o
-                        ledr2 = sact_istream_o;
-                        hex0_i = sdw_istream_real_o[3:0];
-                        hex1_i = sdw_istream_real_o[7:4];
-                        hex2_i = sdw_istream_real_o[11:8];
-                        hex3_i = sdw_istream_real_o[15:12];
-                        hex4_i = {2'b00, sdw_istream_real_o[17:16]};
-                    end
-
-                    3'd4: begin
-                        // LED2 = sact_istream_o
-                        // HEX0..HEX4 = sdw_istream_imag_o
-                        ledr2 = sact_istream_o;
-                        hex0_i = sdw_istream_imag_o[3:0];
-                        hex1_i = sdw_istream_imag_o[7:4];
-                        hex2_i = sdw_istream_imag_o[11:8];
-                        hex3_i = sdw_istream_imag_o[15:12];
-                        hex4_i = {2'b00, sdw_istream_imag_o[17:16]};
-                    end
-
-                    3'd5: begin
-                        // LED3 = fft_run_o
-                        // LED4 = fft_done_o
-                        // HEX0 = fft_input_buffer_status_o
-                        // HEX1 = fft_status_o
-                        // HEX2..HEX3 = bfpexp_o
-                        ledr3 = fft_run_o;
-                        ledr4 = fft_done_o;
-                        hex0_i = {2'b00, fft_input_buffer_status_o};
-                        hex1_i = {1'b0, fft_status_o};
-                        hex2_i = bfpexp_o[3:0];
-                        hex3_i = bfpexp_o[7:4];
-                    end
-
-                    3'd6: begin
-                        // LED0 = fft_tx_valid_o
-                        // LED1 = fft_tx_last_o
-                        // HEX0..HEX2 = fft_tx_index_o
-                        ledr0 = fft_tx_valid_o;
-                        ledr1 = fft_tx_last_o;
-                        hex0_i = fft_tx_index_o[3:0];
-                        hex1_i = fft_tx_index_o[7:4];
-                        hex2_i = {3'b000, fft_tx_index_o[8]};
-                    end
-
-                    3'd7: begin
-                        // LED0 = fft_tx_valid_o
-                        // LED1 = fft_tx_last_o
-                        // HEX0..HEX4 = fft_tx_real_o
-                        ledr0 = fft_tx_valid_o;
-                        ledr1 = fft_tx_last_o;
-                        hex0_i = fft_tx_real_o[3:0];
-                        hex1_i = fft_tx_real_o[7:4];
-                        hex2_i = fft_tx_real_o[11:8];
-                        hex3_i = fft_tx_real_o[15:12];
-                        hex4_i = {2'b00, fft_tx_real_o[17:16]};
-                    end
-
-                    default: begin
-                        // LED0 = fft_tx_valid_o
-                        // LED1 = fft_tx_last_o
-                        // HEX0..HEX4 = fft_tx_imag_o
-                        ledr0 = fft_tx_valid_o;
-                        ledr1 = fft_tx_last_o;
-                        hex0_i = fft_tx_imag_o[3:0];
-                        hex1_i = fft_tx_imag_o[7:4];
-                        hex2_i = fft_tx_imag_o[11:8];
-                        hex3_i = fft_tx_imag_o[15:12];
-                        hex4_i = {2'b00, fft_tx_imag_o[17:16]};
+                    2'b10,
+                    2'b11: begin
+                        dbg_hex_live[3:0]   = bfpexp_o[3:0];
+                        dbg_hex_live[7:4]   = bfpexp_o[7:4];
+                        dbg_hex_live[11:8]  = {1'b0, fft_status_o};
+                        dbg_hex_live[15:12] = {2'b00, fft_input_buffer_status_o};
+                        dbg_gpio_live       = {
+                            fft_status_o[0],
+                            fft_status_o[1],
+                            fft_status_o[2],
+                            fft_done_o
+                        };
                     end
                 endcase
             end
 
-            default: begin
+            2'b11: begin
+                // Saída serial / bins da FFT
+                dbg_led_live[0] = fft_tx_valid_o;
+                dbg_led_live[1] = fft_tx_last_o;
+                dbg_led_live[2] = fft_done_o;
+                dbg_led_live[3] = fft_run_o;
+
+                unique case (dbg_page_sel)
+                    2'b00: begin
+                        dbg_hex_live[$clog2(FFT_LENGTH)-1:0] = fft_tx_index_o;
+                        dbg_gpio_live = {
+                            fft_tx_last_o,
+                            fft_tx_valid_o,
+                            fft_done_o,
+                            fft_run_o
+                        };
+                    end
+
+                    2'b01: begin
+                        dbg_hex_live[17:0] = fft_tx_real_o;
+                        dbg_gpio_live = {
+                            fft_tx_real_o[17],
+                            fft_tx_valid_o,
+                            fft_tx_last_o,
+                            fft_done_o
+                        };
+                    end
+
+                    2'b10,
+                    2'b11: begin
+                        dbg_hex_live[17:0] = fft_tx_imag_o;
+                        dbg_gpio_live = {
+                            fft_tx_imag_o[17],
+                            fft_tx_valid_o,
+                            fft_tx_last_o,
+                            fft_done_o
+                        };
+                    end
+                endcase
             end
         endcase
+
+        ledr0 = dbg_led_capture_r[0];
+        ledr1 = dbg_led_capture_r[1];
+        ledr2 = dbg_led_capture_r[2];
+        ledr3 = dbg_led_capture_r[3];
+        ledr4 = dbg_led_capture_r[4];
+        ledr5 = dbg_led_capture_r[5];
+        ledr6 = dbg_led_capture_r[6];
+        ledr7 = dbg_led_capture_r[7];
+        ledr8 = dbg_led_capture_r[8];
+        ledr9 = dbg_led_capture_r[9];
+
+        hex0_i = dbg_hex_capture_r[3:0];
+        hex1_i = dbg_hex_capture_r[7:4];
+        hex2_i = dbg_hex_capture_r[11:8];
+        hex3_i = dbg_hex_capture_r[15:12];
+        hex4_i = dbg_hex_capture_r[19:16];
+        hex5_i = dbg_hex_capture_r[23:20];
     end
 
     hexa7seg hex0(hex0_i, hex0_o);
@@ -510,8 +585,9 @@ module top_level_test_mux_clear_hex_based_on_uploaded #(
     );
 
     assign i2s_sd_o = mic_sd_internal;
-    assign gpio_1_d2 = i2s_sck_o;
-    assign gpio_1_d3 = i2s_ws_o;
-    assign gpio_1_d4 = mic_lr_sel_o;
+    assign gpio_0_d3 = dbg_gpio_capture_r[0];
+    assign gpio_1_d2 = dbg_gpio_capture_r[1];
+    assign gpio_1_d3 = dbg_gpio_capture_r[2];
+    assign gpio_1_d4 = dbg_gpio_capture_r[3];
 
 endmodule
