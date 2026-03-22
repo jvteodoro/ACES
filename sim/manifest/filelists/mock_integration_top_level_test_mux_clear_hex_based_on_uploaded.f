@@ -1,3 +1,4 @@
+tb/mocks/signals_rom_ip_mock.sv
 tb/mocks/r2fft_tribuf_impl_mock.sv
 rtl/common/hexa7seg.v
 rtl/frontend/i2s_master_clock_gen.sv
@@ -7,5 +8,6 @@ rtl/common/fft_control.sv
 rtl/common/fft_dma_reader.sv
 rtl/core/aces_audio_to_fft_pipeline.sv
 rtl/core/aces.sv
+rtl/stimulus/i2s_stimulus_manager_rom.sv
 rtl/top/top_level_test_mux_clear_hex_based_on_uploaded.sv
 tb/integration/tb_top_level_test_mux_clear_hex_based_on_uploaded.sv

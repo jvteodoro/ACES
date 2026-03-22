@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
   echo "Usage: $0 <filelist> <top_module>" >&2
-  echo "Example: $0 sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test_real" >&2
+  echo "Example: $0 sim/manifest/filelists/mock_integration_top_level_test_mux_clear_hex_based_on_uploaded.f tb_top_level_test_mux_clear_hex_based_on_uploaded" >&2
   exit 2
 fi
 

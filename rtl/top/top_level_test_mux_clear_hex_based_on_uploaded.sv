@@ -440,14 +440,14 @@ module top_level_test_mux_clear_hex_based_on_uploaded #(
         .clk(clk),
         .rst(rst),
 
-        .mic_sd_i(gpio_1_d0),//mic_sd_internal),
-        .mic_lr_sel_i(gpio_1_d1),//stim_lr_sel_i),
+        .mic_sd_i(mic_sd_internal),
+        .mic_lr_sel_i(stim_lr_sel_i),
 
-        .mic_sck_o(gpio_1_d2),//i2s_sck_o),
+        .mic_sck_o(i2s_sck_o),
 
-        .mic_ws_o(gpio_1_d3),//i2s_ws_o),
-        .mic_chipen_o(),//mic_chipen_o),
-        .mic_lr_sel_o(gpio_1_d4),//mic_lr_sel_o),
+        .mic_ws_o(i2s_ws_o),
+        .mic_chipen_o(mic_chipen_o),
+        .mic_lr_sel_o(mic_lr_sel_o),
 
 
         .sample_valid_mic_o(sample_valid_mic_o),
@@ -477,38 +477,41 @@ module top_level_test_mux_clear_hex_based_on_uploaded #(
     // -----------------------------------------
     // gerador de estímulo com ROM interna
     // -----------------------------------------
-    // i2s_stimulus_manager_rom #(
-    //     .SAMPLE_BITS(24),
-    //     .N_POINTS(N_POINTS),
-    //     .N_EXAMPLES(N_EXAMPLES),
-    //     .STARTUP_SCK_CYCLES(8),
-    //     .INACTIVE_ZERO_SYNTH(0)
-    // ) u_i2s_stimulus_manager_rom (
-    //     .clk(clk),
-    //     .rst(rst),
+    i2s_stimulus_manager_rom #(
+        .SAMPLE_BITS(24),
+        .N_POINTS(N_POINTS),
+        .N_EXAMPLES(N_EXAMPLES),
+        .STARTUP_SCK_CYCLES(8),
+        .INACTIVE_ZERO_SYNTH(0)
+    ) u_i2s_stimulus_manager_rom (
+        .clk(clk),
+        .rst(rst),
 
-    //     .start_i(stim_start_i),
-    //     .example_sel_i(stim_example_sel_i),
-    //     .loop_mode_i(stim_loop_mode_i),
+        .start_i(stim_start_i),
+        .example_sel_i(stim_example_sel_i),
+        .loop_mode_i(stim_loop_mode_i),
 
-    //     .chipen_i(mic_chipen_o),
-    //     .lr_i(mic_lr_sel_o),
-    //     .sck_i(i2s_sck_o),
-    //     .ws_i(i2s_ws_o),
-    //     .sd_o(mic_sd_internal),
+        .chipen_i(mic_chipen_o),
+        .lr_i(mic_lr_sel_o),
+        .sck_i(i2s_sck_o),
+        .ws_i(i2s_ws_o),
+        .sd_o(mic_sd_internal),
 
-    //     .ready_o(stim_ready_o),
-    //     .busy_o(stim_busy_o),
-    //     .done_o(stim_done_o),
-    //     .window_done_o(stim_window_done_o),
-    //     .current_example_o(stim_current_example_o),
-    //     .current_point_o(stim_current_point_o),
-    //     .rom_addr_dbg_o(stim_rom_addr_dbg_o),
-    //     .current_sample_dbg_o(stim_current_sample_dbg_o),
-    //     .bit_index_o(stim_bit_index_o),
-    //     .state_dbg_o(stim_state_dbg_o)
-    // );
+        .ready_o(stim_ready_o),
+        .busy_o(stim_busy_o),
+        .done_o(stim_done_o),
+        .window_done_o(stim_window_done_o),
+        .current_example_o(stim_current_example_o),
+        .current_point_o(stim_current_point_o),
+        .rom_addr_dbg_o(stim_rom_addr_dbg_o),
+        .current_sample_dbg_o(stim_current_sample_dbg_o),
+        .bit_index_o(stim_bit_index_o),
+        .state_dbg_o(stim_state_dbg_o)
+    );
 
     assign i2s_sd_o = mic_sd_internal;
+    assign gpio_1_d2 = i2s_sck_o;
+    assign gpio_1_d3 = i2s_ws_o;
+    assign gpio_1_d4 = mic_lr_sel_o;
 
 endmodule

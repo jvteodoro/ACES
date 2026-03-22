@@ -45,16 +45,11 @@ array set filelists {
     i2s_rx_adapter_24              mock_unit_i2s_rx_adapter_24.f
     sample_width_adapter_24_to_18  mock_unit_sample_width_adapter_24_to_18.f
     i2s_master_clock_gen           mock_unit_i2s_master_clock_gen.f
-    i2s_stimulus_manager           mock_unit_i2s_stimulus_manager.f
     i2s_stimulus_manager_rom       mock_unit_i2s_stimulus_manager_rom.f
     fft_control                    mock_unit_fft_control.f
     fft_dma_reader                 mock_unit_fft_dma_reader.f
-    aces_fft_ingest                mock_unit_aces_fft_ingest.f
-    sample_bridge_and_ingest       mock_integration_sample_bridge_and_ingest.f
     aces_audio_to_fft_pipeline     mock_integration_aces_audio_to_fft_pipeline.f
     aces                           mock_integration_aces.f
-    aces_stimulus_manager          mock_integration_aces_stimulus_manager.f
-    top_level_test                 mock_integration_top_level_test.f
     top_level_test_mux_clear_hex_based_on_uploaded mock_integration_top_level_test_mux_clear_hex_based_on_uploaded.f
 }
 
@@ -62,16 +57,11 @@ array set tops {
     i2s_rx_adapter_24              tb_i2s_rx_adapter_24
     sample_width_adapter_24_to_18  tb_sample_width_adapter_24_to_18
     i2s_master_clock_gen           tb_i2s_master_clock_gen
-    i2s_stimulus_manager           tb_i2s_stimulus_manager
     i2s_stimulus_manager_rom       tb_i2s_stimulus_manager_rom
     fft_control                    tb_fft_control
     fft_dma_reader                 tb_fft_dma_reader
-    aces_fft_ingest                tb_aces_fft_ingest
-    sample_bridge_and_ingest       tb_sample_bridge_and_ingest
     aces_audio_to_fft_pipeline     tb_aces_audio_to_fft_pipeline
     aces                           tb_aces
-    aces_stimulus_manager          tb_aces_stimulus_manager
-    top_level_test                 tb_top_level_test_real
     top_level_test_mux_clear_hex_based_on_uploaded tb_top_level_test_mux_clear_hex_based_on_uploaded
 }
 
@@ -80,10 +70,10 @@ array set wave_dos {
 }
 
 if {$flow eq "real"} {
-    if {$test_name ne "top_level_test"} {
-        fail "Real flow is currently defined only for top_level_test."
+    if {$test_name ne "top_level_test_mux_clear_hex_based_on_uploaded"} {
+        fail "Real flow is currently defined only for top_level_test_mux_clear_hex_based_on_uploaded."
     }
-    set filelist_name real_ip_top_level_test.f
+    set filelist_name real_ip_top_level_test_mux_clear_hex_based_on_uploaded.f
 } elseif {[info exists filelists($test_name)]} {
     set filelist_name $filelists($test_name)
 } else {

@@ -1,3 +1,4 @@
+tb/mocks/signals_rom_ip_mock.sv
 tb/mocks/r2fft_tribuf_impl_mock.sv
 rtl/frontend/i2s_master_clock_gen.sv
 rtl/frontend/i2s_rx_adapter_24.sv
@@ -6,5 +7,5 @@ rtl/common/fft_control.sv
 rtl/common/fft_dma_reader.sv
 rtl/core/aces_audio_to_fft_pipeline.sv
 rtl/core/aces.sv
-rtl/stimulus/i2s_stimulus_manager.sv
+rtl/stimulus/i2s_stimulus_manager_rom.sv
 tb/integration/tb_aces.sv
