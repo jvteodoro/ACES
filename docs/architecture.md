@@ -167,7 +167,7 @@ When adding or changing blocks:
 
 ## Top-Level Debug Strategy
 
-The active board-oriented top-level, `top_level_test_mux_clear_hex_based_on_uploaded`, uses a staged debug strategy with three ideas:
+The active board-oriented top-level, `top_level_test`, uses a staged debug strategy with three ideas:
 
 1. **separate control from observation**, so stimulus-manager controls do not fight with debug selection,
 2. **group debug by pipeline stage**, so each selection exposes a coherent subset of signals,
