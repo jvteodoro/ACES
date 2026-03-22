@@ -46,17 +46,28 @@ From the repository root:
 
 ```bash
 sim/manifest/scripts/run_questa.sh i2s_rx_adapter_24
+sim/manifest/scripts/run_questa.sh i2s_master_clock_gen
+sim/manifest/scripts/run_questa.sh fft_control
+sim/manifest/scripts/run_questa.sh fft_dma_reader
+sim/manifest/scripts/run_questa.sh aces_fft_ingest
 sim/manifest/scripts/run_questa.sh i2s_stimulus_manager
 sim/manifest/scripts/run_questa.sh sample_bridge_and_ingest
+sim/manifest/scripts/run_questa.sh aces_audio_to_fft_pipeline
+sim/manifest/scripts/run_questa.sh aces
 sim/manifest/scripts/run_questa.sh top_level_test mock
+sim/manifest/scripts/run_questa.sh top_level_test_mux_clear_hex_based_on_uploaded
 ```
 
 Windows PowerShell equivalents:
 
 ```powershell
 .\sim\manifest\scripts\run_questa.ps1 i2s_rx_adapter_24
+.\sim\manifest\scripts\run_questa.ps1 fft_control
+.\sim\manifest\scripts\run_questa.ps1 fft_dma_reader
 .\sim\manifest\scripts\run_questa.ps1 sample_bridge_and_ingest
+.\sim\manifest\scripts\run_questa.ps1 aces_audio_to_fft_pipeline
 .\sim\manifest\scripts\run_questa.ps1 top_level_test mock
+.\sim\manifest\scripts\run_questa.ps1 top_level_test_mux_clear_hex_based_on_uploaded
 ```
 
 ## Real-IP-Oriented Top-Level Run

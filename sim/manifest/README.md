@@ -14,12 +14,18 @@
 
 - `i2s_rx_adapter_24`
 - `sample_width_adapter_24_to_18`
+- `i2s_master_clock_gen`
 - `i2s_stimulus_manager`
 - `i2s_stimulus_manager_rom`
+- `fft_control`
+- `fft_dma_reader`
+- `aces_fft_ingest`
 - `sample_bridge_and_ingest`
+- `aces_audio_to_fft_pipeline`
 - `aces`
 - `aces_stimulus_manager`
 - `top_level_test`
+- `top_level_test_mux_clear_hex_based_on_uploaded`
 
 ## Primary scripts
 
@@ -32,14 +38,19 @@
 
 ```bash
 sim/manifest/scripts/run_questa.sh i2s_rx_adapter_24
+sim/manifest/scripts/run_questa.sh fft_dma_reader
+sim/manifest/scripts/run_questa.sh aces_audio_to_fft_pipeline
 sim/manifest/scripts/run_questa.sh top_level_test mock
+sim/manifest/scripts/run_questa.sh top_level_test_mux_clear_hex_based_on_uploaded
 sim/manifest/scripts/regression_mock.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
+.\sim\manifest\scripts\run_questa.ps1 fft_dma_reader
 .\sim\manifest\scripts\run_questa.ps1 top_level_test mock
+.\sim\manifest\scripts\run_questa.ps1 top_level_test_mux_clear_hex_based_on_uploaded
 .\sim\manifest\scripts\regression_mock.ps1
 ```
 
