@@ -40,6 +40,10 @@ module tb_top_level_test;
     logic tb_capture_hex_drive;
     logic tb_capture_gpio_drive;
     logic tb_capture_clear_drive;
+    logic tb_dbg_stage0_drive;
+    logic tb_dbg_stage1_drive;
+    logic tb_dbg_page0_drive;
+    logic tb_dbg_page1_drive;
 
     int sample_count;
     int fft_bin_count;
@@ -50,6 +54,10 @@ module tb_top_level_test;
     assign gpio_0_d4 = tb_capture_hex_drive;
     assign gpio_0_d5 = tb_capture_gpio_drive;
     assign gpio_0_d6 = tb_capture_clear_drive;
+    assign gpio_0_d7 = tb_dbg_stage0_drive;
+    assign gpio_0_d8 = tb_dbg_stage1_drive;
+    assign gpio_0_d9 = tb_dbg_page0_drive;
+    assign gpio_0_d10 = tb_dbg_page1_drive;
 
     always #5 tb_clk_drive = ~tb_clk_drive;
 
@@ -97,6 +105,10 @@ module tb_top_level_test;
             key2 = ~stage_sel[0];
             key1 = ~page_sel[1];
             key0 = ~page_sel[0];
+            tb_dbg_stage1_drive = stage_sel[1];
+            tb_dbg_stage0_drive = stage_sel[0];
+            tb_dbg_page1_drive  = page_sel[1];
+            tb_dbg_page0_drive  = page_sel[0];
             @(posedge tb_clk_drive);
         end
     endtask
@@ -260,6 +272,10 @@ module tb_top_level_test;
         tb_capture_hex_drive  = 1'b0;
         tb_capture_gpio_drive = 1'b0;
         tb_capture_clear_drive = 1'b0;
+        tb_dbg_stage0_drive = 1'b0;
+        tb_dbg_stage1_drive = 1'b0;
+        tb_dbg_page0_drive  = 1'b0;
+        tb_dbg_page1_drive  = 1'b0;
         sample_count = 0;
         fft_bin_count = 0;
 
