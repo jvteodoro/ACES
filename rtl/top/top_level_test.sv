@@ -256,14 +256,10 @@ module top_level_test #(
     logic [3:0] hex5_i;
 
     always_comb begin
-        dbg_stage_sel = {~key3, ~key2};
-        dbg_page_sel  = {~key1, ~key0};
-
-        if ((gpio_0_d7 !== 1'bz) && (gpio_0_d8 !== 1'bz))
-            dbg_stage_sel = dbg_stage_sel_gpio;
-
-        if ((gpio_0_d9 !== 1'bz) && (gpio_0_d10 !== 1'bz))
-            dbg_page_sel = dbg_page_sel_gpio;
+        //dbg_stage_sel = {~key3, ~key2};
+        //dbg_page_sel  = {~key1, ~key0};
+         dbg_stage_sel = dbg_stage_sel_gpio;
+         dbg_page_sel = dbg_page_sel_gpio;
     end
 
     always_ff @(posedge clk or posedge rst) begin
