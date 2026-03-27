@@ -1,5 +1,3 @@
 [submodule "submodules/R2FFT"]
 	path = submodules/R2FFT
 	url = https://github.com/jvteodoro/R2FFT.git
-[submodule "i2s-modules"]
-	path = i2s-modules
