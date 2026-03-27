@@ -3,3 +3,4 @@
 	url = https://github.com/jvteodoro/R2FFT.git
 [submodule "submodules/i2s-modules"]
 	path = submodules/i2s-modules
+	url = https://github.com/diegofa2004/i2s-modules.git
