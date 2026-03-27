@@ -22,6 +22,7 @@ foreach relpath {
     rtl/common/fft_dma_reader.sv
     rtl/frontend/i2s_master_clock_gen.sv
     rtl/frontend/i2s_rx_adapter_24.sv
+    rtl/frontend/i2s_fft_tx_adapter.sv
     rtl/core/aces_audio_to_fft_pipeline.sv
     rtl/core/aces.sv
     rtl/stimulus/i2s_stimulus_manager_rom.sv
@@ -50,10 +51,12 @@ foreach relpath {
 }
 
 # Quartus-generated IP wrappers and metadata.
+# Keep the FFT memories promoted under rtl/ip/fft so the root project does not
+# depend on duplicate twrom/dpram definitions inside the restored snapshot.
 foreach relpath {
     rtl/ip/rom/signals_rom_ip.qip
-    submodules/R2FFT/quartus/dpram.qip
-    submodules/R2FFT/quartus/twrom.qip
+    rtl/ip/fft/dpram.qip
+    rtl/ip/fft/twrom.qip
 } {
     add_repo_file $repo_root $relpath QIP_FILE
 }
@@ -70,7 +73,7 @@ proc add_repo_mif {repo_root relpath} {
 
 foreach relpath {
     tools/signals_rom.mif
-    submodules/R2FFT/quartus/twrom.mif
+    rtl/ip/fft/twrom.mif
 } {
     add_repo_mif $repo_root $relpath
 }

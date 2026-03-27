@@ -113,9 +113,9 @@ module top_level_test #(
     inout logic gpio_1_d14, //PIN_H10
     inout logic gpio_1_d15, //PIN_J11
     inout logic gpio_1_d16, //PIN_H14
-    inout logic gpio_1_d17, //PIN_A15
+    output logic gpio_1_d17, //PIN_A15
     inout logic gpio_1_d18, //PIN_J13
-    inout logic gpio_1_d19, //PIN_L8
+    output logic gpio_1_d19, //PIN_L8
     inout logic gpio_1_d20, //PIN_A14
     inout logic gpio_1_d21, //PIN_B15
     inout logic gpio_1_d22, //PIN_C15
@@ -142,11 +142,14 @@ module top_level_test #(
     logic [$clog2(N_EXAMPLES)-1:0] stim_example_sel_i;
     logic [1:0] stim_loop_mode_i;
     logic stim_lr_sel_i;
+	 logic input_select;
 
     assign stim_start_i = sw0;
     assign stim_example_sel_i = {sw3, sw2, sw1};
     assign stim_loop_mode_i = {sw5, sw4};
     assign stim_lr_sel_i = sw6;
+	 assign input_select = sw7;
+	 
 
     logic clk;
     logic rst;
@@ -158,15 +161,11 @@ module top_level_test #(
     logic dbg_capture_hex_i;
     logic dbg_capture_gpio_i;
     logic dbg_capture_clear_i;
-    logic [1:0] dbg_stage_sel_gpio;
-    logic [1:0] dbg_page_sel_gpio;
 
     assign dbg_capture_leds_i  = gpio_0_d2;
     assign dbg_capture_hex_i   = gpio_0_d4;
     assign dbg_capture_gpio_i  = gpio_0_d5;
     assign dbg_capture_clear_i = gpio_0_d6;
-    assign dbg_stage_sel_gpio  = {gpio_0_d8, gpio_0_d7};
-    assign dbg_page_sel_gpio   = {gpio_0_d10, gpio_0_d9};
 
     // -----------------------------------------
     // debug do gerador
@@ -181,6 +180,7 @@ module top_level_test #(
     logic signed [23:0] stim_current_sample_dbg_o;
     logic [5:0] stim_bit_index_o;
     logic [2:0] stim_state_dbg_o;
+	 logic stim_sd_o;
 
     // -----------------------------------------
     // debug dos sinais I2S
@@ -191,6 +191,8 @@ module top_level_test #(
     logic mic_lr_sel_o;
     logic i2s_sd_o;
 
+	 assign gpio_0_d17 = i2s_sck_o;
+	 assign gpio_0_d19 = i2s_ws_o;
 
     // -----------------------------------------
     // debug do ACES
@@ -220,8 +222,16 @@ module top_level_test #(
     logic signed [FFT_DW-1:0] fft_tx_real_o;
     logic signed [FFT_DW-1:0] fft_tx_imag_o;
     logic fft_tx_last_o;
-
+	
+	 logic select_audio_source;
+	 assign select_audio_source = sw7;
+	 logic mic_sd_o;
+	 assign mic_sd_o = gpio_0_d20;
     logic mic_sd_internal;
+	 assign mic_sd_internal = (select_audio_source) ? stim_sd_o: mic_sd_o;
+	 
+	 assign gpio_0_d17 = i2s_sck_o;
+	 assign gpio_0_d19 = i2s_ws_o;
 
     // -----------------------------------------
     // multiplexação de debug
@@ -255,12 +265,14 @@ module top_level_test #(
     logic [3:0] hex4_i;
     logic [3:0] hex5_i;
 
-    always_comb begin
-        //dbg_stage_sel = {~key3, ~key2};
-        //dbg_page_sel  = {~key1, ~key0};
-         dbg_stage_sel = dbg_stage_sel_gpio;
-         dbg_page_sel = dbg_page_sel_gpio;
-    end
+    assign dbg_stage_sel = {gpio_0_d8, gpio_0_d7};
+    assign dbg_page_sel  = {gpio_0_d10, gpio_0_d9};
+	 assign gpio_0_d11 = dbg_stage_sel[0];
+	 assign gpio_0_d12 = dbg_stage_sel[1];
+	 assign gpio_0_d13 = dbg_page_sel[0];
+	 assign gpio_0_d14 = dbg_page_sel[0];
+
+	 
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -522,7 +534,6 @@ module top_level_test #(
     ) u_aces (
         .clk(clk),
         .rst(rst),
-
         .mic_sd_i(mic_sd_internal),
         .mic_lr_sel_i(stim_lr_sel_i),
 
@@ -578,7 +589,7 @@ module top_level_test #(
         .lr_i(mic_lr_sel_o),
         .sck_i(i2s_sck_o),
         .ws_i(i2s_ws_o),
-        .sd_o(mic_sd_internal),
+        .sd_o(stim_sd_o),//mic_sd_internal),
 
         .ready_o(stim_ready_o),
         .busy_o(stim_busy_o),
