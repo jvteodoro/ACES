@@ -2,7 +2,7 @@
 
 module tb_i2s_rx_adapter_24;
 
-    localparam int ROM_DEPTH = 8;
+    localparam int ROM_DEPTH = 10;
     localparam time SCK_HALF = 50ns;
 
     logic rst;
@@ -37,6 +37,8 @@ module tb_i2s_rx_adapter_24;
         rom[5] = 24'sh7ABCDE;
         rom[6] = -24'sh123456;
         rom[7] = 24'sh000000;
+        rom[8] = 24'sh5BDAD5;
+        rom[9] = 24'sh640466;
     end
 
     task automatic sck_pulse;
