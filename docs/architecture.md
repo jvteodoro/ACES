@@ -30,6 +30,7 @@ Relevant modules:
 
 - `i2s_master_clock_gen`
 - `i2s_rx_adapter_24`
+- `i2s_fft_tx_adapter`
 
 ### 2. Sample reconstruction
 `i2s_rx_adapter_24` reconstructs a signed 24-bit sample from serial I2S data.
@@ -94,6 +95,19 @@ Responsibilities:
 - capture returned real/imaginary data,
 - emit bin-valid/index/last information,
 - provide a clean handoff point for future serial streaming or file logging.
+
+### 8. I2S transmit backend for FFT export
+`i2s_fft_tx_adapter` serializes FFT output for an external reader over I2S.
+
+Responsibilities:
+
+- buffer FFT output bins in a FIFO so the FFT and serial link can run at different rates,
+- insert `bfpexp` metadata at the start of each FFT window,
+- repeat `bfpexp` long enough for a slower external host to detect it,
+- assert an explicit `bfpexp_ack_o` flag while the metadata frame is being transmitted,
+- serialize `real` and `imag` as left/right I2S channels.
+
+See `docs/i2s_fft_tx_adapter.md` for the detailed contract.
 
 ## Data Flow in More Detail
 
