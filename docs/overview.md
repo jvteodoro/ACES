@@ -27,6 +27,9 @@ In practical terms, the repository helps engineers:
 ## Key Features
 
 - Structured RTL under `rtl/common`, `rtl/frontend`, `rtl/stimulus`, `rtl/core`, and `rtl/ip/`.
+- Modular pipeline stages with consistent handshake (valid/ready/overflow) for clean producer-consumer decoupling.
+- Integrated I2S TX with BFPEXP-tagged FFT output framing (enables real-time spectral analysis transport).
+- Explicit bridge FIFO (`fft_tx_bridge_fifo`) decoupling FFT burst output from I2S serial rate.
 - Unit, integration, and mock simulation assets separated under `tb/`.
 - A versioned Questa-oriented simulation manifest under `sim/manifest/`.
 - Portable packaging flow that produces a redistributable Questa package under `sim/portable/`.
@@ -57,7 +60,13 @@ I2S mic pins / ROM-backed stimulus
        fft_dma_reader output
               |
               v
- future transport / validation path
+    fft_tx_bridge_fifo (explicit decoupling)
+              |
+              v
+  i2s_fft_tx_adapter (tagged TX framing)
+              |
+              v
+    I2S GPIO pins (SCK, WS, SD) / DMA validation path
 ```
 
 ## Intended Use Cases
@@ -74,8 +83,11 @@ Use the mock flow to bring up control logic, testbench structure, and waveform r
 ### Real-IP-oriented simulation
 Use the real-IP-oriented flow when you want to keep the repository’s RTL/testbench structure while binding the real Quartus ROM wrapper and the checked-in `submodules/R2FFT` implementation.
 
+### Spectral output validation
+Use the integrated I2S TX path (bridge FIFO → TX adapter → GPIO outputs) to export tagged FFT bins in real time, validate serialization logic, and verify that BFPEXP metadata is correctly framed alongside spectral data.
+
 ### Onboarding and AI-assisted maintenance
-Use the repository layout and docs suite to understand where active RTL lives, which tests are meant to run, and where generated simulator artifacts should be kept.
+Use the repository layout and docs suite to understand where active RTL lives, which tests are meant to run, and where generated simulator artifacts should be kept. The modular pipeline architecture and explicit design invariants support automated codebase exploration and refactoring.
 
 ## Where to Go Next
 

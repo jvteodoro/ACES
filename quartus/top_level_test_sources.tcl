@@ -20,6 +20,7 @@ foreach relpath {
     rtl/common/sample_width_adapter_24_to_18.sv
     rtl/common/fft_control.sv
     rtl/common/fft_dma_reader.sv
+    rtl/common/fft_tx_bridge_fifo.sv
     rtl/frontend/i2s_master_clock_gen.sv
     rtl/frontend/i2s_rx_adapter_24.sv
     rtl/frontend/i2s_fft_tx_adapter.sv

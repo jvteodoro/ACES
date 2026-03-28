@@ -222,6 +222,10 @@ module top_level_test #(
     logic signed [FFT_DW-1:0] fft_tx_real_o;
     logic signed [FFT_DW-1:0] fft_tx_imag_o;
     logic fft_tx_last_o;
+    logic tx_i2s_sck_o;
+    logic tx_i2s_ws_o;
+    logic tx_i2s_sd_o;
+    logic tx_overflow_o;
 	
 	 logic select_audio_source;
 	 assign select_audio_source = sw7;
@@ -565,7 +569,11 @@ module top_level_test #(
         .fft_tx_index_o(fft_tx_index_o),
         .fft_tx_real_o(fft_tx_real_o),
         .fft_tx_imag_o(fft_tx_imag_o),
-        .fft_tx_last_o(fft_tx_last_o)
+        .fft_tx_last_o(fft_tx_last_o),
+        .tx_i2s_sck_o(tx_i2s_sck_o),
+        .tx_i2s_ws_o(tx_i2s_ws_o),
+        .tx_i2s_sd_o(tx_i2s_sd_o),
+        .tx_overflow_o(tx_overflow_o)
     );
 
     // -----------------------------------------
@@ -604,6 +612,9 @@ module top_level_test #(
     );
 
     assign i2s_sd_o = mic_sd_internal;
+    assign gpio_1_d17 = tx_i2s_sck_o;
+    assign gpio_1_d19 = tx_i2s_ws_o;
+    assign gpio_1_d20 = tx_i2s_sd_o;
     assign gpio_0_d3 = dbg_gpio_capture_r[0];
     assign gpio_1_d2 = dbg_gpio_capture_r[1];
     assign gpio_1_d3 = dbg_gpio_capture_r[2];

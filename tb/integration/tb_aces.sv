@@ -123,7 +123,11 @@ module tb_aces;
         .fft_tx_index_o(fft_tx_index_o),
         .fft_tx_real_o(fft_tx_real_o),
         .fft_tx_imag_o(fft_tx_imag_o),
-        .fft_tx_last_o(fft_tx_last_o)
+        .fft_tx_last_o(fft_tx_last_o),
+        .tx_i2s_sck_o(),
+        .tx_i2s_ws_o(),
+        .tx_i2s_sd_o(),
+        .tx_overflow_o()
     );
 
     always @(posedge sample_valid_mic_o) begin
