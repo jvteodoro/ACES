@@ -13,16 +13,16 @@
 // Contrato de saida:
 // - O modulo insere na FIFO um frame especial de bfpexp no inicio de cada
 //   janela e depois os bins da FFT na ordem recebida.
-// - O frame de bfpexp e repetido por BFPEXP_HOLD_FRAMES frames I2S completos,
-//   mantendo bfpexp_ack_o em nivel alto durante toda essa transmissao.
+// - O frame de bfpexp e repetido por BFPEXP_HOLD_FRAMES frames I2S completos.
 // - Cada bin da FFT ocupa um frame I2S:
 //     left  = parte real
 //     right = parte imaginaria
 //
 // Formato do slot I2S:
-// - 1 bit de atraso do protocolo I2S
-// - I2S_SAMPLE_W bits de payload signed, MSB-first
-// - padding em zero ate completar I2S_SLOT_W bits por canal
+// - 2 bits de tag em-band nos bits mais altos do slot:
+//     2'd0 = IDLE, 2'd1 = BFPEXP, 2'd2 = FFT
+// - I2S_SAMPLE_W bits de payload signed nos bits menos significativos.
+// - bits intermediarios reservados em zero ate completar I2S_SLOT_W bits.
 //
 // Estrategia de buffering:
 // - A FIFO armazena tanto o marcador de bfpexp quanto os bins da FFT.
@@ -37,7 +37,7 @@
 module i2s_fft_tx_adapter #(
     parameter int FFT_DW              = 18,
     parameter int BFPEXP_W            = 8,
-    parameter int I2S_SAMPLE_W        = 24,
+    parameter int I2S_SAMPLE_W        = 18,
     parameter int I2S_SLOT_W          = 32,
     parameter int CLOCK_DIV           = 16,
     parameter int FIFO_DEPTH          = 1024,
@@ -60,21 +60,24 @@ module i2s_fft_tx_adapter #(
 
     output logic i2s_sck_o,
     output logic i2s_ws_o,
-    output logic i2s_sd_o,
-    output logic bfpexp_ack_o
+    output logic i2s_sd_o
 );
 
     localparam int FIFO_PTR_W  = (FIFO_DEPTH <= 1) ? 1 : $clog2(FIFO_DEPTH);
     localparam int FIFO_LVL_W  = $clog2(FIFO_DEPTH + 1);
     localparam int SLOT_BIT_W  = (I2S_SLOT_W <= 1) ? 1 : $clog2(I2S_SLOT_W);
     localparam int HOLD_CNT_W  = $clog2(BFPEXP_HOLD_FRAMES + 1);
-    localparam int PAD_W       = I2S_SLOT_W - I2S_SAMPLE_W - 1;
+    localparam int TAG_W       = 2;
+    localparam int RESERVED_W  = I2S_SLOT_W - I2S_SAMPLE_W - TAG_W;
     localparam int DIV_CNT_W   = (CLOCK_DIV <= 1) ? 1 : $clog2(CLOCK_DIV);
     localparam int unsigned FIFO_DEPTH_U = FIFO_DEPTH;
-    localparam logic [HOLD_CNT_W-1:0] BFPEXP_HOLD_FRAMES_C = BFPEXP_HOLD_FRAMES;
+    localparam logic [HOLD_CNT_W-1:0] BFPEXP_HOLD_FRAMES_C = HOLD_CNT_W'(BFPEXP_HOLD_FRAMES);
     localparam logic [HOLD_CNT_W-1:0] ONE_HOLD_FRAME_C     = {{(HOLD_CNT_W-1){1'b0}}, 1'b1};
+    localparam logic [TAG_W-1:0] TAG_IDLE_C   = 2'd0;
+    localparam logic [TAG_W-1:0] TAG_BFPEXP_C = 2'd1;
+    localparam logic [TAG_W-1:0] TAG_FFT_C    = 2'd2;
 
-    logic fifo_is_bfpexp_mem [0:FIFO_DEPTH-1];
+    logic [TAG_W-1:0] fifo_tag_mem [0:FIFO_DEPTH-1];
     logic signed [I2S_SAMPLE_W-1:0] fifo_left_mem [0:FIFO_DEPTH-1];
     logic signed [I2S_SAMPLE_W-1:0] fifo_right_mem [0:FIFO_DEPTH-1];
 
@@ -90,7 +93,7 @@ module i2s_fft_tx_adapter #(
     logic [SLOT_BIT_W-1:0] slot_bit_r;
 
     logic active_valid_r;
-    logic active_is_bfpexp_r;
+    logic [TAG_W-1:0] active_tag_r;
     logic signed [I2S_SAMPLE_W-1:0] active_left_r;
     logic signed [I2S_SAMPLE_W-1:0] active_right_r;
     logic [HOLD_CNT_W-1:0] active_hold_frames_r;
@@ -125,12 +128,13 @@ module i2s_fft_tx_adapter #(
     endfunction
 
     function automatic logic i2s_slot_bit(
+        input logic [TAG_W-1:0] tag_i,
         input logic signed [I2S_SAMPLE_W-1:0] sample_i,
         input logic [SLOT_BIT_W-1:0] bit_idx_i
     );
         logic [I2S_SLOT_W-1:0] slot_word;
         begin
-            slot_word = {1'b0, sample_i, {PAD_W{1'b0}}};
+            slot_word = {tag_i, {RESERVED_W{1'b0}}, sample_i};
             i2s_slot_bit = slot_word[I2S_SLOT_W-1-bit_idx_i];
         end
     endfunction
@@ -151,12 +155,11 @@ module i2s_fft_tx_adapter #(
     assign fifo_full_o   = (fifo_count_r == FIFO_DEPTH_U);
     assign fifo_empty_o  = (fifo_count_r == 0);
     assign fifo_level_o  = fifo_count_r;
-    assign bfpexp_ack_o  = active_valid_r && active_is_bfpexp_r;
-    assign i2s_sd_o      = active_valid_r ? i2s_slot_bit(channel_r ? active_right_r : active_left_r, slot_bit_r) : 1'b0;
+    assign i2s_sd_o      = active_valid_r ? i2s_slot_bit(active_tag_r, channel_r ? active_right_r : active_left_r, slot_bit_r) : 1'b0;
 
     initial begin
-        if (I2S_SAMPLE_W >= I2S_SLOT_W)
-            $error("i2s_fft_tx_adapter: I2S_SAMPLE_W deve ser menor que I2S_SLOT_W.");
+        if (I2S_SAMPLE_W > (I2S_SLOT_W - TAG_W))
+            $error("i2s_fft_tx_adapter: I2S_SAMPLE_W deve caber no slot junto com os bits de tag.");
         if (FIFO_DEPTH < 2)
             $error("i2s_fft_tx_adapter: FIFO_DEPTH deve ser pelo menos 2.");
         if (BFPEXP_HOLD_FRAMES < 1)
@@ -179,7 +182,7 @@ module i2s_fft_tx_adapter #(
             slot_bit_r                  <= '0;
 
             active_valid_r              <= 1'b0;
-            active_is_bfpexp_r          <= 1'b0;
+            active_tag_r                <= TAG_IDLE_C;
             active_left_r               <= '0;
             active_right_r              <= '0;
             active_hold_frames_r        <= '0;
@@ -191,10 +194,10 @@ module i2s_fft_tx_adapter #(
             logic pop_entry;
             logic frame_boundary;
             logic next_channel;
-            logic write_is_bfpexp0;
+            logic [TAG_W-1:0] write_tag0;
             logic signed [I2S_SAMPLE_W-1:0] write_left0;
             logic signed [I2S_SAMPLE_W-1:0] write_right0;
-            logic write_is_bfpexp1;
+            logic [TAG_W-1:0] write_tag1;
             logic signed [I2S_SAMPLE_W-1:0] write_left1;
             logic signed [I2S_SAMPLE_W-1:0] write_right1;
 
@@ -202,10 +205,10 @@ module i2s_fft_tx_adapter #(
             pop_entry      = 1'b0;
             frame_boundary = 1'b0;
             next_channel   = channel_r;
-            write_is_bfpexp0 = 1'b0;
+            write_tag0       = TAG_IDLE_C;
             write_left0      = '0;
             write_right0     = '0;
-            write_is_bfpexp1 = 1'b0;
+            write_tag1       = TAG_IDLE_C;
             write_left1      = '0;
             write_right1     = '0;
 
@@ -228,19 +231,19 @@ module i2s_fft_tx_adapter #(
                     end
 
                     if (frame_boundary) begin
-                        if (active_valid_r && active_is_bfpexp_r && (active_hold_frames_r > 1)) begin
+                        if (active_valid_r && (active_tag_r == TAG_BFPEXP_C) && (active_hold_frames_r > 1)) begin
                             active_hold_frames_r <= active_hold_frames_r - 1'b1;
                         end else if (fifo_count_r != 0) begin
                             pop_entry           = 1'b1;
                             active_valid_r      <= 1'b1;
-                            active_is_bfpexp_r  <= fifo_is_bfpexp_mem[fifo_rd_ptr_r];
+                            active_tag_r        <= fifo_tag_mem[fifo_rd_ptr_r];
                             active_left_r       <= fifo_left_mem[fifo_rd_ptr_r];
                             active_right_r      <= fifo_right_mem[fifo_rd_ptr_r];
-                            active_hold_frames_r <= fifo_is_bfpexp_mem[fifo_rd_ptr_r] ? BFPEXP_HOLD_FRAMES_C
-                                                                                       : ONE_HOLD_FRAME_C;
+                            active_hold_frames_r <= (fifo_tag_mem[fifo_rd_ptr_r] == TAG_BFPEXP_C) ? BFPEXP_HOLD_FRAMES_C
+                                                                                                      : ONE_HOLD_FRAME_C;
                         end else begin
                             active_valid_r       <= 1'b0;
-                            active_is_bfpexp_r   <= 1'b0;
+                            active_tag_r         <= TAG_IDLE_C;
                             active_left_r        <= '0;
                             active_right_r       <= '0;
                             active_hold_frames_r <= '0;
@@ -253,7 +256,7 @@ module i2s_fft_tx_adapter #(
                 div_cnt_r <= div_cnt_r + 1'b1;
             end
 
-            next_fifo_count = fifo_count_r;
+            next_fifo_count = int'(fifo_count_r);
             if (pop_entry)
                 next_fifo_count = next_fifo_count - 1;
 
@@ -281,15 +284,15 @@ module i2s_fft_tx_adapter #(
                         end
                     end else begin
                         if (!input_window_in_progress_r) begin
-                            write_is_bfpexp0 = 1'b1;
+                            write_tag0       = TAG_BFPEXP_C;
                             write_left0      = extend_bfpexp(bfpexp_i);
                             write_right0     = extend_bfpexp(bfpexp_i);
-                            write_is_bfpexp1 = 1'b0;
+                            write_tag1       = TAG_FFT_C;
                             write_left1      = extend_fft_sample(fft_real_i);
                             write_right1     = extend_fft_sample(fft_imag_i);
                             write_count = 2;
                         end else begin
-                            write_is_bfpexp0 = 1'b0;
+                            write_tag0       = TAG_FFT_C;
                             write_left0      = extend_fft_sample(fft_real_i);
                             write_right0     = extend_fft_sample(fft_imag_i);
                             write_count = 1;
@@ -302,13 +305,13 @@ module i2s_fft_tx_adapter #(
             end
 
             if (write_count > 0) begin
-                fifo_is_bfpexp_mem[fifo_wr_ptr_r] <= write_is_bfpexp0;
+                fifo_tag_mem[fifo_wr_ptr_r]       <= write_tag0;
                 fifo_left_mem[fifo_wr_ptr_r]      <= write_left0;
                 fifo_right_mem[fifo_wr_ptr_r]     <= write_right0;
             end
 
             if (write_count > 1) begin
-                fifo_is_bfpexp_mem[ptr_inc(fifo_wr_ptr_r, 1)] <= write_is_bfpexp1;
+                fifo_tag_mem[ptr_inc(fifo_wr_ptr_r, 1)]       <= write_tag1;
                 fifo_left_mem[ptr_inc(fifo_wr_ptr_r, 1)]      <= write_left1;
                 fifo_right_mem[ptr_inc(fifo_wr_ptr_r, 1)]     <= write_right1;
             end
@@ -320,7 +323,7 @@ module i2s_fft_tx_adapter #(
                 fifo_wr_ptr_r <= ptr_inc(fifo_wr_ptr_r, write_count);
 
             if (pop_entry || (write_count != 0)) begin
-                next_fifo_count = fifo_count_r;
+                next_fifo_count = int'(fifo_count_r);
                 if (pop_entry)
                     next_fifo_count = next_fifo_count - 1;
                 next_fifo_count = next_fifo_count + write_count;

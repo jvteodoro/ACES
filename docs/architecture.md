@@ -104,7 +104,7 @@ Responsibilities:
 - buffer FFT output bins in a FIFO so the FFT and serial link can run at different rates,
 - insert `bfpexp` metadata at the start of each FFT window,
 - repeat `bfpexp` long enough for a slower external host to detect it,
-- assert an explicit `bfpexp_ack_o` flag while the metadata frame is being transmitted,
+- encode metadata/data type in-band via tagged I2S words,
 - serialize `real` and `imag` as left/right I2S channels.
 
 See `docs/i2s_fft_tx_adapter.md` for the detailed contract.

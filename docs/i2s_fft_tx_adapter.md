@@ -38,18 +38,13 @@ At the start of every new FFT window, the module inserts a special frame carryin
 
 That exponent frame is not sent just once. It is repeated for `BFPEXP_HOLD_FRAMES` complete I2S frames so the external reader has enough time to detect and sample it.
 
-While that repeated exponent frame is being transmitted:
+Type information is carried in-band for every transmitted word using a 2-bit tag:
 
-- `bfpexp_ack_o = 1`
+- `0 = idle`
+- `1 = bfpexp`
+- `2 = fft`
 
-While normal FFT-bin frames are being transmitted:
-
-- `bfpexp_ack_o = 0`
-
-This makes it easy for software on the Raspberry Pi to distinguish:
-
-- metadata frame (`bfpexp`)
-- payload frames (`real` + `imag`)
+This removes the need for an external type flag pin; software can decode type directly from each I2S word.
 
 ## I2S word format
 
@@ -58,20 +53,20 @@ Each channel slot has `I2S_SLOT_W` bits.
 Inside that slot, the transmitted word is:
 
 ```text
-[1 dummy bit][I2S_SAMPLE_W signed payload bits][zero padding]
+[2-bit tag][reserved zero bits][I2S_SAMPLE_W signed payload bits]
 ```
 
 So, with the default parameters:
 
 - `I2S_SLOT_W = 32`
-- `I2S_SAMPLE_W = 24`
+- `I2S_SAMPLE_W = 18`
 
 the slot becomes:
 
 ```text
-bit 31: I2S delay bit
-bits 30:7: signed payload
-bits 6:0: zero padding
+bits 31:30: type tag
+bits 29:18: reserved zeros
+bits 17:0: signed payload
 ```
 
 The payload is transmitted MSB-first.
@@ -101,13 +96,13 @@ A `bfpexp` entry contains:
 
 - `left = bfpexp`
 - `right = bfpexp`
-- internal flag `is_bfpexp = 1`
+- internal `tag = 1`
 
 A data entry contains:
 
 - `left = fft_real`
 - `right = fft_imag`
-- internal flag `is_bfpexp = 0`
+- internal `tag = 2`
 
 ## Window handling
 
@@ -187,8 +182,9 @@ The testbench is separate and is not part of the synthesizable design.
 On the Raspberry Pi side, the simplest rule is:
 
 1. sample each full I2S frame
-2. if `bfpexp_ack_o == 1`, interpret the payload as `bfpexp`
-3. if `bfpexp_ack_o == 0`, interpret the payload as one FFT bin:
+2. extract the 2-bit tag from bits `31:30` of each channel word
+3. if tag is `1`, interpret payload as `bfpexp`
+4. if tag is `2`, interpret payload as one FFT bin:
    `left -> real`, `right -> imag`
 
 ## Verification
@@ -197,6 +193,6 @@ The unit testbench validates:
 
 - insertion of `bfpexp` at each new window
 - repetition of `bfpexp` for the programmed hold length
-- correct `ack` timing
+- correct per-frame tag values
 - preservation of FFT bin ordering
 - FIFO buffering while the serializer drains data
