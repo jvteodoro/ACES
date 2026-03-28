@@ -33,3 +33,6 @@ modelsim.ini
 
 # Generic scratch
 *.bak
+
+# DVT
+*.dvt
