@@ -4,3 +4,9 @@
 [submodule "submodules/i2s-modules"]
 	path = submodules/i2s-modules
 	url = https://github.com/diegofa2004/i2s-modules.git
+[submodule "submodules/ACES-RPi-interface"]
+	path = submodules/ACES-RPi-interface
+	url = https://github.com/diegofa2004/ACES-RPi-interface.git
+[submodule "submodules/MemoryManagementAndComparison"]
+	path = submodules/MemoryManagementAndComparison
+	url = https://github.com/MatheusDaviLeao/MemoryManagementAndComparison.git
