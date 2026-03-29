@@ -9,6 +9,7 @@ TESTS=(
   i2s_stimulus_manager_rom
   fft_control
   fft_dma_reader
+  fft_tx_bridge_fifo
   aces_audio_to_fft_pipeline
   aces
   top_level_test
