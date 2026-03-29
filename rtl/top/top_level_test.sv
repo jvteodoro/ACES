@@ -59,79 +59,79 @@ module top_level_test #(
     // -----------------------------------------
     // expansion headers GPIO_0 / GPIO_1
     // -----------------------------------------
-    inout logic gpio_0_d0,  //PIN_N16
-    inout logic gpio_0_d1,  //PIN_B16
-    inout logic gpio_0_d2,  //PIN_M16
-    inout logic gpio_0_d3,  //PIN_C16
-    inout logic gpio_0_d4,  //PIN_D17
-    inout logic gpio_0_d5,  //PIN_K20
-    inout logic gpio_0_d6,  //PIN_K21
-    inout logic gpio_0_d7,  //PIN_K22
-    inout logic gpio_0_d8,  //PIN_M20
-    inout logic gpio_0_d9,  //PIN_M21
-    inout logic gpio_0_d10, //PIN_N21
-    inout logic gpio_0_d11, //PIN_R22
-    inout logic gpio_0_d12, //PIN_R21
-    inout logic gpio_0_d13, //PIN_T22
-    inout logic gpio_0_d14, //PIN_N20
-    inout logic gpio_0_d15, //PIN_N19
-    inout logic gpio_0_d16, //PIN_M22
-    inout logic gpio_0_d17, //PIN_P19
-    inout logic gpio_0_d18, //PIN_L22
-    inout logic gpio_0_d19, //PIN_P17
-    inout logic gpio_0_d20, //PIN_P16
-    inout logic gpio_0_d21, //PIN_M18
-    inout logic gpio_0_d22, //PIN_L18
-    inout logic gpio_0_d23, //PIN_L17
-    inout logic gpio_0_d24, //PIN_L19
-    inout logic gpio_0_d25, //PIN_K17
-    inout logic gpio_0_d26, //PIN_K19
-    inout logic gpio_0_d27, //PIN_P18
-    inout logic gpio_0_d28, //PIN_R15
-    inout logic gpio_0_d29, //PIN_R17
-    inout logic gpio_0_d30, //PIN_R16
-    inout logic gpio_0_d31, //PIN_T20
-    inout logic gpio_0_d32, //PIN_T19
-    inout logic gpio_0_d33, //PIN_T18
-    inout logic gpio_0_d34, //PIN_T17
-    inout logic gpio_0_d35, //PIN_T15
+    input logic gpio_0_d0,  //PIN_N16
+    input logic gpio_0_d1,  //PIN_B16
+    input logic gpio_0_d2,  //PIN_M16
+    output logic gpio_0_d3,  //PIN_C16
+    input logic gpio_0_d4,  //PIN_D17
+    input logic gpio_0_d5,  //PIN_K20
+    input logic gpio_0_d6,  //PIN_K21
+    input logic gpio_0_d7,  //PIN_K22
+    input logic gpio_0_d8,  //PIN_M20
+    input logic gpio_0_d9,  //PIN_M21
+    input logic gpio_0_d10, //PIN_N21
+    output logic gpio_0_d11, //PIN_R22
+    output logic gpio_0_d12, //PIN_R21
+    output logic gpio_0_d13, //PIN_T22
+    output logic gpio_0_d14, //PIN_N20
+    input logic gpio_0_d15, //PIN_N19
+    input logic gpio_0_d16, //PIN_M22
+    output logic gpio_0_d17, //PIN_P19
+    input logic gpio_0_d18, //PIN_L22
+    output logic gpio_0_d19, //PIN_P17
+    input logic gpio_0_d20, //PIN_P16
+    input logic gpio_0_d21, //PIN_M18
+    input logic gpio_0_d22, //PIN_L18
+    input logic gpio_0_d23, //PIN_L17
+    input logic gpio_0_d24, //PIN_L19
+    input logic gpio_0_d25, //PIN_K17
+    input logic gpio_0_d26, //PIN_K19
+    input logic gpio_0_d27, //PIN_P18
+    input logic gpio_0_d28, //PIN_R15
+    input logic gpio_0_d29, //PIN_R17
+    input logic gpio_0_d30, //PIN_R16
+    input logic gpio_0_d31, //PIN_T20
+    input logic gpio_0_d32, //PIN_T19
+    input logic gpio_0_d33, //PIN_T18
+    input logic gpio_0_d34, //PIN_T17
+    input logic gpio_0_d35, //PIN_T15
 
-    inout logic gpio_1_d0,  //PIN_H16
-    inout logic gpio_1_d1,  //PIN_A12
-    inout logic gpio_1_d2,  //PIN_H15
-    inout logic gpio_1_d3,  //PIN_B12
+    input logic gpio_1_d0,  //PIN_H16
+    input logic gpio_1_d1,  //PIN_A12
+    output logic gpio_1_d2,  //PIN_H15
+    output logic gpio_1_d3,  //PIN_B12
     output logic gpio_1_d4,  //PIN_A13
-    inout logic gpio_1_d5,  //PIN_B13
-    inout logic gpio_1_d6,  //PIN_C13
-    inout logic gpio_1_d7,  //PIN_D13
-    inout logic gpio_1_d8,  //PIN_G18
-    inout logic gpio_1_d9,  //PIN_G17
-    inout logic gpio_1_d10, //PIN_H18
-    inout logic gpio_1_d11, //PIN_J18
-    inout logic gpio_1_d12, //PIN_J19
-    inout logic gpio_1_d13, //PIN_G11
-    inout logic gpio_1_d14, //PIN_H10
-    inout logic gpio_1_d15, //PIN_J11
-    inout logic gpio_1_d16, //PIN_H14
+    input logic gpio_1_d5,  //PIN_B13
+    input logic gpio_1_d6,  //PIN_C13
+    input logic gpio_1_d7,  //PIN_D13
+    input logic gpio_1_d8,  //PIN_G18
+    input logic gpio_1_d9,  //PIN_G17
+    input logic gpio_1_d10, //PIN_H18
+    input logic gpio_1_d11, //PIN_J18
+    input logic gpio_1_d12, //PIN_J19
+    input logic gpio_1_d13, //PIN_G11
+    input logic gpio_1_d14, //PIN_H10
+    input logic gpio_1_d15, //PIN_J11
+    input logic gpio_1_d16, //PIN_H14
     output logic gpio_1_d17, //PIN_A15
-    inout logic gpio_1_d18, //PIN_J13
+    input logic gpio_1_d18, //PIN_J13
     output logic gpio_1_d19, //PIN_L8
-    inout logic gpio_1_d20, //PIN_A14
-    inout logic gpio_1_d21, //PIN_B15
-    inout logic gpio_1_d22, //PIN_C15
-    inout logic gpio_1_d23, //PIN_E14
-    inout logic gpio_1_d24, //PIN_E15
-    inout logic gpio_1_d25, //PIN_E16
-    inout logic gpio_1_d26, //PIN_F14
-    inout logic gpio_1_d27, //PIN_F15
-    inout logic gpio_1_d28, //PIN_F13
-    inout logic gpio_1_d29, //PIN_F12
-    inout logic gpio_1_d30, //PIN_G16
-    inout logic gpio_1_d31, //PIN_G15
-    inout logic gpio_1_d32, //PIN_G13
-    inout logic gpio_1_d33, //PIN_G12
-    inout logic gpio_1_d34, //PIN_J17
-    inout logic gpio_1_d35  //PIN_K16
+    output logic gpio_1_d20, //PIN_A14
+    input logic gpio_1_d21, //PIN_B15
+    input logic gpio_1_d22, //PIN_C15
+    input logic gpio_1_d23, //PIN_E14
+    input logic gpio_1_d24, //PIN_E15
+    input logic gpio_1_d25, //PIN_E16
+    input logic gpio_1_d26, //PIN_F14
+    input logic gpio_1_d27, //PIN_F15
+    input logic gpio_1_d28, //PIN_F13
+    input logic gpio_1_d29, //PIN_F12
+    input logic gpio_1_d30, //PIN_G16
+    input logic gpio_1_d31, //PIN_G15
+    input logic gpio_1_d32, //PIN_G13
+    input logic gpio_1_d33, //PIN_G12
+    input logic gpio_1_d34, //PIN_J17
+    input logic gpio_1_d35  //PIN_K16
 
 
 );
@@ -142,13 +142,11 @@ module top_level_test #(
     logic [$clog2(N_EXAMPLES)-1:0] stim_example_sel_i;
     logic [1:0] stim_loop_mode_i;
     logic stim_lr_sel_i;
-	 logic input_select;
 
     assign stim_start_i = sw0;
     assign stim_example_sel_i = {sw3, sw2, sw1};
     assign stim_loop_mode_i = {sw5, sw4};
     assign stim_lr_sel_i = sw6;
-	 assign input_select = sw7;
 	 
 
     logic clk;
@@ -234,9 +232,6 @@ module top_level_test #(
     logic mic_sd_internal;
 	 assign mic_sd_internal = (select_audio_source) ? stim_sd_o: mic_sd_o;
 	 
-	 assign gpio_0_d17 = i2s_sck_o;
-	 assign gpio_0_d19 = i2s_ws_o;
-
     // -----------------------------------------
     // multiplexação de debug
     // chaves:
@@ -257,6 +252,7 @@ module top_level_test #(
     logic [9:0] dbg_led_live;
     logic [23:0] dbg_hex_live;
     logic [3:0] dbg_gpio_live;
+    logic unused_inputs_probe;
 
     logic [9:0] dbg_led_capture_r;
     logic [23:0] dbg_hex_capture_r;
@@ -275,6 +271,25 @@ module top_level_test #(
 	 assign gpio_0_d12 = dbg_stage_sel[1];
 	 assign gpio_0_d13 = dbg_page_sel[0];
 	 assign gpio_0_d14 = dbg_page_sel[1];
+
+    // Keep optional board pins observable by synthesis so Quartus does not
+    // prune them as completely unused top-level inputs.
+    assign unused_inputs_probe = ^{
+        key0, key1, key2, key3, reset_n,
+        sw8, sw9,
+        clock_50, clock2_50, clock3_50, clock4_50,
+        gpio_0_d15, gpio_0_d16, gpio_0_d18,
+        gpio_0_d21, gpio_0_d22, gpio_0_d23, gpio_0_d24, gpio_0_d25,
+        gpio_0_d26, gpio_0_d27, gpio_0_d28, gpio_0_d29, gpio_0_d30,
+        gpio_0_d31, gpio_0_d32, gpio_0_d33, gpio_0_d34, gpio_0_d35,
+        gpio_1_d0, gpio_1_d1,
+        gpio_1_d5, gpio_1_d6, gpio_1_d7, gpio_1_d8, gpio_1_d9,
+        gpio_1_d10, gpio_1_d11, gpio_1_d12, gpio_1_d13, gpio_1_d14,
+        gpio_1_d15, gpio_1_d16, gpio_1_d18,
+        gpio_1_d21, gpio_1_d22, gpio_1_d23, gpio_1_d24, gpio_1_d25,
+        gpio_1_d26, gpio_1_d27, gpio_1_d28, gpio_1_d29, gpio_1_d30,
+        gpio_1_d31, gpio_1_d32, gpio_1_d33, gpio_1_d34, gpio_1_d35
+    };
 
 	 
 
@@ -618,6 +633,6 @@ module top_level_test #(
     assign gpio_0_d3 = dbg_gpio_capture_r[0];
     assign gpio_1_d2 = dbg_gpio_capture_r[1];
     assign gpio_1_d3 = dbg_gpio_capture_r[2];
-    assign gpio_1_d4 = dbg_gpio_capture_r[3];
+    assign gpio_1_d4 = dbg_gpio_capture_r[3] ^ (sw9 & unused_inputs_probe);
 
 endmodule

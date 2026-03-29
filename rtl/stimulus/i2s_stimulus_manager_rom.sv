@@ -67,7 +67,6 @@ module i2s_stimulus_manager_rom #(
     logic [STARTUP_W-1:0] startup_count;
     logic startup_active;
 
-    logic [EXAMPLE_SEL_W-1:0] start_example;
     logic [EXAMPLE_SEL_W-1:0] current_example;
     logic [POINT_IDX_W-1:0]   current_point;
 
@@ -109,7 +108,7 @@ module i2s_stimulus_manager_rom #(
     function automatic [ROM_ADDR_W-1:0] calc_base_addr(
         input logic [EXAMPLE_SEL_W-1:0] example_idx
     );
-        calc_base_addr = example_idx * N_POINTS;
+        calc_base_addr = ROM_ADDR_W'(example_idx * N_POINTS);
     endfunction
 
     //------------------------------------------------------------
@@ -199,7 +198,6 @@ module i2s_stimulus_manager_rom #(
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
             state          <= ST_IDLE;
-            start_example  <= '0;
             current_example<= '0;
             current_point  <= '0;
             rom_addr_reg   <= '0;
@@ -221,7 +219,6 @@ module i2s_stimulus_manager_rom #(
                     bit_index     <= 6'd0;
 
                     if (start_pulse && chipen_i) begin
-                        start_example   <= example_sel_i;
                         current_example <= example_sel_i;
                         current_point   <= '0;
 
@@ -352,14 +349,7 @@ module i2s_stimulus_manager_rom #(
     //------------------------------------------------------------
     always_comb begin
         if (!chipen_i) begin
-`ifdef SYNTHESIS
             sd_o = 1'b0;
-`else
-            if (INACTIVE_ZERO_SYNTH)
-                sd_o = 1'b0;
-            else
-                sd_o = 1'bz;
-`endif
         end else if (target_half_active) begin
             if (bit_index == 6'd0)
                 sd_o = 1'b0;
@@ -368,14 +358,7 @@ module i2s_stimulus_manager_rom #(
             else
                 sd_o = 1'b0;
         end else begin
-`ifdef SYNTHESIS
             sd_o = 1'b0;
-`else
-            if (INACTIVE_ZERO_SYNTH)
-                sd_o = 1'b0;
-            else
-                sd_o = 1'bz;
-`endif
         end
     end
 
