@@ -19,6 +19,7 @@
 - `i2s_stimulus_manager_rom`
 - `fft_control`
 - `fft_dma_reader`
+- `fft_tx_bridge_fifo`
 - `aces_fft_ingest`
 - `sample_bridge_and_ingest`
 - `aces_audio_to_fft_pipeline`
@@ -30,6 +31,8 @@
 
 - `scripts/run_questa.sh` / `scripts/run_questa.ps1`: batch entry points for named tests.
 - `scripts/open_questa_gui.sh` / `scripts/open_questa_gui.ps1`: convenience helpers for interactive GUI launches.
+- `scripts/run_modelsim.sh` / `scripts/run_modelsim.ps1`: batch entry points mirroring Questa flow for ModelSim users.
+- `scripts/open_modelsim_gui.sh` / `scripts/open_modelsim_gui.ps1`: interactive GUI launch helpers for ModelSim users.
 - `scripts/regression_mock.sh` / `scripts/regression_mock.ps1`: batch mock regression helpers.
 - `scripts/package_portable.sh` / `scripts/package_portable.ps1`: portable package generators.
 
@@ -51,6 +54,22 @@ Windows PowerShell:
 .\sim\manifest\scripts\run_questa.ps1 top_level_test mock
 .\sim\manifest\scripts\run_questa.ps1 top_level_test
 .\sim\manifest\scripts\regression_mock.ps1
+```
+
+## Running locally with ModelSim
+
+```bash
+sim/manifest/scripts/run_modelsim.sh fft_dma_reader
+sim/manifest/scripts/run_modelsim.sh top_level_test mock
+sim/manifest/scripts/run_modelsim.sh top_level_test real
+```
+
+Windows PowerShell:
+
+```powershell
+.\sim\manifest\scripts\run_modelsim.ps1 fft_dma_reader
+.\sim\manifest\scripts\run_modelsim.ps1 top_level_test mock
+.\sim\manifest\scripts\run_modelsim.ps1 top_level_test real
 ```
 
 ## Real-IP-oriented flow

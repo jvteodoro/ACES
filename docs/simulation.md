@@ -35,6 +35,8 @@ Examples:
 - export environment variables used by the Tcl launcher,
 - launch Questa in batch mode.
 
+ModelSim users can run the mirrored wrappers `sim/manifest/scripts/run_modelsim.sh` and `sim/manifest/scripts/run_modelsim.ps1`, which use the same Tcl launcher and filelist mapping.
+
 ### Waveform setups
 Waveform `.do` files live under `sim/manifest/waves/`.
 
@@ -127,6 +129,16 @@ sim/manifest/scripts/open_questa_gui.sh sim/manifest/filelists/mock_integration_
 ```
 
 For unit and integration tests, substitute the matching filelist and wave file.
+
+Equivalent ModelSim GUI wrappers are available:
+
+```bash
+sim/manifest/scripts/open_modelsim_gui.sh sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test
+```
+
+```powershell
+.\sim\manifest\scripts\open_modelsim_gui.ps1 sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test
+```
 
 For FPGA build bring-up, the repository also includes a Quartus project entry point at `quartus/top_level_test.qpf`; its companion source manifest `quartus/top_level_test_sources.tcl` adds the active top-level RTL, the checked-in R2FFT submodule sources, and the required ROM/FFT `.qip` files and memory assignments.
 

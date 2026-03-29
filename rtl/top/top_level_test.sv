@@ -274,7 +274,7 @@ module top_level_test #(
 	 assign gpio_0_d11 = dbg_stage_sel[0];
 	 assign gpio_0_d12 = dbg_stage_sel[1];
 	 assign gpio_0_d13 = dbg_page_sel[0];
-	 assign gpio_0_d14 = dbg_page_sel[0];
+	 assign gpio_0_d14 = dbg_page_sel[1];
 
 	 
 

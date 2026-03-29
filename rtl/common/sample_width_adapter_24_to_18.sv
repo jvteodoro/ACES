@@ -6,8 +6,6 @@ module sample_width_adapter_24_to_18 (
 );
     // Sign-preserving arithmetic truncation:
     // keep the 18 MSBs and discard 6 LSBs.
-    always_comb begin
-        sample_18_o = sample_24_i[23:6];
-        valid_18_o = valid_24_i;
-    end
+    assign sample_18_o = sample_24_i[23:6];
+    assign valid_18_o  = valid_24_i;
 endmodule
