@@ -40,3 +40,4 @@ modelsim.ini
 # Quartus
 *quartus/db
 *quartus/output_files
+*quartus/incremental*
