@@ -72,6 +72,8 @@ module i2s_stimulus_manager_rom #(
     logic [POINT_IDX_W-1:0]   current_point;
 
     logic [ROM_ADDR_W-1:0] rom_addr_reg;
+    localparam int ROM_IP_ADDR_W = 12;
+    logic [ROM_IP_ADDR_W-1:0] rom_addr_ip;
     logic signed [SAMPLE_BITS-1:0] rom_q;
     logic signed [SAMPLE_BITS-1:0] current_sample;
 
@@ -92,6 +94,14 @@ module i2s_stimulus_manager_rom #(
     assign target_half_active = (lr_i == 1'b0) ? (ws_i == 1'b0) : (ws_i == 1'b1);
     assign target_half_start  = (lr_i == 1'b0) ? (ws_prev == 1'b1 && ws_i == 1'b0)
                                                : (ws_prev == 1'b0 && ws_i == 1'b1);
+
+    generate
+        if (ROM_ADDR_W >= ROM_IP_ADDR_W) begin : g_rom_addr_trunc
+            assign rom_addr_ip = rom_addr_reg[ROM_IP_ADDR_W-1:0];
+        end else begin : g_rom_addr_extend
+            assign rom_addr_ip = {{(ROM_IP_ADDR_W-ROM_ADDR_W){1'b0}}, rom_addr_reg};
+        end
+    endgenerate
 
     //------------------------------------------------------------
     // Função para calcular endereço base de cada exemplo
@@ -179,7 +189,7 @@ module i2s_stimulus_manager_rom #(
     //------------------------------------------------------------
     signals_rom_ip u_signals_rom (
         .clock   (clk),
-        .address (rom_addr_reg),
+        .address (rom_addr_ip),
         .q       (rom_q)
     );
 

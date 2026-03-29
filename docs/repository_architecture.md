@@ -15,6 +15,16 @@ That separation makes the repository easier to understand for both engineers and
 ### `rtl/`
 Only active design sources live here. If a file is part of the maintained hardware/simulation implementation, it belongs here.
 
+Design files are organized by functional layer:
+- **`rtl/common/`**: Shared pipeline stages and utilities (FFT control, DMA reader, bridge FIFO, sample adapters).
+- **`rtl/frontend/`**: I2S receiver and clock generation interface logic.
+- **`rtl/core/`**: Top-level integration orchestrating the audio-to-FFT pipeline and tagged TX outputs.
+- **`rtl/ip/`**: Vendor IP wrappers (R2FFT, ROM generators).
+- **`rtl/stimulus/`**: ROM-backed stimulus managers for deterministic testing.
+- **`rtl/top/`**: Board-level wrapper with GPIO/debug multiplexing.
+
+Modular pipeline stages (like `fft_tx_bridge_fifo`) follow a consistent handshake pattern: push/pop with valid/ready/overflow signals, enabling clean decoupling between FFT burst output and I2S serial transmission rates.
+
 ### `tb/`
 All executable testbenches and simulation-only mocks live here. Unit and integration tests are intentionally split so filelists can stay narrow.
 

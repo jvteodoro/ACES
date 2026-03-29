@@ -1,18 +1,19 @@
-module signals_rom_ip #(
-    parameter int SAMPLE_BITS   = 24,
-    parameter int N_POINTS      = 8,
-    parameter int N_EXAMPLES    = 4,
-    parameter int TOTAL_SAMPLES = N_POINTS * N_EXAMPLES,
-    parameter int ROM_ADDR_W    = (TOTAL_SAMPLES <= 1) ? 1 : $clog2(TOTAL_SAMPLES)
-) (
-    input  logic                     clock,
-    input  logic [ROM_ADDR_W-1:0]    address,
-    output logic signed [SAMPLE_BITS-1:0] q
+module signals_rom_ip (
+    input  logic               clock,
+    input  logic [11:0]        address,
+    output logic signed [23:0] q
 );
-    logic [ROM_ADDR_W-1:0] address_r;
+    localparam int SAMPLE_BITS   = 24;
+    localparam int TOTAL_SAMPLES = 4096;
+
+    logic [11:0] address_r;
     logic signed [SAMPLE_BITS-1:0] rom_mem [0:TOTAL_SAMPLES-1];
+    integer i;
 
     initial begin
+        for (i = 0; i < TOTAL_SAMPLES; i = i + 1)
+            rom_mem[i] = '0;
+
         rom_mem[0] = 24'h000001; rom_mem[1] = 24'h000002; rom_mem[2] = 24'h000003; rom_mem[3] = 24'h000004;
         rom_mem[4] = 24'h000005; rom_mem[5] = 24'h000006; rom_mem[6] = 24'h000007; rom_mem[7] = 24'h000008;
         rom_mem[8] = 24'h123450; rom_mem[9] = 24'h123451; rom_mem[10] = 24'h123452; rom_mem[11] = 24'h123453;

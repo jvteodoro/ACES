@@ -93,15 +93,26 @@ Responsibilities:
 
 - trigger DMA-style address stepping after FFT completion,
 - capture returned real/imaginary data,
-- emit bin-valid/index/last information,
-- provide a clean handoff point for future serial streaming or file logging.
+- emit bin-valid/index/last information.
 
-### 8. I2S transmit backend for FFT export
+### 8. TX bridge FIFO
+`fft_tx_bridge_fifo` is an explicit buffering stage between `fft_dma_reader` and `i2s_fft_tx_adapter`.
+
+Responsibilities:
+
+- decouple FFT DMA burst output from I2S transmit consumption,
+- keep `(real, imag, last, bfpexp)` aligned per bin entry,
+- provide a standard push/pop pipeline boundary,
+- flag bridge overflow when producer throughput exceeds consumer throughput.
+
+The active integration is in `rtl/core/aces.sv` and the dedicated FIFO module is in `rtl/common/fft_tx_bridge_fifo.sv`.
+
+### 9. I2S transmit backend for FFT export
 `i2s_fft_tx_adapter` serializes FFT output for an external reader over I2S.
 
 Responsibilities:
 
-- buffer FFT output bins in a FIFO so the FFT and serial link can run at different rates,
+- consume bins from the bridge FIFO at `fft_ready_o` pace,
 - insert `bfpexp` metadata at the start of each FFT window,
 - repeat `bfpexp` long enough for a slower external host to detect it,
 - encode metadata/data type in-band via tagged I2S words,
@@ -123,6 +134,8 @@ See `docs/i2s_fft_tx_adapter.md` for the detailed contract.
 2. The FFT core fills its input buffer and processes the transform.
 3. Completion triggers `fft_dma_reader`.
 4. Bins are read sequentially and exposed with index/valid metadata.
+5. `fft_tx_bridge_fifo` buffers `(real, imag, last, bfpexp)` entries.
+6. `i2s_fft_tx_adapter` emits tagged I2S words and inserts BFPEXP-tagged frames at each FFT-window start.
 
 ## Timing Considerations
 
@@ -163,10 +176,13 @@ A high pulse spanning multiple FFT clock cycles changes stream semantics and inv
 ### Invariant 5: FFT DMA ordering must remain monotonic
 Readout ordering must match the published bin-index contract used by validation scripts and downstream consumers.
 
-### Invariant 6: mock and real-IP flows must stay explicit
+### Invariant 6: bridge FIFO entry alignment must be preserved
+`real`, `imag`, `last`, and `bfpexp` for a given bin must always share the same FIFO entry from push to pop.
+
+### Invariant 7: mock and real-IP flows must stay explicit
 The repository should never silently mix a mock FFT path with a real-IP expectation or vice versa. The manifest/filelist boundary is part of the architecture.
 
-### Invariant 7: generated artifacts do not become source of truth
+### Invariant 8: generated artifacts do not become source of truth
 `sim/local/` and generated portable outputs must remain disposable; the versioned truth lives in `rtl/`, `tb/`, `docs/`, and `sim/manifest/`.
 
 ## Extension Guidance
@@ -296,6 +312,9 @@ The selected-and-captured debug information is routed to these board-visible dev
 | `GPIO_1_D2` | GPIO debug snapshot bit `1`. |
 | `GPIO_1_D3` | GPIO debug snapshot bit `2`. |
 | `GPIO_1_D4` | GPIO debug snapshot bit `3`. |
+| `GPIO_1_D17` | tagged TX I2S SCK output from ACES (`tx_i2s_sck_o`). |
+| `GPIO_1_D19` | tagged TX I2S WS output from ACES (`tx_i2s_ws_o`). |
+| `GPIO_1_D20` | tagged TX I2S SD output from ACES (`tx_i2s_sd_o`). |
 
 That explicit nibble ordering is important when the Analog Discovery script reconstructs a multi-digit value from the seven-segment displays: `HEX0` is always the least-significant nibble and `HEX5` is always the most-significant nibble.
 

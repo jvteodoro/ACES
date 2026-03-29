@@ -9,6 +9,8 @@ The block is intended to be synthesizable and to let the FFT run at its own rate
 ## Module location
 
 - `rtl/frontend/i2s_fft_tx_adapter.sv`
+- `rtl/common/fft_tx_bridge_fifo.sv`
+- `rtl/core/aces.sv`
 - `tb/unit/tb_i2s_fft_tx_adapter.sv`
 
 ## What the module receives
@@ -20,6 +22,8 @@ For each FFT bin, the module accepts:
 - `fft_imag_i`: imaginary part of the bin
 - `fft_last_i`: marks the last bin of the current FFT window
 - `bfpexp_i`: block-floating exponent associated with the current FFT window
+
+In the active ACES integration, these fields come from `fft_tx_bridge_fifo`, not directly from `fft_dma_reader`.
 
 The intended contract is:
 
@@ -73,17 +77,17 @@ The payload is transmitted MSB-first.
 
 ## FIFO behavior
 
-The FIFO is central to the design.
+The implementation currently has two FIFO stages:
 
-It stores both:
+- bridge FIFO (`fft_tx_bridge_fifo`) in `aces.sv` between FFT DMA readout and TX adapter,
+- adapter FIFO inside `i2s_fft_tx_adapter` used by the serializer/tagger.
 
-- the repeated-window marker entry for `bfpexp`
-- the FFT `(real, imag)` entries
+This two-stage buffering decouples the producer side and serial-consumer side:
 
-That means the producer side and the serializer side are decoupled:
+- FFT DMA readout can burst data quickly,
+- the I2S output drains data at its own slower clock rate.
 
-- the FFT can burst data quickly
-- the I2S output can drain data at its own slower clock rate
+The bridge FIFO default depth is `2048`, which stores four full 512-bin windows when each entry carries `(real, imag, last, bfpexp)` together.
 
 ### FIFO entry types
 

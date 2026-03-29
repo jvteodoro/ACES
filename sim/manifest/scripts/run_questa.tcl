@@ -91,6 +91,7 @@ array set filelists {
     i2s_stimulus_manager_rom       mock_unit_i2s_stimulus_manager_rom.f
     fft_control                    mock_unit_fft_control.f
     fft_dma_reader                 mock_unit_fft_dma_reader.f
+    fft_tx_bridge_fifo             mock_unit_fft_tx_bridge_fifo.f
     aces_audio_to_fft_pipeline     mock_integration_aces_audio_to_fft_pipeline.f
     aces                           mock_integration_aces.f
     top_level_test mock_integration_top_level_test.f
@@ -105,6 +106,7 @@ array set tops {
     i2s_stimulus_manager_rom       tb_i2s_stimulus_manager_rom
     fft_control                    tb_fft_control
     fft_dma_reader                 tb_fft_dma_reader
+    fft_tx_bridge_fifo             tb_fft_tx_bridge_fifo
     aces_audio_to_fft_pipeline     tb_aces_audio_to_fft_pipeline
     aces                           tb_aces
     top_level_test tb_top_level_test
