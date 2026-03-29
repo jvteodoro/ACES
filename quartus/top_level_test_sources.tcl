@@ -56,6 +56,7 @@ foreach relpath {
 # depend on duplicate twrom/dpram definitions inside the restored snapshot.
 foreach relpath {
     rtl/ip/rom/signals_rom_ip.qip
+    rtl/ip/output_fifo/fft_output_fifo.qip
     rtl/ip/fft/dpram.qip
     rtl/ip/fft/twrom.qip
 } {

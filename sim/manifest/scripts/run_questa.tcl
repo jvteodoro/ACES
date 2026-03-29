@@ -43,6 +43,17 @@ proc write_absolute_filelist {root local_dir source_path output_path} {
     set in [open $source_path r]
     set out [open $output_path w]
 
+    # Include Intel/Altera primitive simulation sources when available.
+    foreach sim_lib [list \
+        "/opt/intelFPGA/20.1/modelsim_ase/altera/verilog/src/220model.v" \
+        "/opt/intelFPGA/20.1/modelsim_ase/altera/verilog/src/altera_mf.v" \
+        "/opt/intelFPGA/20.1/modelsim_ase/altera/verilog/src/altera_lnsim.sv" \
+    ] {
+        if {[file exists $sim_lib]} {
+            puts $out [normalize_for_hdl $sim_lib]
+        }
+    }
+
     set staged_signals_rom [normalize_for_hdl [stage_runtime_asset         [file join $root tools signals_rom.mif]         [file join $local_dir signals_rom.mif]]]
     set staged_signals_hex [normalize_for_hdl [stage_runtime_asset         [file join $root tools signals_rom_mirror.hex]         [file join $local_dir signals_rom_mirror.hex]]]
     set staged_twrom_mif [normalize_for_hdl [stage_runtime_asset         [file join $root submodules R2FFT quartus twrom.mif]         [file join $local_dir twrom.mif]]]
@@ -144,7 +155,7 @@ vmap work work
 set local_filelist_path [file join $local_dir compiled_files.f]
 write_absolute_filelist $repo_root $local_dir $filelist_path $local_filelist_path
 
-set compile_cmd [list vlog -sv -work work -f $local_filelist_path]
+set compile_cmd [list vlog -work work -f $local_filelist_path]
 puts "Compiling: $compile_cmd"
 if {[catch {eval $compile_cmd} result]} {
     fail "Compile failed: $result"
@@ -154,7 +165,7 @@ if {$extra_filelist ne ""} {
     set local_extra_filelist_path [file join $local_dir compiled_extra_files.f]
     write_absolute_filelist $repo_root $local_dir $extra_filelist $local_extra_filelist_path
 
-    set extra_cmd [list vlog -sv -work work -f $local_extra_filelist_path]
+    set extra_cmd [list vlog -work work -f $local_extra_filelist_path]
     puts "Compiling extra filelist: $extra_cmd"
     if {[catch {eval $extra_cmd} result]} {
         fail "Extra filelist compile failed: $result"
@@ -188,10 +199,10 @@ if {$gui_mode} {
         set sim_do "view wave; log -r sim:/*; add wave -r sim:/*; run -all"
     }
 
-    set sim_cmd [list vsim -voptargs=+acc work.$top -do $sim_do]
+    set sim_cmd [list vsim -voptargs=+acc -L altera_mf work.$top -do $sim_do]
 } else {
     set sim_do "run -all; quit -code 0"
-    set sim_cmd [list vsim -c work.$top -do $sim_do]
+    set sim_cmd [list vsim -c -L altera_mf work.$top -do $sim_do]
 }
 puts "Launching: $sim_cmd"
 if {[catch {eval $sim_cmd} result]} {

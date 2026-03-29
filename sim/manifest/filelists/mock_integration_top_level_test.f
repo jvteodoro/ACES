@@ -8,6 +8,7 @@ rtl/common/sample_width_adapter_24_to_18.sv
 rtl/common/fft_control.sv
 rtl/common/fft_dma_reader.sv
 rtl/common/fft_tx_bridge_fifo.sv
+rtl/ip/output_fifo/fft_output_fifo_bb.v
 rtl/core/aces_audio_to_fft_pipeline.sv
 rtl/core/aces.sv
 rtl/stimulus/i2s_stimulus_manager_rom.sv

@@ -305,4 +305,5 @@ set_instance_assignment -name IO_STANDARD "2.5 V" -to gpio_1_d34
 set_location_assignment PIN_K16 -to gpio_1_d35
 set_instance_assignment -name IO_STANDARD "2.5 V" -to gpio_1_d35
 
+set_global_assignment -name QIP_FILE ../rtl/ip/output_fifo/fft_output_fifo.qip
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
