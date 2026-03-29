@@ -1,13 +1,13 @@
 `timescale 1ns/1ps
 
-module tb_i2s_fft_tx_adapter;
+module tb_fft_tx_i2s_link;
 
     localparam int FFT_DW             = 18;
     localparam int BFPEXP_W           = 8;
+    localparam int FIFO_DEPTH         = 8;
     localparam int I2S_SAMPLE_W       = 18;
     localparam int I2S_SLOT_W         = 32;
     localparam int CLOCK_DIV          = 2;
-    localparam int FIFO_DEPTH         = 32;
     localparam int BFPEXP_HOLD_FRAMES = 3;
     localparam int TAG_W              = 2;
     localparam int EXPECTED_COUNT     = 11;
@@ -20,26 +20,39 @@ module tb_i2s_fft_tx_adapter;
     logic clk;
     logic rst;
 
-    logic fft_valid_i;
+    logic push_i;
     logic signed [FFT_DW-1:0] fft_real_i;
     logic signed [FFT_DW-1:0] fft_imag_i;
     logic fft_last_i;
     logic signed [BFPEXP_W-1:0] bfpexp_i;
 
-    logic fft_ready_o;
+    logic fifo_valid_o;
+    logic signed [FFT_DW-1:0] fifo_real_o;
+    logic signed [FFT_DW-1:0] fifo_imag_o;
+    logic fifo_last_o;
+    logic signed [BFPEXP_W-1:0] fifo_bfpexp_o;
     logic fifo_full_o;
     logic fifo_empty_o;
-    logic overflow_o;
+    logic fifo_overflow_o;
     logic [$clog2(FIFO_DEPTH+1)-1:0] fifo_level_o;
+
+    logic bridge_pop_i;
+    logic adapter_ready_o;
+    logic adapter_fifo_full_o;
+    logic adapter_fifo_empty_o;
+    logic adapter_overflow_o;
+    logic [$clog2(FIFO_DEPTH+1)-1:0] adapter_fifo_level_o;
 
     logic i2s_sck_o;
     logic i2s_ws_o;
     logic i2s_sd_o;
 
+    int max_fifo_level_r;
+    bit saw_fifo_overflow_r;
+    bit saw_adapter_overflow_r;
     int sck_toggle_count;
     time last_sck_toggle_time;
     bit sck_timing_armed_r;
-    bit saw_overflow_r;
 
     logic mon_slot_ws_r;
     logic [I2S_SLOT_W-1:0] mon_slot_shift_r;
@@ -77,6 +90,32 @@ module tb_i2s_fft_tx_adapter;
 
     always #CLK_HALF clk = ~clk;
 
+    assign bridge_pop_i = fifo_valid_o && adapter_ready_o;
+
+    fft_tx_bridge_fifo #(
+        .FFT_DW(FFT_DW),
+        .BFPEXP_W(BFPEXP_W),
+        .FIFO_DEPTH(FIFO_DEPTH)
+    ) u_fifo (
+        .clk(clk),
+        .rst(rst),
+        .push_i(push_i),
+        .fft_real_i(fft_real_i),
+        .fft_imag_i(fft_imag_i),
+        .fft_last_i(fft_last_i),
+        .bfpexp_i(bfpexp_i),
+        .pop_i(bridge_pop_i),
+        .valid_o(fifo_valid_o),
+        .fft_real_o(fifo_real_o),
+        .fft_imag_o(fifo_imag_o),
+        .fft_last_o(fifo_last_o),
+        .bfpexp_o(fifo_bfpexp_o),
+        .full_o(fifo_full_o),
+        .empty_o(fifo_empty_o),
+        .overflow_o(fifo_overflow_o),
+        .level_o(fifo_level_o)
+    );
+
     i2s_fft_tx_adapter #(
         .FFT_DW(FFT_DW),
         .BFPEXP_W(BFPEXP_W),
@@ -85,41 +124,40 @@ module tb_i2s_fft_tx_adapter;
         .CLOCK_DIV(CLOCK_DIV),
         .FIFO_DEPTH(FIFO_DEPTH),
         .BFPEXP_HOLD_FRAMES(BFPEXP_HOLD_FRAMES)
-    ) dut (
+    ) u_adapter (
         .clk(clk),
         .rst(rst),
-        .fft_valid_i(fft_valid_i),
-        .fft_real_i(fft_real_i),
-        .fft_imag_i(fft_imag_i),
-        .fft_last_i(fft_last_i),
-        .bfpexp_i(bfpexp_i),
-        .fft_ready_o(fft_ready_o),
-        .fifo_full_o(fifo_full_o),
-        .fifo_empty_o(fifo_empty_o),
-        .overflow_o(overflow_o),
-        .fifo_level_o(fifo_level_o),
+        .fft_valid_i(fifo_valid_o),
+        .fft_real_i(fifo_real_o),
+        .fft_imag_i(fifo_imag_o),
+        .fft_last_i(fifo_last_o),
+        .bfpexp_i(fifo_bfpexp_o),
+        .fft_ready_o(adapter_ready_o),
+        .fifo_full_o(adapter_fifo_full_o),
+        .fifo_empty_o(adapter_fifo_empty_o),
+        .overflow_o(adapter_overflow_o),
+        .fifo_level_o(adapter_fifo_level_o),
         .i2s_sck_o(i2s_sck_o),
         .i2s_ws_o(i2s_ws_o),
         .i2s_sd_o(i2s_sd_o)
     );
 
-    task automatic send_fft_bin(
+    task automatic push_fft_bin(
         input logic signed [FFT_DW-1:0] real_i,
         input logic signed [FFT_DW-1:0] imag_i,
         input logic signed [BFPEXP_W-1:0] bfpexp_i_t,
         input logic last_i
     );
         begin
-            wait (fft_ready_o === 1'b1);
             @(negedge clk);
-            fft_valid_i = 1'b1;
+            push_i      = 1'b1;
             fft_real_i  = real_i;
             fft_imag_i  = imag_i;
             fft_last_i  = last_i;
             bfpexp_i    = bfpexp_i_t;
             @(posedge clk);
             @(negedge clk);
-            fft_valid_i = 1'b0;
+            push_i      = 1'b0;
             fft_last_i  = 1'b0;
         end
     endtask
@@ -162,7 +200,7 @@ module tb_i2s_fft_tx_adapter;
             end
 
             if (!found)
-                $fatal(1, "Nao foi encontrado o primeiro frame esperado.");
+                $fatal(1, "Nao foi encontrado o primeiro frame esperado na integracao.");
         end
     endtask
 
@@ -178,7 +216,7 @@ module tb_i2s_fft_tx_adapter;
                 end
 
                 if (captured_read_idx >= captured_write_idx)
-                    $fatal(1, "Timeout esperando frame idx=%0d", idx);
+                    $fatal(1, "Timeout esperando frame de integracao idx=%0d", idx);
 
                 assert (captured_tag_mem[captured_read_idx] === expected_tag_mem[idx])
                 else $fatal(1, "TAG mismatch idx=%0d exp=%0d got=%0d",
@@ -199,22 +237,27 @@ module tb_i2s_fft_tx_adapter;
 
     always @(posedge clk) begin
         if (rst) begin
-            saw_overflow_r             <= 1'b0;
+            max_fifo_level_r            <= 0;
+            saw_fifo_overflow_r         <= 1'b0;
+            saw_adapter_overflow_r      <= 1'b0;
         end else begin
-            if (overflow_o)
-                saw_overflow_r <= 1'b1;
+            if (fifo_level_o > max_fifo_level_r)
+                max_fifo_level_r <= fifo_level_o;
 
-            assert (fft_ready_o == !dut.pending_valid_r)
-            else $fatal(1, "fft_ready_o incoerente com pending_valid_r.");
+            if (fifo_overflow_o)
+                saw_fifo_overflow_r <= 1'b1;
 
-            assert (fifo_full_o == dut.pending_valid_r)
-            else $fatal(1, "fifo_full_o incoerente com pending_valid_r.");
+            if (adapter_overflow_o)
+                saw_adapter_overflow_r <= 1'b1;
 
-            assert (fifo_empty_o == !dut.pending_valid_r)
-            else $fatal(1, "fifo_empty_o incoerente com pending_valid_r.");
+            assert (bridge_pop_i == (fifo_valid_o && adapter_ready_o))
+            else $fatal(1, "bridge_pop_i incoerente com valid/ready.");
 
-            assert (fifo_level_o == (dut.pending_valid_r ? 1 : 0))
-            else $fatal(1, "fifo_level_o incoerente com pending_valid_r.");
+            assert (fifo_valid_o == !fifo_empty_o)
+            else $fatal(1, "FIFO valid/empty incoerentes.");
+
+            assert (fifo_full_o == (fifo_level_o == FIFO_DEPTH))
+            else $fatal(1, "FIFO full incoerente com level=%0d", fifo_level_o);
 
         end
     end
@@ -256,14 +299,14 @@ module tb_i2s_fft_tx_adapter;
                 mon_slot_count_r <= 1;
             end else begin
                 assert (i2s_ws_o == mon_slot_ws_r)
-                else $fatal(1, "WS mudou no meio do slot I2S.");
+                else $fatal(1, "WS mudou no meio do slot I2S na integracao.");
 
                 completed_word = {mon_slot_shift_r[I2S_SLOT_W-2:0], i2s_sd_o};
 
                 if (mon_slot_count_r == I2S_SLOT_W-1) begin
                     if (mon_prev_slot_valid_r) begin
                         assert (mon_prev_slot_ws_r != mon_slot_ws_r)
-                        else $fatal(1, "WS nao alternou entre slots consecutivos.");
+                        else $fatal(1, "WS nao alternou entre slots consecutivos na integracao.");
                     end
 
                     mon_prev_slot_valid_r <= 1'b1;
@@ -276,10 +319,11 @@ module tb_i2s_fft_tx_adapter;
                         mon_have_right_r <= 1'b1;
                     end else if (mon_have_right_r) begin
                         if (captured_write_idx >= CAPTURE_DEPTH) begin
-                            $fatal(1, "CAPTURE_DEPTH insuficiente no monitor I2S.");
+                            $fatal(1, "CAPTURE_DEPTH insuficiente no monitor de integracao.");
                         end else begin
                             assert (decode_tag(completed_word) == decode_tag(mon_right_word_r))
-                            else $fatal(1, "Tags diferentes entre canais no frame idx=%0d", captured_write_idx);
+                            else $fatal(1, "Tags diferentes entre canais no frame de integracao idx=%0d",
+                                        captured_write_idx);
 
                             captured_tag_mem[captured_write_idx]   <= decode_tag(completed_word);
                             captured_left_mem[captured_write_idx]  <= decode_payload(completed_word);
@@ -297,24 +341,24 @@ module tb_i2s_fft_tx_adapter;
     end
 
     initial begin
-        clk              = 1'b0;
-        rst              = 1'b1;
-        fft_valid_i      = 1'b0;
-        fft_real_i       = '0;
-        fft_imag_i       = '0;
-        fft_last_i       = 1'b0;
-        bfpexp_i         = '0;
+        clk               = 1'b0;
+        rst               = 1'b1;
+        push_i            = 1'b0;
+        fft_real_i        = '0;
+        fft_imag_i        = '0;
+        fft_last_i        = 1'b0;
+        bfpexp_i          = '0;
         captured_read_idx = 0;
 
         repeat (4) @(posedge clk);
         rst = 1'b0;
         repeat (2) @(posedge clk);
 
-        send_fft_bin(18'sd10, -18'sd10,  8'sd5, 1'b0);
-        send_fft_bin(18'sd20, -18'sd20,  8'sd5, 1'b0);
-        send_fft_bin(18'sd30, -18'sd30,  8'sd5, 1'b1);
-        send_fft_bin(18'sd40, -18'sd40, -8'sd3, 1'b0);
-        send_fft_bin(18'sd50, -18'sd50, -8'sd3, 1'b1);
+        push_fft_bin(18'sd10, -18'sd10,  8'sd5, 1'b0);
+        push_fft_bin(18'sd20, -18'sd20,  8'sd5, 1'b0);
+        push_fft_bin(18'sd30, -18'sd30,  8'sd5, 1'b1);
+        push_fft_bin(18'sd40, -18'sd40, -8'sd3, 1'b0);
+        push_fft_bin(18'sd50, -18'sd50, -8'sd3, 1'b1);
 
         set_expected_frame(0,  TAG_BFPEXP_C,  18'sd5,   18'sd5);
         set_expected_frame(1,  TAG_BFPEXP_C,  18'sd5,   18'sd5);
@@ -331,15 +375,22 @@ module tb_i2s_fft_tx_adapter;
         wait_for_first_expected_frame();
         check_expected_sequence();
 
+        assert (max_fifo_level_r >= 3)
+        else $fatal(1, "A FIFO nao desacoplou o burst como esperado. max_level=%0d", max_fifo_level_r);
+
+        assert (!saw_fifo_overflow_r)
+        else $fatal(1, "fifo_overflow_o nao deveria ter sido ativado.");
+
+        assert (!saw_adapter_overflow_r)
+        else $fatal(1, "adapter_overflow_o nao deveria ter sido ativado.");
+
         assert (sck_toggle_count > 64)
         else $fatal(1, "Poucos toggles de SCK observados: %0d", sck_toggle_count);
 
-        assert (!saw_overflow_r)
-        else $fatal(1, "overflow_o nao deveria ter sido ativado no fluxo nominal.");
-
+        wait (fifo_empty_o == 1'b1);
         repeat (8) @(posedge clk);
 
-        $display("tb_i2s_fft_tx_adapter PASSED");
+        $display("tb_fft_tx_i2s_link PASSED");
         $finish;
     end
 

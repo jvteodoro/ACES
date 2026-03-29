@@ -29,6 +29,7 @@ add wave sim:/tb_fft_tx_bridge_fifo/empty_o
 
 add wave -divider {DUT internals}
 add wave -radix binary sim:/tb_fft_tx_bridge_fifo/dut/fifo_mem
+add wave -radix hex sim:/tb_fft_tx_bridge_fifo/dut/head_word
 add wave -radix unsigned sim:/tb_fft_tx_bridge_fifo/dut/wptr_r
 add wave -radix unsigned sim:/tb_fft_tx_bridge_fifo/dut/rptr_r
 

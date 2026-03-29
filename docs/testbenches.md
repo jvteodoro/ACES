@@ -25,6 +25,11 @@ Characteristics:
 - direct assertions close to the behavior being tested,
 - fast debug turnaround.
 
+Current examples in this repository:
+
+- `tb_fft_tx_bridge_fifo` verifies aligned FIFO semantics for `(real, imag, last, bfpexp)`.
+- `tb_i2s_fft_tx_adapter` verifies tagged I2S framing, hold frames, and serializer timing.
+
 ## Integration Testbenches
 
 Integration benches should verify behavior across boundaries such as:
@@ -35,6 +40,11 @@ Integration benches should verify behavior across boundaries such as:
 - top-level simulation wrapper plus ROM stimulus flow.
 
 These tests validate contracts between modules rather than just local combinational correctness.
+
+Current examples in this repository:
+
+- `tb_aces_audio_to_fft_pipeline` verifies receive-side frontend composition.
+- `tb_fft_tx_i2s_link` verifies burst-to-serial behavior across `fft_tx_bridge_fifo` and `i2s_fft_tx_adapter`.
 
 ## Mock vs Real-IP Testbenches
 

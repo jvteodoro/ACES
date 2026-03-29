@@ -103,6 +103,7 @@ array set filelists {
     fft_control                    mock_unit_fft_control.f
     fft_dma_reader                 mock_unit_fft_dma_reader.f
     fft_tx_bridge_fifo             mock_unit_fft_tx_bridge_fifo.f
+    fft_tx_i2s_link                mock_integration_fft_tx_i2s_link.f
     aces_audio_to_fft_pipeline     mock_integration_aces_audio_to_fft_pipeline.f
     aces                           mock_integration_aces.f
     top_level_test mock_integration_top_level_test.f
@@ -118,6 +119,7 @@ array set tops {
     fft_control                    tb_fft_control
     fft_dma_reader                 tb_fft_dma_reader
     fft_tx_bridge_fifo             tb_fft_tx_bridge_fifo
+    fft_tx_i2s_link                tb_fft_tx_i2s_link
     aces_audio_to_fft_pipeline     tb_aces_audio_to_fft_pipeline
     aces                           tb_aces
     top_level_test tb_top_level_test

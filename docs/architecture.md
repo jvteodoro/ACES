@@ -105,14 +105,14 @@ Responsibilities:
 - provide a standard push/pop pipeline boundary,
 - flag bridge overflow when producer throughput exceeds consumer throughput.
 
-The active integration is in `rtl/core/aces.sv` and the dedicated FIFO module is in `rtl/common/fft_tx_bridge_fifo.sv`.
+The dedicated FIFO module is in `rtl/common/fft_tx_bridge_fifo.sv`, and the focused subsystem verification of this boundary is `tb/integration/tb_fft_tx_i2s_link.sv`.
 
 ### 9. I2S transmit backend for FFT export
 `i2s_fft_tx_adapter` serializes FFT output for an external reader over I2S.
 
 Responsibilities:
 
-- consume bins from the bridge FIFO at `fft_ready_o` pace,
+- consume bins from the bridge FIFO or equivalent staged source at `fft_ready_o` pace,
 - insert `bfpexp` metadata at the start of each FFT window,
 - repeat `bfpexp` long enough for a slower external host to detect it,
 - encode metadata/data type in-band via tagged I2S words,

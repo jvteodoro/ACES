@@ -51,6 +51,9 @@ These are checked in so that waveform review can be shared instead of recreated 
 From the repository root:
 
 ```bash
+sim/manifest/scripts/run_questa.sh fft_tx_bridge_fifo
+sim/manifest/scripts/run_questa.sh i2s_fft_tx_adapter
+sim/manifest/scripts/run_questa.sh fft_tx_i2s_link
 sim/manifest/scripts/run_questa.sh hexa7seg
 sim/manifest/scripts/run_questa.sh i2s_rx_adapter_24
 sim/manifest/scripts/run_questa.sh i2s_master_clock_gen
@@ -68,6 +71,8 @@ sim/manifest/scripts/run_questa.sh top_level_test
 To open the same supported targets in GUI mode and auto-load the matching checked-in wave file:
 
 ```bash
+sim/manifest/scripts/run_questa.sh i2s_fft_tx_adapter gui
+sim/manifest/scripts/run_questa.sh fft_tx_i2s_link gui
 sim/manifest/scripts/run_questa.sh hexa7seg gui
 sim/manifest/scripts/run_questa.sh fft_dma_reader gui
 sim/manifest/scripts/run_questa.sh top_level_test mock gui
@@ -76,6 +81,9 @@ sim/manifest/scripts/run_questa.sh top_level_test mock gui
 Windows PowerShell equivalents:
 
 ```powershell
+.\sim\manifest\scripts\run_questa.ps1 fft_tx_bridge_fifo
+.\sim\manifest\scripts\run_questa.ps1 i2s_fft_tx_adapter
+.\sim\manifest\scripts\run_questa.ps1 fft_tx_i2s_link
 .\sim\manifest\scripts\run_questa.ps1 hexa7seg
 .\sim\manifest\scripts\run_questa.ps1 i2s_rx_adapter_24
 .\sim\manifest\scripts\run_questa.ps1 fft_control
@@ -89,6 +97,8 @@ Windows PowerShell equivalents:
 PowerShell GUI equivalents:
 
 ```powershell
+.\sim\manifest\scripts\run_questa.ps1 i2s_fft_tx_adapter -Gui
+.\sim\manifest\scripts\run_questa.ps1 fft_tx_i2s_link -Gui
 .\sim\manifest\scripts\run_questa.ps1 hexa7seg -Gui
 .\sim\manifest\scripts\run_questa.ps1 fft_dma_reader -Gui
 .\sim\manifest\scripts\run_questa.ps1 top_level_test mock -Gui

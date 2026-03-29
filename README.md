@@ -57,6 +57,9 @@ ACES supports two complementary simulation flows:
 From the repository root:
 
 ```bash
+sim/manifest/scripts/run_questa.sh fft_tx_bridge_fifo
+sim/manifest/scripts/run_questa.sh i2s_fft_tx_adapter
+sim/manifest/scripts/run_questa.sh fft_tx_i2s_link
 sim/manifest/scripts/run_questa.sh i2s_rx_adapter_24
 sim/manifest/scripts/run_questa.sh fft_dma_reader
 sim/manifest/scripts/run_questa.sh sample_bridge_and_ingest
@@ -80,6 +83,9 @@ sim/manifest/scripts/regression_mock.sh
 Windows PowerShell equivalents:
 
 ```powershell
+.\sim\manifest\scripts\run_questa.ps1 fft_tx_bridge_fifo
+.\sim\manifest\scripts\run_questa.ps1 i2s_fft_tx_adapter
+.\sim\manifest\scripts\run_questa.ps1 fft_tx_i2s_link
 .\sim\manifest\scripts\run_questa.ps1 i2s_rx_adapter_24
 .\sim\manifest\scripts\run_questa.ps1 fft_dma_reader
 .\sim\manifest\scripts\regression_mock.ps1
@@ -109,6 +115,8 @@ To preserve an already-open simulator session, pass `-KeepExistingSessions` to t
 To open the supported testbenches directly in GUI mode from the main launcher and load the matching checked-in wave setup:
 
 ```bash
+sim/manifest/scripts/run_questa.sh i2s_fft_tx_adapter gui
+sim/manifest/scripts/run_questa.sh fft_tx_i2s_link gui
 sim/manifest/scripts/run_questa.sh hexa7seg gui
 sim/manifest/scripts/run_questa.sh i2s_rx_adapter_24 gui
 sim/manifest/scripts/run_questa.sh top_level_test mock gui

@@ -26,19 +26,68 @@ module fft_tx_bridge_fifo #(
     output logic [$clog2(FIFO_DEPTH+1)-1:0] level_o
 );
 
-    // FIFO RTL removida intencionalmente para migracao para FIFO IP externa.
-    logic unused_inputs_sink;
-    assign unused_inputs_sink = clk ^ rst ^ push_i ^ pop_i ^ fft_last_i ^
-                                fft_real_i[0] ^ fft_imag_i[0] ^ bfpexp_i[0];
+    localparam int ENTRY_W = (2 * FFT_DW) + BFPEXP_W + 1;
+    localparam int PTR_W   = (FIFO_DEPTH <= 1) ? 1 : $clog2(FIFO_DEPTH);
 
-    assign valid_o    = 1'b0 & unused_inputs_sink;
-    assign fft_real_o = '0;
-    assign fft_imag_o = '0;
-    assign fft_last_o = 1'b0;
-    assign bfpexp_o   = '0;
-    assign full_o     = 1'b0;
-    assign empty_o    = 1'b1;
-    assign overflow_o = 1'b0;
-    assign level_o    = '0;
+    logic [ENTRY_W-1:0] fifo_mem [0:FIFO_DEPTH-1];
+    logic [PTR_W-1:0] wptr_r;
+    logic [PTR_W-1:0] rptr_r;
+    logic [ENTRY_W-1:0] head_word;
+
+    function automatic logic [PTR_W-1:0] fifo_inc_ptr(
+        input logic [PTR_W-1:0] ptr_i
+    );
+        begin
+            if (ptr_i == FIFO_DEPTH-1)
+                fifo_inc_ptr = '0;
+            else
+                fifo_inc_ptr = ptr_i + 1'b1;
+        end
+    endfunction
+
+    assign head_word = fifo_mem[rptr_r];
+
+    assign valid_o    = (level_o != '0);
+    assign empty_o    = (level_o == '0);
+    assign full_o     = (level_o == FIFO_DEPTH);
+    assign fft_real_o = empty_o ? '0 : head_word[ENTRY_W-1 -: FFT_DW];
+    assign fft_imag_o = empty_o ? '0 : head_word[BFPEXP_W+1 +: FFT_DW];
+    assign fft_last_o = empty_o ? 1'b0 : head_word[BFPEXP_W];
+    assign bfpexp_o   = empty_o ? '0 : head_word[BFPEXP_W-1:0];
+
+    initial begin
+        if (FIFO_DEPTH < 1)
+            $error("fft_tx_bridge_fifo: FIFO_DEPTH deve ser >= 1.");
+    end
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            wptr_r      <= '0;
+            rptr_r      <= '0;
+            level_o     <= '0;
+            overflow_o  <= 1'b0;
+        end else begin
+            logic do_push;
+            logic do_pop;
+
+            do_pop      = pop_i && !empty_o;
+            do_push     = push_i && (!full_o || do_pop);
+            overflow_o  <= push_i && full_o && !do_pop;
+
+            if (do_push) begin
+                fifo_mem[wptr_r] <= {fft_real_i, fft_imag_i, fft_last_i, bfpexp_i};
+                wptr_r <= fifo_inc_ptr(wptr_r);
+            end
+
+            if (do_pop)
+                rptr_r <= fifo_inc_ptr(rptr_r);
+
+            case ({do_push, do_pop})
+                2'b10: level_o <= level_o + 1'b1;
+                2'b01: level_o <= level_o - 1'b1;
+                default: level_o <= level_o;
+            endcase
+        end
+    end
 
 endmodule

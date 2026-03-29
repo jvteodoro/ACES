@@ -25,8 +25,9 @@
 // - bits intermediarios reservados em zero ate completar I2S_SLOT_W bits.
 //
 // Observacao importante:
-// - Este modulo nao contem FIFO interna.
-// - A insercao de uma FIFO IP externa deve ser feita no nivel superior.
+// - Este modulo nao contem FIFO profunda para absorver bursts da FFT.
+// - Existe apenas um registrador pendente de 1 entrada para handshake.
+// - A desacoplagem principal deve ser feita por uma FIFO externa.
 //
 // Observacao:
 // - Este arquivo contem apenas RTL sintetizavel. O testbench correspondente
@@ -61,13 +62,15 @@ module i2s_fft_tx_adapter #(
     output logic i2s_sd_o
 );
 
-    localparam int SLOT_BIT_W  = (I2S_SLOT_W <= 1) ? 1 : $clog2(I2S_SLOT_W);
-    localparam int HOLD_CNT_W  = $clog2(BFPEXP_HOLD_FRAMES + 1);
-    localparam int TAG_W       = 2;
-    localparam int RESERVED_W  = I2S_SLOT_W - I2S_SAMPLE_W - TAG_W;
-    localparam int DIV_CNT_W   = (CLOCK_DIV <= 1) ? 1 : $clog2(CLOCK_DIV);
+    localparam int SLOT_BIT_W    = (I2S_SLOT_W <= 1) ? 1 : $clog2(I2S_SLOT_W);
+    localparam int HOLD_CNT_W    = $clog2(BFPEXP_HOLD_FRAMES + 1);
+    localparam int TAG_W         = 2;
+    localparam int RESERVED_W    = I2S_SLOT_W - I2S_SAMPLE_W - TAG_W;
+    localparam int DIV_CNT_W     = (CLOCK_DIV <= 1) ? 1 : $clog2(CLOCK_DIV);
+    localparam int FIFO_LEVEL_W  = $clog2(FIFO_DEPTH + 1);
     localparam logic [HOLD_CNT_W-1:0] BFPEXP_HOLD_FRAMES_C = HOLD_CNT_W'(BFPEXP_HOLD_FRAMES);
     localparam logic [HOLD_CNT_W-1:0] ONE_HOLD_FRAME_C     = {{(HOLD_CNT_W-1){1'b0}}, 1'b1};
+    localparam logic [FIFO_LEVEL_W-1:0] ONE_FIFO_LEVEL_C   = {{(FIFO_LEVEL_W-1){1'b0}}, 1'b1};
     localparam logic [TAG_W-1:0] TAG_IDLE_C   = 2'd0;
     localparam logic [TAG_W-1:0] TAG_BFPEXP_C = 2'd1;
     localparam logic [TAG_W-1:0] TAG_FFT_C    = 2'd2;
@@ -89,6 +92,12 @@ module i2s_fft_tx_adapter #(
     logic signed [FFT_DW-1:0] pending_imag_r;
     logic pending_last_r;
     logic signed [BFPEXP_W-1:0] pending_bfpexp_r;
+
+    logic stalled_input_valid_r;
+    logic signed [FFT_DW-1:0] stalled_real_r;
+    logic signed [FFT_DW-1:0] stalled_imag_r;
+    logic stalled_last_r;
+    logic signed [BFPEXP_W-1:0] stalled_bfpexp_r;
 
     function automatic logic signed [I2S_SAMPLE_W-1:0] extend_fft_sample(
         input logic signed [FFT_DW-1:0] sample_i
@@ -119,15 +128,18 @@ module i2s_fft_tx_adapter #(
     endfunction
 
     assign fft_ready_o   = !pending_valid_r;
-    assign fifo_full_o   = 1'b0;
-    assign fifo_empty_o  = 1'b1;
-    assign overflow_o    = 1'b0;
-    assign fifo_level_o  = '0;
+    assign fifo_full_o   = pending_valid_r;
+    assign fifo_empty_o  = !pending_valid_r;
+    assign fifo_level_o  = pending_valid_r ? ONE_FIFO_LEVEL_C : '0;
     assign i2s_sd_o      = active_valid_r ? i2s_slot_bit(active_tag_r, channel_r ? active_right_r : active_left_r, slot_bit_r) : 1'b0;
 
     initial begin
         if (I2S_SAMPLE_W > (I2S_SLOT_W - TAG_W))
             $error("i2s_fft_tx_adapter: I2S_SAMPLE_W deve caber no slot junto com os bits de tag.");
+        if (I2S_SAMPLE_W < FFT_DW)
+            $error("i2s_fft_tx_adapter: I2S_SAMPLE_W deve ser >= FFT_DW.");
+        if (I2S_SAMPLE_W < BFPEXP_W)
+            $error("i2s_fft_tx_adapter: I2S_SAMPLE_W deve ser >= BFPEXP_W.");
         if (BFPEXP_HOLD_FRAMES < 1)
             $error("i2s_fft_tx_adapter: BFPEXP_HOLD_FRAMES deve ser >= 1.");
     end
@@ -153,12 +165,37 @@ module i2s_fft_tx_adapter #(
             pending_imag_r              <= '0;
             pending_last_r              <= 1'b0;
             pending_bfpexp_r            <= '0;
+
+            stalled_input_valid_r       <= 1'b0;
+            stalled_real_r              <= '0;
+            stalled_imag_r              <= '0;
+            stalled_last_r              <= 1'b0;
+            stalled_bfpexp_r            <= '0;
+            overflow_o                  <= 1'b0;
         end else begin
             logic frame_boundary;
             logic next_channel;
 
             frame_boundary = 1'b0;
             next_channel   = channel_r;
+            overflow_o     <= 1'b0;
+
+            if (pending_valid_r && fft_valid_i) begin
+                if (!stalled_input_valid_r) begin
+                    stalled_input_valid_r <= 1'b1;
+                    stalled_real_r        <= fft_real_i;
+                    stalled_imag_r        <= fft_imag_i;
+                    stalled_last_r        <= fft_last_i;
+                    stalled_bfpexp_r      <= bfpexp_i;
+                end else if ((fft_real_i  !== stalled_real_r)   ||
+                             (fft_imag_i  !== stalled_imag_r)   ||
+                             (fft_last_i  !== stalled_last_r)   ||
+                             (bfpexp_i    !== stalled_bfpexp_r)) begin
+                    overflow_o            <= 1'b1;
+                end
+            end else begin
+                stalled_input_valid_r <= 1'b0;
+            end
 
             if (!pending_valid_r && fft_valid_i) begin
                 pending_valid_r  <= 1'b1;

@@ -8,6 +8,8 @@ $tests = @(
     'fft_control',
     'fft_dma_reader',
     'fft_tx_bridge_fifo',
+    'i2s_fft_tx_adapter',
+    'fft_tx_i2s_link',
     'aces_audio_to_fft_pipeline',
     'aces',
     'top_level_test'

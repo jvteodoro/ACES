@@ -144,3 +144,48 @@ O teste também verifica a infraestrutura de captura via GPIO, importante para c
 | Seleção Stage 1 / Page 0 + pulso de captura | GPIOs capturados devem refletir `{lr_sel, chipen, ws, sck}` | Sim, se os sinais I2S forem capturados corretamente | Registrar erro de roteamento nos probes |
 | Displays HEX após captura | `HEX0..HEX5` não devem permanecer indefinidos | Sim, se a codificação 7-seg for válida | Registrar nibble inválido ou display indefinido |
 
+## 4.3.11 Cenário de Teste 11 — `tb_fft_tx_bridge_fifo`
+
+Este cenário valida a FIFO dedicada à ponte entre a leitura DMA da FFT e o backend de transmissão I2S. O objetivo é garantir que os campos `real`, `imag`, `last` e `bfpexp` permaneçam alinhados em cada entrada e que a ordem dos bins seja preservada mesmo em operações simultâneas de push e pop.
+
+O testbench cobre reset, enchimento, leitura, overflow e o caso crítico de `push+pop` no mesmo ciclo, que é justamente o comportamento esperado quando a FFT ainda produz bins enquanto o serializador já começou a drenar a fila.
+
+**Tabela 11 – Descrição e Resultados Simulados do `tb_fft_tx_bridge_fifo`**
+
+| Entradas | Saídas Esperadas | Resultado Simulado OK? | Análise de Não Conformidades |
+| --- | --- | --- | --- |
+| Reset inicial sem `push_i`/`pop_i` | `empty_o = 1`, `valid_o = 0`, `level_o = 0`, `overflow_o = 0` | Sim, se o estado inicial for coerente | Registrar flag inicial incorreta ou lixo residual |
+| Dois pushes com bins conhecidos | Cabeça da FIFO deve refletir o primeiro bin e `level_o = 2` | Sim, se a ordenação e o nível forem preservados | Registrar bin fora de ordem ou ocupação incorreta |
+| Enchimento até `FIFO_DEPTH` | `full_o = 1` e `level_o = FIFO_DEPTH` | Sim, se a FIFO sinalizar cheia no instante correto | Registrar saturação prematura ou ausência de `full` |
+| Push extra com FIFO cheia | `overflow_o` deve pulsar e o conteúdo anterior deve permanecer íntegro | Sim, se o write for rejeitado sem corromper a fila | Registrar corrupção de dados ou overflow ausente |
+| `push_i` e `pop_i` simultâneos | A ocupação deve se manter e o novo bin deve entrar no final da fila | Sim, se a ordem final for preservada | Registrar perda, duplicação ou desalinhamento de bin |
+
+## 4.3.12 Cenário de Teste 12 — `tb_i2s_fft_tx_adapter`
+
+Este cenário valida o adaptador que converte bins da FFT em palavras I2S etiquetadas. O objetivo é verificar não apenas os valores transmitidos, mas também a temporização do serializador: período de `SCK`, estabilidade de `WS` dentro de cada slot e ordenação dos frames entre janelas FFT.
+
+O bench usa duas janelas FFT com expoentes distintos e decodifica o barramento serial em palavras novamente, permitindo checar a sequência completa de frames `BFPEXP` e `FFT` com asserts estruturais e temporais.
+
+**Tabela 12 – Descrição e Resultados Simulados do `tb_i2s_fft_tx_adapter`**
+
+| Entradas | Saídas Esperadas | Resultado Simulado OK? | Análise de Não Conformidades |
+| --- | --- | --- | --- |
+| Cinco bins organizados em duas janelas FFT | Inserção de `BFPEXP` antes de cada janela e bins serializados em ordem | Sim, se a sequência decodificada casar com a esperada | Registrar frame ausente, fora de ordem ou com tag incorreta |
+| `CLOCK_DIV = 2` durante a transmissão | `i2s_sck_o` deve alternar com período lógico constante | Sim, se nenhuma assertiva temporal falhar | Registrar jitter lógico ou divisor incorreto |
+| Slots I2S completos de 32 bits | `i2s_ws_o` deve permanecer estável dentro do slot e alternar entre slots | Sim, se o framing permanecer consistente | Registrar mudança de `WS` no meio do slot ou alternância ausente |
+| Handshake com registrador pendente de 1 entrada | `fft_ready_o`, `fifo_full_o`, `fifo_empty_o` e `fifo_level_o` devem refletir o estado interno | Sim, se os sinais permanecerem coerentes | Registrar backpressure incorreto ou flag inconsistente |
+
+## 4.3.13 Cenário de Teste 13 — `tb_fft_tx_i2s_link`
+
+Este cenário integra a FIFO de ponte com o adaptador I2S, modelando o caso real em que a FFT produz bins em burst e o link serial os consome mais lentamente. O objetivo é comprovar o desacoplamento temporal entre produtor e consumidor sem perda de ordenação.
+
+O bench injeta duas janelas FFT consecutivas, mede a ocupação máxima da FIFO, verifica ausência de overflow e decodifica a saída serial para confirmar que a sequência transmitida continua idêntica à do cenário unitário do adaptador.
+
+**Tabela 13 – Descrição e Resultados Simulados do `tb_fft_tx_i2s_link`**
+
+| Entradas | Saídas Esperadas | Resultado Simulado OK? | Análise de Não Conformidades |
+| --- | --- | --- | --- |
+| Burst de bins aplicados na FIFO em ciclos consecutivos | `fifo_level_o` deve crescer acima de 1 antes do escoamento completo | Sim, se a FIFO desacoplar produtor e consumidor | Registrar ocupação insuficiente ou ausência de desacoplamento |
+| Handshake `valid_o/fft_ready_o` entre FIFO e adapter | `bridge_pop_i` deve ocorrer somente quando ambos estiverem aptos | Sim, se o pop ocorrer apenas em condição válida | Registrar leitura espúria ou perda de sincronismo entre módulos |
+| Saída I2S decodificada após duas janelas FFT | Mesma sequência de tags e payloads esperada no backend serial | Sim, se todos os frames coincidirem | Registrar divergência entre caminho isolado e caminho integrado |
+| Execução completa sem saturar a cadeia | `fifo_overflow_o = 0` e `adapter_overflow_o = 0` | Sim, se não houver violação de protocolo nem perda de dados | Registrar o estágio e o instante da saturação observada |
