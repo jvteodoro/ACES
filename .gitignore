@@ -36,3 +36,7 @@ modelsim.ini
 
 # DVT
 *.dvt
+
+# Quartus
+*quartus/db
+*quartus/output_files
