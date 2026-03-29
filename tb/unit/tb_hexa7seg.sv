@@ -36,7 +36,7 @@ module tb_hexa7seg;
             #1;
 
             assert (display === expected[idx])
-            else $error("hexa7seg mismatch for input 0x%0h: got=%07b expected=%07b",
+            else $fatal(1, "hexa7seg mismatch for input 0x%0h: got=%07b expected=%07b",
                         hexa, display, expected[idx]);
         end
 

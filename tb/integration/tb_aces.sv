@@ -143,7 +143,7 @@ module tb_aces;
         // Verifica o contrato do adapter (24 -> 18) sem depender do conteúdo da ROM.
         if (mic_count < FFT_LENGTH) begin
             assert (sample_mic_o === trunc_24_to_18(sample_24_dbg_o))
-            else $error("ACES mic sample mismatch idx=%0d exp=0x%05h got=0x%05h",
+            else $fatal(1, "ACES mic sample mismatch idx=%0d exp=0x%05h got=0x%05h",
                         mic_count, trunc_24_to_18(sample_24_dbg_o), sample_mic_o);
         end
 
@@ -153,17 +153,17 @@ module tb_aces;
     always @(posedge clk) begin
         if (fft_tx_valid_o) begin
             assert (fft_tx_index_o == fft_bin_count[$clog2(FFT_LENGTH)-1:0])
-            else $error("FFT tx index mismatch idx=%0d got=%0d", fft_bin_count, fft_tx_index_o);
+            else $fatal(1, "FFT tx index mismatch idx=%0d got=%0d", fft_bin_count, fft_tx_index_o);
 
             assert (fft_tx_real_o == fft_bin_count + 1)
-            else $error("FFT tx real mismatch idx=%0d got=%0d", fft_bin_count, fft_tx_real_o);
+            else $fatal(1, "FFT tx real mismatch idx=%0d got=%0d", fft_bin_count, fft_tx_real_o);
 
             assert (fft_tx_imag_o == expected_mock_imag(fft_bin_count))
-            else $error("FFT tx imag mismatch idx=%0d exp=%0d got=%0d",
+            else $fatal(1, "FFT tx imag mismatch idx=%0d exp=%0d got=%0d",
                         fft_bin_count, expected_mock_imag(fft_bin_count), fft_tx_imag_o);
 
             assert (fft_tx_last_o == (fft_bin_count == FFT_LENGTH-1))
-            else $error("FFT tx last mismatch idx=%0d", fft_bin_count);
+            else $fatal(1, "FFT tx last mismatch idx=%0d", fft_bin_count);
 
             fft_bin_count = fft_bin_count + 1;
         end
@@ -193,10 +193,10 @@ module tb_aces;
 
         // Pode haver uma amostra extra de borda enquanto o FFT window fecha.
         assert ((mic_count >= FFT_LENGTH) && (mic_count <= FFT_LENGTH + 1))
-        else $error("ACES expected %0d..%0d mic samples got %0d", FFT_LENGTH, FFT_LENGTH + 1, mic_count);
+        else $fatal(1, "ACES expected %0d..%0d mic samples got %0d", FFT_LENGTH, FFT_LENGTH + 1, mic_count);
 
         assert (fft_bin_count == FFT_LENGTH)
-        else $error("ACES expected %0d fft bins got %0d", FFT_LENGTH, fft_bin_count);
+        else $fatal(1, "ACES expected %0d fft bins got %0d", FFT_LENGTH, fft_bin_count);
 
         $display("tb_aces PASSED");
         $finish;

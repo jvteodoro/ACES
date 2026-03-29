@@ -26,11 +26,11 @@ module tb_sample_width_adapter_24_to_18;
             #1;
 
             assert (sample_18_o === expected_sample)
-            else $error("adapter mismatch: in=%0d out=%0d expected=%0d",
+            else $fatal(1, "adapter mismatch: in=%0d out=%0d expected=%0d",
                         sample_in, sample_18_o, expected_sample);
 
             assert (valid_18_o === expected_valid)
-            else $error("valid mismatch: in=%0b out=%0b expected=%0b",
+            else $fatal(1, "valid mismatch: in=%0b out=%0b expected=%0b",
                         valid_in, valid_18_o, expected_valid);
         end
     endtask

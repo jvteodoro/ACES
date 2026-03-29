@@ -79,19 +79,19 @@ module tb_aces_audio_to_fft_pipeline;
     always @(posedge clk) begin
         if (sact_istream_o) begin
             assert (sample_mic_o == vectors[capture_count][23:6])
-            else $error("sample_mic mismatch idx=%0d", capture_count);
+            else $fatal(1, "sample_mic mismatch idx=%0d", capture_count);
 
             assert (fft_sample_valid_o == 1'b1)
-            else $error("fft_sample_valid_o deveria acompanhar a amostra");
+            else $fatal(1, "fft_sample_valid_o deveria acompanhar a amostra");
 
             assert (fft_sample_o == vectors[capture_count][23:6])
-            else $error("fft_sample mismatch idx=%0d", capture_count);
+            else $fatal(1, "fft_sample mismatch idx=%0d", capture_count);
 
             assert (sdw_istream_real_o == vectors[capture_count][23:6])
-            else $error("real stream mismatch idx=%0d", capture_count);
+            else $fatal(1, "real stream mismatch idx=%0d", capture_count);
 
             assert (sdw_istream_imag_o == '0)
-            else $error("imag stream deveria ser zero");
+            else $fatal(1, "imag stream deveria ser zero");
 
             capture_count = capture_count + 1;
         end
@@ -119,7 +119,7 @@ module tb_aces_audio_to_fft_pipeline;
 
         repeat (10) @(posedge clk);
         assert (capture_count == 3)
-        else $error("Esperadas 3 capturas, obtidas %0d", capture_count);
+        else $fatal(1, "Esperadas 3 capturas, obtidas %0d", capture_count);
 
         $display("tb_aces_audio_to_fft_pipeline PASSED");
         $finish;

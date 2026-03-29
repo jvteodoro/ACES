@@ -86,6 +86,36 @@ Windows PowerShell equivalents:
 .\sim\manifest\scripts\run_questa.ps1 top_level_test real
 ```
 
+If you work from VS Code Remote WSL but have Questa and Quartus installed only on Windows, keep using the POSIX wrappers from the WSL terminal:
+
+```bash
+sim/manifest/scripts/run_questa.sh hexa7seg
+sim/manifest/scripts/run_questa.sh top_level_test mock
+sim/manifest/scripts/open_questa_gui.sh sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test
+```
+
+When `vsim` is not present in the Linux `PATH`, these `.sh` wrappers now auto-forward to the matching PowerShell script through `powershell.exe`.
+
+The batch launchers also stop existing `vsim`/`vsimk` sessions before starting a new run, which avoids single-seat Questa license conflicts on Windows installs commonly used from WSL.
+
+The equivalent manual WSL-to-Windows invocation pattern is:
+
+```bash
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& './sim/manifest/scripts/run_questa.ps1' 'top_level_test' 'mock'"
+```
+
+To preserve an already-open simulator session, pass `-KeepExistingSessions` to the PowerShell launcher instead of using the default cleanup behavior.
+
+To open the supported testbenches directly in GUI mode from the main launcher and load the matching checked-in wave setup:
+
+```bash
+sim/manifest/scripts/run_questa.sh hexa7seg gui
+sim/manifest/scripts/run_questa.sh i2s_rx_adapter_24 gui
+sim/manifest/scripts/run_questa.sh top_level_test mock gui
+```
+
+For the supported manifest targets, the launcher looks for the corresponding `tb_<name>.do` file under `sim/manifest/waves/` and opens the verification-oriented signal set automatically.
+
 For an interactive GUI bring-up using a specific filelist and top module:
 
 ```bash
@@ -96,6 +126,12 @@ PowerShell:
 
 ```powershell
 .\sim\manifest\scripts\open_questa_gui.ps1 sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test
+```
+
+For Quartus commands from WSL, invoke the Windows executable through PowerShell in the same way:
+
+```bash
+powershell.exe -NoProfile -Command "& 'C:\altera_lite\25.1std\quartus\bin64\quartus_sh.exe' --version"
 ```
 
 For Quartus project bring-up of the active board top-level, open `quartus/top_level_test.qpf`. The companion `quartus/top_level_test.qsf` loads `quartus/top_level_test_sources.tcl`, which adds the RTL, the checked-in R2FFT submodule sources, the required IP `.qip` files, and the ROM/twiddle memory assignments for `top_level_test`.

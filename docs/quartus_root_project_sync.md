@@ -126,11 +126,8 @@ Validacoes concluidas:
 
 Limitacao desta sessao:
 
-- A compilacao do Quartus nao pode ser executada diretamente daqui porque este ambiente WSL nao esta conseguindo iniciar os executaveis `.exe` do Quartus instalado no Windows.
-- O erro observado ao tentar invocar o binario foi:
-  - `WSL ... UtilBindVsockAnyPort:307: socket failed 1`
-
-Isso significa que a verificacao final de synthesis/fitter precisa ser rodada do lado Windows, ou em um WSL com interop funcional.
+- A forma confiavel de acionar ferramentas Windows a partir deste workspace WSL foi via `powershell.exe`, nao por invocacao direta do `.exe` a partir do shell Linux.
+- Na pratica, a verificacao final de synthesis/fitter continua dependendo do toolchain Windows, mas pode ser disparada do terminal WSL usando a ponte PowerShell quando o interop direto do `.exe` falhar.
 
 ## Resumo final
 

@@ -85,6 +85,15 @@ Windows PowerShell:
 .\scripts\run_questa.ps1 top_level_test mock
 ```
 
+From a WSL terminal attached through VS Code Remote WSL, the same package can also be run with:
+
+```bash
+scripts/run_questa.sh i2s_rx_adapter_24
+scripts/run_questa.sh top_level_test mock
+```
+
+If the simulator is installed only on Windows, the package-level `.sh` wrappers auto-forward to the packaged `.ps1` scripts through `powershell.exe`.
+
 ### Step 5: run a real-IP-oriented top-level test if needed
 Example:
 

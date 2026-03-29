@@ -35,6 +35,10 @@ Examples:
 - export environment variables used by the Tcl launcher,
 - launch Questa in batch mode.
 
+When these scripts are run from a WSL terminal and `vsim` is not available in the Linux `PATH`, `run_questa.sh` now auto-forwards to `run_questa.ps1` through `powershell.exe`, so the same repository command still works from VS Code Remote WSL when the simulator itself is installed only on Windows.
+
+Before each batch launch, the PowerShell wrappers also stop any existing `vsim`/`vsimk` processes by default so a node-locked Questa seat is released before the new run starts.
+
 ModelSim users can run the mirrored wrappers `sim/manifest/scripts/run_modelsim.sh` and `sim/manifest/scripts/run_modelsim.ps1`, which use the same Tcl launcher and filelist mapping.
 
 ### Waveform setups
@@ -61,6 +65,14 @@ sim/manifest/scripts/run_questa.sh top_level_test mock
 sim/manifest/scripts/run_questa.sh top_level_test
 ```
 
+To open the same supported targets in GUI mode and auto-load the matching checked-in wave file:
+
+```bash
+sim/manifest/scripts/run_questa.sh hexa7seg gui
+sim/manifest/scripts/run_questa.sh fft_dma_reader gui
+sim/manifest/scripts/run_questa.sh top_level_test mock gui
+```
+
 Windows PowerShell equivalents:
 
 ```powershell
@@ -73,6 +85,40 @@ Windows PowerShell equivalents:
 .\sim\manifest\scripts\run_questa.ps1 top_level_test mock
 .\sim\manifest\scripts\run_questa.ps1 top_level_test
 ```
+
+PowerShell GUI equivalents:
+
+```powershell
+.\sim\manifest\scripts\run_questa.ps1 hexa7seg -Gui
+.\sim\manifest\scripts\run_questa.ps1 fft_dma_reader -Gui
+.\sim\manifest\scripts\run_questa.ps1 top_level_test mock -Gui
+```
+
+### Running from VS Code Remote WSL with Windows-installed tools
+
+If your editor is attached to WSL but the actual Questa or ModelSim executables are installed only on Windows, run the usual POSIX wrappers from the WSL terminal:
+
+```bash
+sim/manifest/scripts/run_questa.sh hexa7seg
+sim/manifest/scripts/run_questa.sh top_level_test mock
+sim/manifest/scripts/open_questa_gui.sh sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test
+```
+
+On WSL, these `.sh` wrappers detect the missing Linux-side simulator binaries and forward to the matching `.ps1` launcher with:
+
+```bash
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& './sim/manifest/scripts/run_questa.ps1' 'top_level_test' 'mock'"
+```
+
+The same bridging pattern works for direct Quartus checks from the WSL terminal:
+
+```bash
+powershell.exe -NoProfile -Command "& 'C:\altera_lite\25.1std\quartus\bin64\quartus_sh.exe' --version"
+```
+
+If you need to force the Windows PowerShell path even when a Linux-side simulator is installed, export `ACES_USE_WINDOWS_POWERSHELL=1` before invoking the wrapper.
+
+If you intentionally want to keep an existing simulator session open, call the PowerShell launcher directly with `-KeepExistingSessions`.
 
 ## Real-IP-Oriented Top-Level Run
 
@@ -127,6 +173,10 @@ sim/manifest/scripts/open_questa_gui.sh sim/manifest/filelists/mock_integration_
 ```powershell
 .\sim\manifest\scripts\open_questa_gui.ps1 sim/manifest/filelists/mock_integration_top_level_test.f tb_top_level_test
 ```
+
+From WSL, the same `open_questa_gui.sh` wrapper can be used; it forwards to `open_questa_gui.ps1` automatically when the GUI tools are available only on Windows.
+
+For the supported manifest-driven tests, `run_questa.sh ... gui` is now the preferred path because it reuses the same compile flow, opens the correct top module, and auto-loads the matching wave `.do` file with the checkpoint signals used by the testbench assertions.
 
 For unit and integration tests, substitute the matching filelist and wave file.
 

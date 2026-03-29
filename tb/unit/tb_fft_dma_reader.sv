@@ -52,16 +52,16 @@ module tb_fft_dma_reader;
     always @(posedge clk) begin
         if (fft_bin_valid_o) begin
             assert (fft_bin_index_o == capture_count[$clog2(FFT_LENGTH)-1:0])
-            else $error("Index mismatch idx=%0d got=%0d", capture_count, fft_bin_index_o);
+            else $fatal(1, "Index mismatch idx=%0d got=%0d", capture_count, fft_bin_index_o);
 
             assert (fft_bin_real_o == real_mem[capture_count])
-            else $error("Real mismatch idx=%0d", capture_count);
+            else $fatal(1, "Real mismatch idx=%0d", capture_count);
 
             assert (fft_bin_imag_o == imag_mem[capture_count])
-            else $error("Imag mismatch idx=%0d", capture_count);
+            else $fatal(1, "Imag mismatch idx=%0d", capture_count);
 
             assert (fft_bin_last_o == (capture_count == FFT_LENGTH-1))
-            else $error("Last mismatch idx=%0d", capture_count);
+            else $fatal(1, "Last mismatch idx=%0d", capture_count);
 
             capture_count = capture_count + 1;
         end
@@ -88,7 +88,7 @@ module tb_fft_dma_reader;
 
         wait (capture_count == FFT_LENGTH);
         @(posedge clk);
-        assert (dmaact_o == 1'b0) else $error("DMA deveria voltar a idle");
+        assert (dmaact_o == 1'b0) else $fatal(1, "DMA deveria voltar a idle");
 
         $display("tb_fft_dma_reader PASSED");
         $finish;

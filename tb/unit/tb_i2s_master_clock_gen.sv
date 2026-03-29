@@ -39,7 +39,7 @@ module tb_i2s_master_clock_gen;
 
             if (sck_o != prev_sck) begin
                 assert (clk_edges_since_toggle == CLOCK_DIV)
-                else $error("SCK mudou fora do divisor esperado: %0d", clk_edges_since_toggle);
+                else $fatal(1, "SCK mudou fora do divisor esperado: %0d", clk_edges_since_toggle);
 
                 clk_edges_since_toggle <= 0;
                 sck_toggle_count       <= sck_toggle_count + 1;
@@ -63,10 +63,10 @@ module tb_i2s_master_clock_gen;
         repeat (HALF_FRAME_BITS * 2 * CLOCK_DIV * 2 + 8) @(posedge clk);
 
         assert (sck_toggle_count > 64)
-        else $error("Poucos toggles de SCK observados: %0d", sck_toggle_count);
+        else $fatal(1, "Poucos toggles de SCK observados: %0d", sck_toggle_count);
 
         assert (ws_transition_count >= 2)
-        else $error("WS nao alternou como esperado");
+        else $fatal(1, "WS nao alternou como esperado");
 
         $display("tb_i2s_master_clock_gen PASSED");
         $finish;

@@ -106,6 +106,9 @@ Good wave files reduce rework during collaborative debug because everyone starts
 - When checking serialized interfaces, verify both data and framing behavior.
 - Prefer deterministic ROM-backed or local-array-backed stimulus over opaque random behavior.
 - Make failure messages specific enough that a headless run is still useful.
+- Prefer fail-fast checks for manifest-supported regression benches so `run_questa.sh` can stop immediately on a real mismatch.
+- Expose checkpoint counters or scoreboard state as plain testbench signals when possible so the matching wave `.do` file can show where each verification step occurs.
+- Keep a bench-specific wave `.do` file under `sim/manifest/waves/` for supported tests, and organize it around verification checkpoints rather than raw hierarchy dumps.
 
 ## Related Reading
 

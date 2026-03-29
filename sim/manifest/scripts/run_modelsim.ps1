@@ -6,7 +6,9 @@ param(
     [ValidateSet('mock', 'real')]
     [string]$Flow = 'mock',
 
-    [switch]$Gui
+    [switch]$Gui,
+
+    [switch]$KeepExistingSessions
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,6 +30,20 @@ function Find-RepoRoot {
     }
 }
 
+function Stop-ExistingModelSimSessions {
+    $processNames = @('vsim', 'vsimk')
+    $processes = Get-Process -Name $processNames -ErrorAction SilentlyContinue
+
+    if ($null -eq $processes -or $processes.Count -eq 0) {
+        return
+    }
+
+    $pids = @($processes | Select-Object -ExpandProperty Id)
+    Write-Host ("Stopping existing ModelSim/Questa sessions before launch: {0}" -f (($pids | Sort-Object) -join ', '))
+    $processes | Stop-Process -Force
+    Start-Sleep -Seconds 1
+}
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Find-RepoRoot -StartDir $scriptDir
 $localDir = Join-Path $repoRoot (Join-Path 'sim/local/modelsim' ("{0}_{1}" -f $TestName, $Flow))
@@ -42,6 +58,10 @@ $env:ACES_GUI = if ($Gui) { '1' } else { '0' }
 
 Push-Location $repoRoot
 try {
+    if (-not $KeepExistingSessions) {
+        Stop-ExistingModelSimSessions
+    }
+
     $vsimArgs = @('-do', "do {$tclScriptPath}")
     if (-not $Gui) {
         $vsimArgs = @('-c') + $vsimArgs

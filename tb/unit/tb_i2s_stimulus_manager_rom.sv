@@ -177,7 +177,7 @@ module tb_i2s_stimulus_manager_rom;
         begin
 `ifndef USE_REAL_ROM
             assert(rx_sample === rom_mem[addr])
-            else $error("Sample mismatch: addr=%0d exp=0x%06h got=0x%06h",
+            else $fatal(1, "Sample mismatch: addr=%0d exp=0x%06h got=0x%06h",
                         addr, rom_mem[addr][23:0], rx_sample[23:0]);
 `else
             $display("RX sample at addr=%0d -> 0x%06h (valide manualmente contra a ROM IP real)",
@@ -234,10 +234,10 @@ module tb_i2s_stimulus_manager_rom;
         repeat (10) @(posedge clk);
 
         assert(rx_count == N_POINTS)
-        else $error("Sem loop: esperado %0d samples, obtido %0d", N_POINTS, rx_count);
+        else $fatal(1, "Sem loop: esperado %0d samples, obtido %0d", N_POINTS, rx_count);
 
         assert(saw_z_on_inactive)
-        else $error("Nao foi observado Z no canal inativo");
+        else $fatal(1, "Nao foi observado Z no canal inativo");
 
         $display("Cenario 1 OK");
     end

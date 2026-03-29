@@ -98,7 +98,7 @@ module tb_i2s_rx_adapter_24;
 
                 begin : timeout_block
                     #100_000ns;
-                    $error("Timeout esperando sample_valid_o para sample 0x%06h", expected_sample[23:0]);
+                    $fatal(1, "Timeout esperando sample_valid_o para sample 0x%06h", expected_sample[23:0]);
                 end
             join_any
 
@@ -106,7 +106,7 @@ module tb_i2s_rx_adapter_24;
             disable timeout_block;
 
             if (!got_sample) begin
-                $error("sample_valid_o nao foi observado para sample 0x%06h", expected_sample[23:0]);
+                $fatal(1, "sample_valid_o nao foi observado para sample 0x%06h", expected_sample[23:0]);
             end
         end
     endtask
@@ -137,7 +137,7 @@ module tb_i2s_rx_adapter_24;
             $display("Enviando ROM[%0d] = 0x%06h (%0d)", i, rom[i][23:0], rom[i]);
 
             if (captured_samples.size() != 0) begin
-                $error("Fila de samples monitorados nao esvaziou antes do idx=%0d", i);
+                $fatal(1, "Fila de samples monitorados nao esvaziou antes do idx=%0d", i);
                 captured_samples.delete();
             end
 
@@ -145,7 +145,7 @@ module tb_i2s_rx_adapter_24;
             wait_for_captured_sample(captured_sample, rom[i]);
 
             if (captured_sample !== rom[i]) begin
-                $error("ERRO idx=%0d esperado=0x%06h obtido=0x%06h",
+                $fatal(1, "ERRO idx=%0d esperado=0x%06h obtido=0x%06h",
                        i, rom[i][23:0], captured_sample[23:0]);
             end else begin
                 $display("OK idx=%0d recebido=0x%06h (%0d)",
@@ -155,7 +155,7 @@ module tb_i2s_rx_adapter_24;
             #200ns;
         end
 
-        $display("==== TESTE CONCLUIDO COM SUCESSO ====");
+        $display("tb_i2s_rx_adapter_24 PASSED");
         #200ns;
         $finish;
     end

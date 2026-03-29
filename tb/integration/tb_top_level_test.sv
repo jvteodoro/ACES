@@ -183,10 +183,10 @@ module tb_top_level_test;
             // Aqui validamos o payload HEX capturado, que eh o dado mais estavel por pagina.
             assert (snapshots_match(captured, live_before) || snapshots_match(captured, live_after))
             else begin
-                $error("%s snapshot capturado nao bate.", label);
-                $error("%s expected(before): leds=%b hex=0x%06h gpio=%b", label, live_before.leds, live_before.hex, live_before.gpio);
-                $error("%s expected(after):  leds=%b hex=0x%06h gpio=%b", label, live_after.leds,  live_after.hex,  live_after.gpio);
-                $error("%s got:              leds=%b hex=0x%06h gpio=%b", label, captured.leds,   captured.hex,   captured.gpio);
+                $display("%s snapshot capturado nao bate.", label);
+                $display("%s expected(before): leds=%b hex=0x%06h gpio=%b", label, live_before.leds, live_before.hex, live_before.gpio);
+                $display("%s expected(after):  leds=%b hex=0x%06h gpio=%b", label, live_after.leds,  live_after.hex,  live_after.gpio);
+                $fatal(1, "%s got:              leds=%b hex=0x%06h gpio=%b", label, captured.leds, captured.hex, captured.gpio);
             end
 
             $display("[%0t] %s | stage=%0d page=%0d | leds=%b hex=0x%06h gpio=%b | sample_count=%0d fft_bin_count=%0d current_example=%0d current_point=%0d",
@@ -213,7 +213,7 @@ module tb_top_level_test;
 
             wait (dut.stim_busy_o == 1'b1);
             assert (dut.stim_current_example_o == example_bits)
-            else $error("Stimulus manager iniciou exemplo errado. exp=%0d got=%0d", example_idx, dut.stim_current_example_o);
+            else $fatal(1, "Stimulus manager iniciou exemplo errado. exp=%0d got=%0d", example_idx, dut.stim_current_example_o);
 
             $display("[%0t] Iniciando exemplo %0d/%0d", $time, example_idx, N_EXAMPLES-1);
         end
@@ -223,7 +223,7 @@ module tb_top_level_test;
         begin
             wait (sample_count > previous_sample_count);
             assert (dut.stim_current_example_o == example_idx[EXAMPLE_SEL_W-1:0])
-            else $error("A primeira amostra nao pertence ao exemplo esperado. exp=%0d got=%0d", example_idx, dut.stim_current_example_o);
+            else $fatal(1, "A primeira amostra nao pertence ao exemplo esperado. exp=%0d got=%0d", example_idx, dut.stim_current_example_o);
         end
     endtask
 
@@ -259,16 +259,16 @@ module tb_top_level_test;
             capture_and_check(2'b00, 2'b00, $sformatf("ex%0d stim done", example_idx));
 
             assert (((sample_count - sample_base) >= N_POINTS) && ((sample_count - sample_base) <= N_POINTS + 1))
-            else $error("Exemplo %0d deveria gerar %0d..%0d amostras, gerou %0d", example_idx, N_POINTS, N_POINTS + 1, sample_count - sample_base);
+            else $fatal(1, "Exemplo %0d deveria gerar %0d..%0d amostras, gerou %0d", example_idx, N_POINTS, N_POINTS + 1, sample_count - sample_base);
 
             assert (((fft_bin_count - fft_base) >= FFT_LENGTH) && ((fft_bin_count - fft_base) <= FFT_LENGTH + 1))
-            else $error("Exemplo %0d deveria gerar %0d..%0d bins FFT, gerou %0d", example_idx, FFT_LENGTH, FFT_LENGTH + 1, fft_bin_count - fft_base);
+            else $fatal(1, "Exemplo %0d deveria gerar %0d..%0d bins FFT, gerou %0d", example_idx, FFT_LENGTH, FFT_LENGTH + 1, fft_bin_count - fft_base);
 
             assert (dut.stim_current_example_o == example_idx[EXAMPLE_SEL_W-1:0])
-            else $error("Stimulus manager terminou em exemplo inesperado. exp=%0d got=%0d", example_idx, dut.stim_current_example_o);
+            else $fatal(1, "Stimulus manager terminou em exemplo inesperado. exp=%0d got=%0d", example_idx, dut.stim_current_example_o);
 
             assert (dut.stim_current_point_o == N_POINTS-1)
-            else $error("Stimulus manager terminou em ponto inesperado. exp=%0d got=%0d", N_POINTS-1, dut.stim_current_point_o);
+            else $fatal(1, "Stimulus manager terminou em ponto inesperado. exp=%0d got=%0d", N_POINTS-1, dut.stim_current_point_o);
 
             $display("[%0t] Exemplo %0d concluido com %0d amostras e %0d bins FFT", $time, example_idx, sample_count - sample_base, fft_bin_count - fft_base);
         end
@@ -302,11 +302,11 @@ module tb_top_level_test;
         end
 
         assert ((sample_count >= (N_EXAMPLES * N_POINTS)) && (sample_count <= (N_EXAMPLES * (N_POINTS + 1))))
-        else $error("Esperadas %0d..%0d amostras no total, obtidas %0d",
+        else $fatal(1, "Esperadas %0d..%0d amostras no total, obtidas %0d",
                 N_EXAMPLES * N_POINTS, N_EXAMPLES * (N_POINTS + 1), sample_count);
 
         assert ((fft_bin_count >= (N_EXAMPLES * FFT_LENGTH)) && (fft_bin_count <= (N_EXAMPLES * (FFT_LENGTH + 1))))
-        else $error("Esperados %0d..%0d bins FFT no total, obtidos %0d",
+        else $fatal(1, "Esperados %0d..%0d bins FFT no total, obtidos %0d",
                 N_EXAMPLES * FFT_LENGTH, N_EXAMPLES * (FFT_LENGTH + 1), fft_bin_count);
 
         $display("tb_top_level_test PASSED com %0d exemplos reais do signal_rom_generator", N_EXAMPLES);

@@ -12,6 +12,17 @@
 - if using a portable package, run from the package root and use either `scripts/run_questa.sh ...` or `.\scripts\run_questa.ps1 ...`,
 - verify the filelist path you selected matches the intended flow.
 
+## I am in VS Code WSL, but Questa or Quartus is installed only on Windows
+
+### What to do
+- keep using the checked-in `.sh` wrappers from the WSL terminal,
+- `run_questa.sh`, `run_modelsim.sh`, `open_questa_gui.sh`, and `open_modelsim_gui.sh` auto-forward to the matching `.ps1` launcher through `powershell.exe` when the Linux-side simulator binaries are absent,
+- if needed, you can invoke the PowerShell entry point manually with `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& './sim/manifest/scripts/run_questa.ps1' 'top_level_test' 'mock'"`,
+- for direct Quartus checks from WSL, invoke the Windows executable through PowerShell, for example `powershell.exe -NoProfile -Command "& 'C:\altera_lite\25.1std\quartus\bin64\quartus_sh.exe' --version"`,
+- if both Linux and Windows tool installs exist and you want to force the Windows route, export `ACES_USE_WINDOWS_POWERSHELL=1` before running the wrapper,
+- batch PowerShell launchers stop existing `vsim` and `vsimk` processes before starting a new run so a single-seat license can be reused,
+- if you need to keep a simulator session open intentionally, launch the PowerShell wrapper with `-KeepExistingSessions`.
+
 ## I get an IP-not-found or module-not-found error
 
 ### Likely causes

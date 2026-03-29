@@ -147,16 +147,16 @@ module tb_aces_audio_to_fft_pipeline;
     // ------------------------------------------------------------
     always @(posedge sample_valid_mic_o) begin
         assert(mic_count < N_SAMPLES)
-        else $error("Mais samples no frontend do que o esperado");
+        else $fatal(1, "Mais samples no frontend do que o esperado");
 
         assert(sample_24_dbg_o === expected24[mic_count])
-        else $error(
+        else $fatal(1,
             "sample_24_dbg_o mismatch idx=%0d exp=0x%06h got=0x%06h",
             mic_count, expected24[mic_count][23:0], sample_24_dbg_o[23:0]
         );
 
         assert(sample_mic_o === expected18[mic_count])
-        else $error(
+        else $fatal(1,
             "sample_mic_o mismatch idx=%0d exp=0x%05h got=0x%05h",
             mic_count, expected18[mic_count], sample_mic_o
         );
@@ -188,10 +188,10 @@ module tb_aces_audio_to_fft_pipeline;
             // checa sequência do bridge
             if (fft_sample_valid_o) begin
                 assert(fft_count < N_SAMPLES)
-                else $error("Mais samples no bridge do que o esperado");
+                else $fatal(1, "Mais samples no bridge do que o esperado");
 
                 assert(fft_sample_o === expected18[fft_count])
-                else $error(
+                else $fatal(1,
                     "fft_sample_o mismatch idx=%0d exp=0x%05h got=0x%05h",
                     fft_count, expected18[fft_count], fft_sample_o
                 );
@@ -202,23 +202,23 @@ module tb_aces_audio_to_fft_pipeline;
             // checa ingestão 1 ciclo depois do bridge valid
             if (fft_valid_d) begin
                 assert(sact_istream_o === 1'b1)
-                else $error("sact_istream_o deveria subir 1 ciclo após fft_sample_valid_o");
+                else $fatal(1, "sact_istream_o deveria subir 1 ciclo após fft_sample_valid_o");
 
                 assert(sdw_istream_real_o === fft_sample_d)
-                else $error(
+                else $fatal(1,
                     "sdw_istream_real_o mismatch exp=0x%05h got=0x%05h",
                     fft_sample_d, sdw_istream_real_o
                 );
 
                 assert(sdw_istream_imag_o === '0)
-                else $error("sdw_istream_imag_o deveria ser zero");
+                else $fatal(1, "sdw_istream_imag_o deveria ser zero");
 
                 stream_count = stream_count + 1;
             end
 
             // largura do pulso de sact = 1 ciclo
             if (sact_prev && sact_istream_o) begin
-                $error("sact_istream_o permaneceu alto por mais de 1 ciclo");
+                $fatal(1, "sact_istream_o permaneceu alto por mais de 1 ciclo");
             end
 
             sact_prev <= sact_istream_o;
@@ -252,13 +252,13 @@ module tb_aces_audio_to_fft_pipeline;
         repeat (100) @(posedge clk);
 
         assert(mic_count == N_SAMPLES)
-        else $error("Esperado %0d samples no frontend, obtido %0d", N_SAMPLES, mic_count);
+        else $fatal(1, "Esperado %0d samples no frontend, obtido %0d", N_SAMPLES, mic_count);
 
         assert(fft_count == N_SAMPLES)
-        else $error("Esperado %0d samples no bridge, obtido %0d", N_SAMPLES, fft_count);
+        else $fatal(1, "Esperado %0d samples no bridge, obtido %0d", N_SAMPLES, fft_count);
 
         assert(stream_count == N_SAMPLES)
-        else $error("Esperado %0d pulsos de stream, obtido %0d", N_SAMPLES, stream_count);
+        else $fatal(1, "Esperado %0d pulsos de stream, obtido %0d", N_SAMPLES, stream_count);
 
         $display("tb_aces_audio_to_fft_pipeline PASSED");
         $finish;
