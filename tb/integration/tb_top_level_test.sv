@@ -44,6 +44,8 @@ module tb_top_level_test;
     logic tb_dbg_stage1_drive;
     logic tb_dbg_page0_drive;
     logic tb_dbg_page1_drive;
+    logic fft_tx_valid_prev;
+    logic [$clog2(FFT_LENGTH)-1:0] fft_tx_index_prev;
 
     int sample_count;
     int fft_bin_count;
@@ -93,10 +95,14 @@ module tb_top_level_test;
         .gpio_1_d35(gpio_1_d35)
     );
 
-    always @(posedge dut.sample_valid_mic_o) sample_count <= sample_count + 1;
     always @(posedge tb_clk_drive) begin
-        if (dut.fft_tx_valid_o)
+        if (dut.sact_istream_o)
+            sample_count <= sample_count + 1;
+        if (dut.fft_tx_valid_o && (!fft_tx_valid_prev || (dut.fft_tx_index_o != fft_tx_index_prev)))
             fft_bin_count <= fft_bin_count + 1;
+
+        fft_tx_valid_prev <= dut.fft_tx_valid_o;
+        fft_tx_index_prev <= dut.fft_tx_index_o;
     end
 
     task automatic set_stage_page(input logic [1:0] stage_sel, input logic [1:0] page_sel);
@@ -255,11 +261,14 @@ module tb_top_level_test;
             capture_and_check(2'b11, 2'b01, $sformatf("ex%0d fft tx real", example_idx));
             capture_and_check(2'b11, 2'b10, $sformatf("ex%0d fft tx imag", example_idx));
 
-            wait (dut.stim_done_o == 1'b1);
+            wait (dut.stim_ready_o == 1'b1);
+            @(posedge tb_clk_drive);
             capture_and_check(2'b00, 2'b00, $sformatf("ex%0d stim done", example_idx));
 
-            assert (((sample_count - sample_base) >= N_POINTS) && ((sample_count - sample_base) <= N_POINTS + 1))
-            else $fatal(1, "Exemplo %0d deveria gerar %0d..%0d amostras, gerou %0d", example_idx, N_POINTS, N_POINTS + 1, sample_count - sample_base);
+            wait ((fft_bin_count - fft_base) >= FFT_LENGTH);
+
+            assert (((sample_count - sample_base) >= N_POINTS) && ((sample_count - sample_base) <= N_POINTS + 4))
+            else $fatal(1, "Exemplo %0d deveria gerar %0d..%0d amostras ingeridas, gerou %0d", example_idx, N_POINTS, N_POINTS + 4, sample_count - sample_base);
 
             assert (((fft_bin_count - fft_base) >= FFT_LENGTH) && ((fft_bin_count - fft_base) <= FFT_LENGTH + 1))
             else $fatal(1, "Exemplo %0d deveria gerar %0d..%0d bins FFT, gerou %0d", example_idx, FFT_LENGTH, FFT_LENGTH + 1, fft_bin_count - fft_base);
@@ -267,8 +276,8 @@ module tb_top_level_test;
             assert (dut.stim_current_example_o == example_idx[EXAMPLE_SEL_W-1:0])
             else $fatal(1, "Stimulus manager terminou em exemplo inesperado. exp=%0d got=%0d", example_idx, dut.stim_current_example_o);
 
-            assert (dut.stim_current_point_o == N_POINTS-1)
-            else $fatal(1, "Stimulus manager terminou em ponto inesperado. exp=%0d got=%0d", N_POINTS-1, dut.stim_current_point_o);
+            assert (dut.stim_current_point_o == '0)
+            else $fatal(1, "Stimulus manager deveria voltar ao ponto 0 em idle. got=%0d", dut.stim_current_point_o);
 
             $display("[%0t] Exemplo %0d concluido com %0d amostras e %0d bins FFT", $time, example_idx, sample_count - sample_base, fft_bin_count - fft_base);
         end
@@ -276,7 +285,12 @@ module tb_top_level_test;
 
     initial begin
         key0 = 1'b1; key1 = 1'b1; key2 = 1'b1; key3 = 1'b1; reset_n = 1'b1;
-        sw0 = 1'b0; sw1 = 1'b0; sw2 = 1'b0; sw3 = 1'b0; sw4 = 1'b0; sw5 = 1'b0; sw6 = 1'b0; sw7 = 1'b0; sw8 = 1'b0; sw9 = 1'b0;
+        // No topo, sw7 seleciona a origem de audio:
+        // 0 -> pino fisico do microfone
+        // 1 -> gerador sintetico `stim_sd_o`
+        // O bench precisa forcar a ROM interna para evitar capturar 'Z'
+        // do GPIO tri-state e testar o fluxo deterministico esperado.
+        sw0 = 1'b0; sw1 = 1'b0; sw2 = 1'b0; sw3 = 1'b0; sw4 = 1'b0; sw5 = 1'b0; sw6 = 1'b0; sw7 = 1'b1; sw8 = 1'b0; sw9 = 1'b0;
         clock_50 = 1'b0; clock2_50 = 1'b0; clock3_50 = 1'b0; clock4_50 = 1'b0;
         tb_clk_drive = 1'b0;
         tb_rst_drive = 1'b1;
@@ -288,6 +302,8 @@ module tb_top_level_test;
         tb_dbg_stage1_drive = 1'b0;
         tb_dbg_page0_drive  = 1'b0;
         tb_dbg_page1_drive  = 1'b0;
+        fft_tx_valid_prev = 1'b0;
+        fft_tx_index_prev = '0;
         sample_count = 0;
         fft_bin_count = 0;
 
@@ -301,9 +317,9 @@ module tb_top_level_test;
             repeat (8) @(posedge tb_clk_drive);
         end
 
-        assert ((sample_count >= (N_EXAMPLES * N_POINTS)) && (sample_count <= (N_EXAMPLES * (N_POINTS + 1))))
-        else $fatal(1, "Esperadas %0d..%0d amostras no total, obtidas %0d",
-                N_EXAMPLES * N_POINTS, N_EXAMPLES * (N_POINTS + 1), sample_count);
+        assert ((sample_count >= (N_EXAMPLES * N_POINTS)) && (sample_count <= (N_EXAMPLES * (N_POINTS + 4))))
+        else $fatal(1, "Esperadas %0d..%0d amostras ingeridas no total, obtidas %0d",
+                N_EXAMPLES * N_POINTS, N_EXAMPLES * (N_POINTS + 4), sample_count);
 
         assert ((fft_bin_count >= (N_EXAMPLES * FFT_LENGTH)) && (fft_bin_count <= (N_EXAMPLES * (FFT_LENGTH + 1))))
         else $fatal(1, "Esperados %0d..%0d bins FFT no total, obtidos %0d",

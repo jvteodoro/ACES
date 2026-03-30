@@ -96,12 +96,12 @@ module top_level_test #(
     input logic gpio_0_d34, //PIN_T17
     input logic gpio_0_d35, //PIN_T15
 
-    input logic gpio_1_d0,  //PIN_H16
-    input logic gpio_1_d1,  //PIN_A12
+    output logic gpio_1_d0,  //PIN_H16
+    output logic gpio_1_d1,  //PIN_A12
     output logic gpio_1_d2,  //PIN_H15
     output logic gpio_1_d3,  //PIN_B12
     output logic gpio_1_d4,  //PIN_A13
-    input logic gpio_1_d5,  //PIN_B13
+    output logic gpio_1_d5,  //PIN_B13
     input logic gpio_1_d6,  //PIN_C13
     input logic gpio_1_d7,  //PIN_D13
     input logic gpio_1_d8,  //PIN_G18
@@ -123,11 +123,11 @@ module top_level_test #(
     input logic gpio_1_d24, //PIN_E15
     input logic gpio_1_d25, //PIN_E16
     input logic gpio_1_d26, //PIN_F14
-    input logic gpio_1_d27, //PIN_F15
+    output logic gpio_1_d27, //PIN_F15
     input logic gpio_1_d28, //PIN_F13
-    input logic gpio_1_d29, //PIN_F12
+    output logic gpio_1_d29, //PIN_F12
     input logic gpio_1_d30, //PIN_G16
-    input logic gpio_1_d31, //PIN_G15
+    output logic gpio_1_d31, //PIN_G15
     input logic gpio_1_d32, //PIN_G13
     input logic gpio_1_d33, //PIN_G12
     input logic gpio_1_d34, //PIN_J17
@@ -188,9 +188,14 @@ module top_level_test #(
     logic mic_chipen_o;
     logic mic_lr_sel_o;
     logic i2s_sd_o;
+	 logic mic_sd_o;
 
-	 assign gpio_0_d17 = i2s_sck_o;
-	 assign gpio_0_d19 = i2s_ws_o;
+	 assign gpio_1_d1 = mic_lr_sel_o;
+	 assign gpio_1_d3 = i2s_ws_o;
+	 assign gpio_1_d5 = i2s_sck_o;
+	 //assign i2s_sd_o = gpio_1_d7;
+	 assign mic_sd_o = gpio_1_d7;
+
 
     // -----------------------------------------
     // debug do ACES
@@ -227,8 +232,6 @@ module top_level_test #(
 	
 	 logic select_audio_source;
 	 assign select_audio_source = sw7;
-	 logic mic_sd_o;
-	 assign mic_sd_o = gpio_0_d20;
     logic mic_sd_internal;
 	 assign mic_sd_internal = (select_audio_source) ? stim_sd_o: mic_sd_o;
 	 
@@ -274,22 +277,20 @@ module top_level_test #(
 
     // Keep optional board pins observable by synthesis so Quartus does not
     // prune them as completely unused top-level inputs.
-    assign unused_inputs_probe = ^{
-        key0, key1, key2, key3, reset_n,
-        sw8, sw9,
-        clock_50, clock2_50, clock3_50, clock4_50,
-        gpio_0_d15, gpio_0_d16, gpio_0_d18,
-        gpio_0_d21, gpio_0_d22, gpio_0_d23, gpio_0_d24, gpio_0_d25,
-        gpio_0_d26, gpio_0_d27, gpio_0_d28, gpio_0_d29, gpio_0_d30,
-        gpio_0_d31, gpio_0_d32, gpio_0_d33, gpio_0_d34, gpio_0_d35,
-        gpio_1_d0, gpio_1_d1,
-        gpio_1_d5, gpio_1_d6, gpio_1_d7, gpio_1_d8, gpio_1_d9,
-        gpio_1_d10, gpio_1_d11, gpio_1_d12, gpio_1_d13, gpio_1_d14,
-        gpio_1_d15, gpio_1_d16, gpio_1_d18,
-        gpio_1_d21, gpio_1_d22, gpio_1_d23, gpio_1_d24, gpio_1_d25,
-        gpio_1_d26, gpio_1_d27, gpio_1_d28, gpio_1_d29, gpio_1_d30,
-        gpio_1_d31, gpio_1_d32, gpio_1_d33, gpio_1_d34, gpio_1_d35
-    };
+//    assign unused_inputs_probe = ^{
+//        key0, key1, key2, key3, reset_n,
+//        sw8, sw9,
+//        clock_50, clock2_50, clock3_50, clock4_50,
+//        gpio_0_d15, gpio_0_d16, gpio_0_d18,
+//        gpio_0_d21, gpio_0_d22, gpio_0_d23, gpio_0_d24, gpio_0_d25,
+//        gpio_0_d26, gpio_0_d27, gpio_0_d28, gpio_0_d29, gpio_0_d30,
+//        gpio_0_d31, gpio_0_d32, gpio_0_d33, gpio_0_d34, gpio_0_d35,
+//        gpio_1_d0, gpio_1_d6, gpio_1_d7, gpio_1_d8, gpio_1_d9,
+//        gpio_1_d10, gpio_1_d11, gpio_1_d12, gpio_1_d13, gpio_1_d14,
+//        gpio_1_d15, gpio_1_d16, gpio_1_d17, gpio_1_d18, gpio_1_d19, gpio_1_d20,
+//        gpio_1_d21, gpio_1_d22, gpio_1_d23, gpio_1_d24, gpio_1_d25,
+//        gpio_1_d26, gpio_1_d28, gpio_1_d30, gpio_1_d32, gpio_1_d33, gpio_1_d34, gpio_1_d35
+//    };
 
 	 
 
@@ -626,13 +627,17 @@ module top_level_test #(
         .state_dbg_o(stim_state_dbg_o)
     );
 
-    assign i2s_sd_o = mic_sd_internal;
-    assign gpio_1_d17 = tx_i2s_sck_o;
-    assign gpio_1_d19 = tx_i2s_ws_o;
-    assign gpio_1_d20 = tx_i2s_sd_o;
-    assign gpio_0_d3 = dbg_gpio_capture_r[0];
-    assign gpio_1_d2 = dbg_gpio_capture_r[1];
-    assign gpio_1_d3 = dbg_gpio_capture_r[2];
-    assign gpio_1_d4 = dbg_gpio_capture_r[3] ^ (sw9 & unused_inputs_probe);
+    //assign i2s_sd_o = mic_sd_internal;
+//    assign gpio_1_d17 = tx_i2s_sck_o;
+//    assign gpio_1_d19 = tx_i2s_ws_o;
+//    assign gpio_1_d20 = tx_i2s_sd_o;
+//    assign gpio_0_d3 = dbg_gpio_capture_r[0];
+//    assign gpio_1_d2 = dbg_gpio_capture_r[1];
+//    assign gpio_1_d3 = dbg_gpio_capture_r[2];
+//    assign gpio_1_d4 = dbg_gpio_capture_r[3] ^ (sw9 & unused_inputs_probe);
+    
+//   assign gpio_1_d27 = tx_i2s_sck_o;
+//   assign gpio_1_d29 = tx_i2s_ws_o;
+//   assign gpio_1_d31 = tx_i2s_sd_o;
 
 endmodule
