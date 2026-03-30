@@ -29,6 +29,11 @@
 - `aces_stimulus_manager`
 - `top_level_test`
 
+## Supported real-IP-oriented tests
+
+- `top_level_test`
+- `top_level_fft_isolated`
+
 ## Primary scripts
 
 - `scripts/run_questa.sh` / `scripts/run_questa.ps1`: batch entry points for named tests.
@@ -49,6 +54,7 @@ sim/manifest/scripts/run_questa.sh fft_dma_reader
 sim/manifest/scripts/run_questa.sh aces_audio_to_fft_pipeline
 sim/manifest/scripts/run_questa.sh top_level_test mock
 sim/manifest/scripts/run_questa.sh top_level_test
+sim/manifest/scripts/run_questa.sh top_level_fft_isolated real
 sim/manifest/scripts/regression_mock.sh
 ```
 
@@ -61,6 +67,7 @@ Windows PowerShell:
 .\sim\manifest\scripts\run_questa.ps1 fft_dma_reader
 .\sim\manifest\scripts\run_questa.ps1 top_level_test mock
 .\sim\manifest\scripts\run_questa.ps1 top_level_test
+.\sim\manifest\scripts\run_questa.ps1 top_level_fft_isolated real
 .\sim\manifest\scripts\regression_mock.ps1
 ```
 
@@ -86,12 +93,14 @@ The repository includes the real Quartus ROM wrapper under `rtl/ip/rom/` plus th
 
 ```bash
 sim/manifest/scripts/run_questa.sh top_level_test real
+sim/manifest/scripts/run_questa.sh top_level_fft_isolated real
 ```
 
 PowerShell:
 
 ```powershell
 .\sim\manifest\scripts\run_questa.ps1 top_level_test real
+.\sim\manifest\scripts\run_questa.ps1 top_level_fft_isolated real
 ```
 
 That keeps the mock and real flows explicit and reproducible.

@@ -245,11 +245,12 @@ module aces #(
     fft_dma_reader #(
         .FFT_LENGTH(FFT_LENGTH),
         .FFT_DW(FFT_DW),
-        .READ_LATENCY(1)
+        .READ_LATENCY(2)
     ) u_fft_dma_reader (
         .clk(clk),
         .rst(rst),
         .done_i(fft_done_o),
+        .run_i(fft_run_o),
 
         .dmaact_o(dmaact_i),
         .dmaa_o(dmaa_i),

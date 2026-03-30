@@ -45,6 +45,7 @@ Current examples in this repository:
 
 - `tb_aces_audio_to_fft_pipeline` verifies receive-side frontend composition.
 - `tb_fft_tx_i2s_link` verifies burst-to-serial behavior across `fft_tx_bridge_fifo` and `i2s_fft_tx_adapter`.
+- `tb_top_level_fft_isolated` verifies the real FFT control/readout path inside the top-level wrapper while isolating it from the rest of the end-to-end bench.
 
 ## Mock vs Real-IP Testbenches
 
@@ -66,6 +67,10 @@ Use real-IP-oriented flow when you want:
 - the checked-in Quartus ROM wrapper,
 - explicit binding to the checked-in `submodules/R2FFT` implementation,
 - a stronger approximation of the vendor-IP-facing simulation environment.
+
+The main real-IP-oriented debug bench currently used for FFT bring-up is:
+
+- `tb_top_level_fft_isolated`
 
 ## Naming Conventions
 
@@ -126,3 +131,4 @@ Good wave files reduce rework during collaborative debug because everyone starts
 - [verification_methodology.md](verification_methodology.md)
 - [coding_guidelines.md](coding_guidelines.md)
 - [testbench_report_tables.md](testbench_report_tables.md)
+- [top_level_fft_diagnosis.md](top_level_fft_diagnosis.md)

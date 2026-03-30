@@ -106,9 +106,8 @@ module tb_aces_audio_to_fft_pipeline;
     // tarefa: envia 1 amostra no canal esquerdo
     //
     // Compatível com o receiver atual:
-    // - ws muda 1->0
-    // - 1 ciclo para detectar borda
-    // - 1 ciclo de skip_bit
+    // - ws muda 1->0 durante o bit de atraso do I2S
+    // - o próximo ciclo já carrega o MSB
     // - 24 bits úteis MSB-first
     // - padding até 32 bits no half-frame
     // - half-frame direito em ws=1
@@ -124,9 +123,6 @@ module tb_aces_audio_to_fft_pipeline;
             // borda WS 1 -> 0 detectada no próximo posedge
             sck_cycle(1'b0, 1'b0);
 
-            // ciclo consumido pelo skip_bit do receiver
-            sck_cycle(1'b0, 1'b0);
-
             // 24 bits úteis
             for (i = 23; i >= 0; i = i - 1) begin
                 sck_cycle(1'b0, sample[i]);
@@ -134,8 +130,8 @@ module tb_aces_audio_to_fft_pipeline;
 
             // padding restante do half-frame esquerdo:
             // total do slot = 32 ciclos
-            // já usamos 2 + 24 = 26
-            repeat (6) sck_cycle(1'b0, 1'b0);
+            // já usamos 1 + 24 = 25
+            repeat (7) sck_cycle(1'b0, 1'b0);
 
             // half-frame direito completo
             repeat (32) sck_cycle(1'b1, 1'b0);

@@ -2,17 +2,42 @@
 
 module tb_top_level_test;
 
-    localparam int FFT_LENGTH   = 512;
-    localparam int FFT_DW       = 18;
-    localparam int N_POINTS     = 512;
-    localparam int N_EXAMPLES   = 8;
-    localparam int EXAMPLE_SEL_W = (N_EXAMPLES <= 1) ? 1 : $clog2(N_EXAMPLES);
+    localparam int FFT_LENGTH             = 512;
+    localparam int FFT_DW                 = 18;
+    localparam int N_POINTS               = 512;
+    localparam int N_EXAMPLES             = 8;
+    localparam int I2S_CLOCK_DIV          = 4;
+    localparam int BFPEXP_W               = 8;
+    localparam int I2S_SAMPLE_W           = 18;
+    localparam int I2S_SLOT_W             = 32;
+    localparam int TAG_W                  = 2;
+    localparam int BFPEXP_HOLD_FRAMES     = 128;
+    localparam int TOTAL_SAMPLES          = N_EXAMPLES * N_POINTS;
+    localparam int TOTAL_BINS             = N_EXAMPLES * FFT_LENGTH;
+    localparam int SERIAL_FRAMES_PER_EX   = BFPEXP_HOLD_FRAMES + FFT_LENGTH;
+    localparam int SERIAL_EXPECT_DEPTH    = SERIAL_FRAMES_PER_EX + 16;
+    localparam int EXAMPLE_SEL_W          = (N_EXAMPLES <= 1) ? 1 : $clog2(N_EXAMPLES);
+    localparam int FFT_N                  = $clog2(FFT_LENGTH);
+    localparam time CLK_HALF              = 5ns;
+    localparam time TX_SCK_TOGGLE_PERIOD  = 2 * CLK_HALF * I2S_CLOCK_DIV;
+    localparam int MAX_SAMPLE_SLACK       = 4;
+    localparam int MAX_EXAMPLE_CYCLES     = 1_000_000;
 
-    typedef struct packed {
-        logic [9:0]  leds;
-        logic [23:0] hex;
-        logic [3:0]  gpio;
-    } snapshot_t;
+`ifdef TB_TOP_LEVEL_REAL_FLOW
+    localparam bit REAL_FLOW              = 1'b1;
+    localparam int EXAMPLES_TO_RUN        = N_EXAMPLES;
+    localparam real FFT_MAX_ABS_ERR_TOL   = 100_000.0;
+    localparam real FFT_RMSE_ERR_TOL      = 12_000.0;
+`else
+    localparam bit REAL_FLOW              = 1'b0;
+    localparam int EXAMPLES_TO_RUN        = 1;
+    localparam real FFT_MAX_ABS_ERR_TOL   = 0.0;
+    localparam real FFT_RMSE_ERR_TOL      = 0.0;
+`endif
+
+    localparam logic [TAG_W-1:0] TAG_IDLE_C   = 2'd0;
+    localparam logic [TAG_W-1:0] TAG_BFPEXP_C = 2'd1;
+    localparam logic [TAG_W-1:0] TAG_FFT_C    = 2'd2;
 
     logic key0, key1, key2, key3, reset_n;
     logic sw0, sw1, sw2, sw3, sw4, sw5, sw6, sw7, sw8, sw9;
@@ -44,31 +69,491 @@ module tb_top_level_test;
     logic tb_dbg_stage1_drive;
     logic tb_dbg_page0_drive;
     logic tb_dbg_page1_drive;
-    logic fft_tx_valid_prev;
-    logic [$clog2(FFT_LENGTH)-1:0] fft_tx_index_prev;
 
-    int sample_count;
-    int fft_bin_count;
+    int expected_sample24_mem [0:TOTAL_SAMPLES-1];
+    int expected_sample18_mem [0:TOTAL_SAMPLES-1];
+    real expected_fft_real_mem [0:TOTAL_BINS-1];
+    real expected_fft_imag_mem [0:TOTAL_BINS-1];
 
-    assign gpio_0_d0 = tb_clk_drive;
-    assign gpio_0_d1 = tb_rst_drive;
-    assign gpio_0_d2 = tb_capture_leds_drive;
-    assign gpio_0_d4 = tb_capture_hex_drive;
-    assign gpio_0_d5 = tb_capture_gpio_drive;
-    assign gpio_0_d6 = tb_capture_clear_drive;
-    assign gpio_0_d7 = tb_dbg_stage0_drive;
-    assign gpio_0_d8 = tb_dbg_stage1_drive;
-    assign gpio_0_d9 = tb_dbg_page0_drive;
+    real measured_fft_real_mem [0:FFT_LENGTH-1];
+    real measured_fft_imag_mem [0:FFT_LENGTH-1];
+
+    logic [TAG_W-1:0] expected_tag_mem [0:SERIAL_EXPECT_DEPTH-1];
+    logic signed [I2S_SAMPLE_W-1:0] expected_left_mem [0:SERIAL_EXPECT_DEPTH-1];
+    logic signed [I2S_SAMPLE_W-1:0] expected_right_mem [0:SERIAL_EXPECT_DEPTH-1];
+
+    int active_example_r;
+    bit example_in_progress_r;
+    int sample24_count_r;
+    int sample18_count_r;
+    int extra_sample24_count_r;
+    int extra_sample18_count_r;
+    int fft_bin_count_r;
+    int extra_fft_bin_count_r;
+    int serial_expected_write_idx_r;
+    int serial_expected_read_idx_r;
+    int serial_frames_seen_r;
+    int extra_serial_frames_r;
+    int fft_run_count_r;
+
+    logic signed [BFPEXP_W-1:0] frame_bfpexp_r;
+    bit frame_bfpexp_valid_r;
+    bit serial_bfpexp_enqueued_r;
+    bit stim_done_seen_r;
+    bit fft_done_seen_r;
+    bit tx_overflow_seen_r;
+    bit fft_frame_done_r;
+    bit sact_prev_r;
+    bit fft_run_seen_r;
+    bit fft_ingest_gated_r;
+    bit fft_ingest_gate_pending_r;
+
+    time tx_last_sck_toggle_time_r;
+    bit tx_sck_timing_armed_r;
+    int tx_sck_toggle_count_r;
+    int tx_sck_toggle_total_r;
+
+    logic tx_mon_slot_ws_r;
+    logic [I2S_SLOT_W-1:0] tx_mon_slot_shift_r;
+    int tx_mon_slot_count_r;
+    bit tx_mon_prev_slot_valid_r;
+    logic tx_mon_prev_slot_ws_r;
+    logic [I2S_SLOT_W-1:0] tx_mon_right_word_r;
+    bit tx_mon_have_right_r;
+
+    function automatic int flat_sample_idx(input int example_idx, input int sample_idx);
+        flat_sample_idx = example_idx * N_POINTS + sample_idx;
+    endfunction
+
+    function automatic int flat_fft_idx(input int example_idx, input int bin_idx);
+        flat_fft_idx = example_idx * FFT_LENGTH + bin_idx;
+    endfunction
+
+    function automatic logic [TAG_W-1:0] decode_tag(
+        input logic [I2S_SLOT_W-1:0] word_i
+    );
+        begin
+            decode_tag = word_i[I2S_SLOT_W-1 -: TAG_W];
+        end
+    endfunction
+
+    function automatic logic signed [I2S_SAMPLE_W-1:0] decode_payload(
+        input logic [I2S_SLOT_W-1:0] word_i
+    );
+        begin
+            decode_payload = $signed(word_i[I2S_SAMPLE_W-1:0]);
+        end
+    endfunction
+
+    function automatic logic signed [I2S_SAMPLE_W-1:0] extend_bfpexp_payload(
+        input logic signed [BFPEXP_W-1:0] bfpexp_i
+    );
+        begin
+            extend_bfpexp_payload = {{(I2S_SAMPLE_W-BFPEXP_W){bfpexp_i[BFPEXP_W-1]}}, bfpexp_i};
+        end
+    endfunction
+
+    function automatic logic signed [FFT_DW-1:0] expected_mock_imag(
+        input int idx_i
+    );
+        logic signed [FFT_N-1:0] addr_s;
+        begin
+            addr_s = idx_i[FFT_N-1:0];
+            expected_mock_imag = -addr_s;
+        end
+    endfunction
+
+    function automatic real apply_bfpexp(
+        input logic signed [FFT_DW-1:0] sample_i,
+        input logic signed [BFPEXP_W-1:0] bfpexp_i
+    );
+        real value_r;
+        int shift_i;
+        begin
+            value_r = $itor(sample_i);
+            if (bfpexp_i >= 0) begin
+                for (shift_i = 0; shift_i < bfpexp_i; shift_i++)
+                    value_r = value_r * 2.0;
+            end else begin
+                for (shift_i = 0; shift_i < -bfpexp_i; shift_i++)
+                    value_r = value_r / 2.0;
+            end
+            apply_bfpexp = value_r;
+        end
+    endfunction
+
+    task automatic enqueue_expected_frame(
+        input logic [TAG_W-1:0] tag_i,
+        input logic signed [I2S_SAMPLE_W-1:0] left_i,
+        input logic signed [I2S_SAMPLE_W-1:0] right_i
+    );
+        begin
+            if (serial_expected_write_idx_r >= SERIAL_EXPECT_DEPTH)
+                $fatal(1, "SERIAL_EXPECT_DEPTH insuficiente no scoreboard do top-level.");
+
+            expected_tag_mem[serial_expected_write_idx_r]   = tag_i;
+            expected_left_mem[serial_expected_write_idx_r]  = left_i;
+            expected_right_mem[serial_expected_write_idx_r] = right_i;
+            serial_expected_write_idx_r                     = serial_expected_write_idx_r + 1;
+        end
+    endtask
+
+    task automatic reset_example_scoreboard(input int example_idx);
+        int bin_idx;
+        begin
+            active_example_r             = example_idx;
+            example_in_progress_r        = 1'b1;
+            sample24_count_r             = 0;
+            sample18_count_r             = 0;
+            extra_sample24_count_r       = 0;
+            extra_sample18_count_r       = 0;
+            fft_bin_count_r              = 0;
+            extra_fft_bin_count_r        = 0;
+            serial_expected_write_idx_r  = 0;
+            serial_expected_read_idx_r   = 0;
+            serial_frames_seen_r         = 0;
+            extra_serial_frames_r        = 0;
+            fft_run_count_r              = 0;
+            frame_bfpexp_r               = '0;
+            frame_bfpexp_valid_r         = 1'b0;
+            serial_bfpexp_enqueued_r     = 1'b0;
+            stim_done_seen_r             = 1'b0;
+            fft_done_seen_r              = 1'b0;
+            tx_overflow_seen_r           = 1'b0;
+            fft_frame_done_r             = 1'b0;
+            fft_run_seen_r               = 1'b0;
+            fft_ingest_gated_r           = 1'b0;
+            fft_ingest_gate_pending_r    = 1'b0;
+
+            for (bin_idx = 0; bin_idx < FFT_LENGTH; bin_idx++) begin
+                measured_fft_real_mem[bin_idx] = 0.0;
+                measured_fft_imag_mem[bin_idx] = 0.0;
+            end
+        end
+    endtask
+
+    task automatic gate_fft_ingest_after_window;
+        begin
+            force dut.u_aces.u_audio_to_fft_pipeline.valid_reg = 1'b0;
+            force dut.u_aces.u_audio_to_fft_pipeline.valid_d = 1'b0;
+            fft_ingest_gated_r = 1'b1;
+        end
+    endtask
+
+    task automatic release_fft_ingest_gate;
+        begin
+            if (fft_ingest_gated_r) begin
+                release dut.u_aces.u_audio_to_fft_pipeline.valid_reg;
+                release dut.u_aces.u_audio_to_fft_pipeline.valid_d;
+                fft_ingest_gated_r = 1'b0;
+            end
+        end
+    endtask
+
+    task automatic apply_reset_sequence;
+        begin
+            release_fft_ingest_gate();
+            tb_rst_drive = 1'b1;
+            repeat (8) @(posedge tb_clk_drive);
+            tb_rst_drive = 1'b0;
+            repeat (8) @(posedge tb_clk_drive);
+        end
+    endtask
+
+    task automatic load_expected_samples;
+        string path_s;
+        string header_s;
+        int fd_i;
+        int ex_idx;
+        int sample_idx;
+        int sample24_i;
+        int sample18_i;
+        int scan_count;
+        begin
+            path_s = "../../../../tb/data/top_level_test_expected_samples.csv";
+            fd_i = $fopen(path_s, "r");
+            if (fd_i == 0)
+                $fatal(1, "Nao foi possivel abrir %s", path_s);
+
+            void'($fgets(header_s, fd_i));
+            scan_count = 0;
+            while (!$feof(fd_i)) begin
+                if ($fscanf(fd_i, "%d,%d,%d,%d\n", ex_idx, sample_idx, sample24_i, sample18_i) == 4) begin
+                    expected_sample24_mem[flat_sample_idx(ex_idx, sample_idx)] = sample24_i;
+                    expected_sample18_mem[flat_sample_idx(ex_idx, sample_idx)] = sample18_i;
+                    scan_count = scan_count + 1;
+                end else begin
+                    void'($fgets(header_s, fd_i));
+                end
+            end
+
+            $fclose(fd_i);
+
+            assert (scan_count == TOTAL_SAMPLES)
+            else $fatal(1, "Arquivo de samples esperados incompleto. exp=%0d got=%0d", TOTAL_SAMPLES, scan_count);
+        end
+    endtask
+
+    task automatic load_expected_fft;
+        string path_s;
+        string header_s;
+        int fd_i;
+        int ex_idx;
+        int bin_idx;
+        real real_r;
+        real imag_r;
+        int scan_count;
+        begin
+            path_s = "../../../../tb/data/top_level_test_expected_fft.csv";
+            fd_i = $fopen(path_s, "r");
+            if (fd_i == 0)
+                $fatal(1, "Nao foi possivel abrir %s", path_s);
+
+            void'($fgets(header_s, fd_i));
+            scan_count = 0;
+            while (!$feof(fd_i)) begin
+                if ($fscanf(fd_i, "%d,%d,%f,%f\n", ex_idx, bin_idx, real_r, imag_r) == 4) begin
+                    expected_fft_real_mem[flat_fft_idx(ex_idx, bin_idx)] = real_r;
+                    expected_fft_imag_mem[flat_fft_idx(ex_idx, bin_idx)] = imag_r;
+                    scan_count = scan_count + 1;
+                end else begin
+                    void'($fgets(header_s, fd_i));
+                end
+            end
+
+            $fclose(fd_i);
+
+            assert (scan_count == TOTAL_BINS)
+            else $fatal(1, "Arquivo de FFT esperada incompleto. exp=%0d got=%0d", TOTAL_BINS, scan_count);
+        end
+    endtask
+
+    task automatic start_example(input int example_idx);
+        logic [EXAMPLE_SEL_W-1:0] example_bits;
+        begin
+            example_bits = example_idx[EXAMPLE_SEL_W-1:0];
+
+            wait (dut.stim_ready_o == 1'b1);
+            @(posedge tb_clk_drive);
+
+            reset_example_scoreboard(example_idx);
+
+            sw3 = example_bits[2];
+            sw2 = example_bits[1];
+            sw1 = example_bits[0];
+            sw4 = 1'b0;
+            sw5 = 1'b0;
+            sw6 = 1'b0;
+
+            @(posedge tb_clk_drive);
+            sw0 = 1'b1;
+            @(posedge tb_clk_drive);
+            sw0 = 1'b0;
+
+            wait (dut.stim_busy_o == 1'b1);
+            assert (dut.stim_current_example_o == example_bits)
+            else $fatal(1, "Stimulus manager iniciou exemplo errado. exp=%0d got=%0d",
+                        example_idx, dut.stim_current_example_o);
+
+            $display("[%0t] top_level_test: iniciando exemplo %0d", $time, example_idx);
+        end
+    endtask
+
+    task automatic check_fft_against_expected(input int example_idx);
+        int bin_idx;
+        real diff_real_r;
+        real diff_imag_r;
+        real abs_err_r;
+        real max_abs_err_r;
+        real mse_r;
+        real rmse_r;
+        begin
+            max_abs_err_r = 0.0;
+            mse_r         = 0.0;
+
+            for (bin_idx = 0; bin_idx < FFT_LENGTH; bin_idx++) begin
+                diff_real_r = measured_fft_real_mem[bin_idx] - expected_fft_real_mem[flat_fft_idx(example_idx, bin_idx)];
+                diff_imag_r = measured_fft_imag_mem[bin_idx] - expected_fft_imag_mem[flat_fft_idx(example_idx, bin_idx)];
+
+                abs_err_r = $sqrt((diff_real_r * diff_real_r) + (diff_imag_r * diff_imag_r));
+                mse_r = mse_r + (abs_err_r * abs_err_r);
+
+                if (abs_err_r > max_abs_err_r)
+                    max_abs_err_r = abs_err_r;
+            end
+
+            rmse_r = $sqrt(mse_r / $itor(FFT_LENGTH));
+
+            $display("[%0t] top_level_test: exemplo %0d FFT rmse=%0f max_abs=%0f bfpexp=%0d",
+                     $time, example_idx, rmse_r, max_abs_err_r, frame_bfpexp_r);
+            for (bin_idx = 0; bin_idx < 8; bin_idx = bin_idx + 1)
+                $display("  bin %0d: measured=(%0f,%0f) expected=(%0f,%0f)",
+                         bin_idx,
+                         measured_fft_real_mem[bin_idx],
+                         measured_fft_imag_mem[bin_idx],
+                         expected_fft_real_mem[flat_fft_idx(example_idx, bin_idx)],
+                         expected_fft_imag_mem[flat_fft_idx(example_idx, bin_idx)]);
+
+            assert (max_abs_err_r <= FFT_MAX_ABS_ERR_TOL)
+            else $fatal(1, "FFT max_abs_err fora da tolerancia no exemplo %0d: got=%0f tol=%0f",
+                        example_idx, max_abs_err_r, FFT_MAX_ABS_ERR_TOL);
+
+            assert (rmse_r <= FFT_RMSE_ERR_TOL)
+            else $fatal(1, "FFT rmse fora da tolerancia no exemplo %0d: got=%0f tol=%0f",
+                        example_idx, rmse_r, FFT_RMSE_ERR_TOL);
+        end
+    endtask
+
+    task automatic wait_for_example_completion(input int example_idx);
+        int timeout_cycles;
+        begin
+            timeout_cycles = 0;
+            while ((timeout_cycles < MAX_EXAMPLE_CYCLES) &&
+                   !(fft_frame_done_r &&
+                     (serial_expected_read_idx_r == serial_expected_write_idx_r) &&
+                     (sample18_count_r >= N_POINTS) &&
+                     dut.stim_ready_o)) begin
+                @(posedge tb_clk_drive);
+                timeout_cycles = timeout_cycles + 1;
+            end
+
+            if (timeout_cycles >= MAX_EXAMPLE_CYCLES)
+                $fatal(1,
+                       "Timeout esperando conclusao do exemplo %0d: fft_run_seen=%0b fft_frame_done=%0b serial_rd=%0d serial_wr=%0d sample18=%0d stim_ready=%0b extra_fft=%0d extra_serial=%0d gated=%0b gate_pending=%0b",
+                       example_idx,
+                       fft_run_seen_r,
+                       fft_frame_done_r,
+                       serial_expected_read_idx_r,
+                       serial_expected_write_idx_r,
+                       sample18_count_r,
+                       dut.stim_ready_o,
+                       extra_fft_bin_count_r,
+                       extra_serial_frames_r,
+                       fft_ingest_gated_r,
+                       fft_ingest_gate_pending_r);
+        end
+    endtask
+
+    task automatic check_example_summary(input int example_idx);
+        begin
+            if (REAL_FLOW) begin
+                assert (sample24_count_r == N_POINTS)
+                else $fatal(1, "Exemplo %0d deveria ter %0d amostras 24b, obteve %0d",
+                            example_idx, N_POINTS, sample24_count_r);
+
+                assert (sample18_count_r >= N_POINTS)
+                else $fatal(1, "Exemplo %0d deveria ter pelo menos %0d amostras 18b, obteve %0d",
+                            example_idx, N_POINTS, sample18_count_r);
+
+                assert (stim_done_seen_r)
+                else $fatal(1, "Exemplo %0d nao observou pulso de stim_done_o", example_idx);
+
+                assert (fft_done_seen_r)
+                else $fatal(1, "Exemplo %0d nao observou pulso de fft_done_o", example_idx);
+            end else begin
+                assert (sample18_count_r > 0)
+                else $fatal(1, "Mock flow nao observou amostras ingeridas.");
+            end
+
+            assert (fft_bin_count_r == FFT_LENGTH)
+            else $fatal(1, "Exemplo %0d deveria ter %0d bins FFT, obteve %0d",
+                        example_idx, FFT_LENGTH, fft_bin_count_r);
+
+            assert (serial_frames_seen_r == SERIAL_FRAMES_PER_EX)
+            else $fatal(1, "Exemplo %0d deveria ter %0d frames I2S tagged, obteve %0d",
+                        example_idx, SERIAL_FRAMES_PER_EX, serial_frames_seen_r);
+
+            assert (!tx_overflow_seen_r)
+            else $fatal(1, "Exemplo %0d ativou tx_overflow_o", example_idx);
+
+            if (REAL_FLOW)
+                check_fft_against_expected(example_idx);
+
+            $display("[%0t] top_level_test: exemplo %0d concluido. sample24=%0d sample18=%0d fft_bins=%0d serial_frames=%0d extra_fft=%0d extra_serial=%0d",
+                     $time, example_idx, sample24_count_r, sample18_count_r, fft_bin_count_r, serial_frames_seen_r,
+                     extra_fft_bin_count_r, extra_serial_frames_r);
+        end
+    endtask
+
+    task automatic run_example_and_check(input int example_idx);
+        begin
+            start_example(example_idx);
+            wait_for_example_completion(example_idx);
+            check_example_summary(example_idx);
+            example_in_progress_r = 1'b0;
+            apply_reset_sequence();
+        end
+    endtask
+
+    task automatic check_decoded_frame(
+        input logic [I2S_SLOT_W-1:0] left_word_i,
+        input logic [I2S_SLOT_W-1:0] right_word_i
+    );
+        logic [TAG_W-1:0] left_tag;
+        logic [TAG_W-1:0] right_tag;
+        logic signed [I2S_SAMPLE_W-1:0] left_payload;
+        logic signed [I2S_SAMPLE_W-1:0] right_payload;
+        begin
+            left_tag      = decode_tag(left_word_i);
+            right_tag     = decode_tag(right_word_i);
+            left_payload  = decode_payload(left_word_i);
+            right_payload = decode_payload(right_word_i);
+
+            assert (left_tag == right_tag)
+            else $fatal(1, "Tags diferentes entre canais do stream TX: left=%0d right=%0d", left_tag, right_tag);
+
+            if (serial_expected_read_idx_r >= serial_expected_write_idx_r) begin
+                if (REAL_FLOW && fft_frame_done_r) begin
+                    extra_serial_frames_r = extra_serial_frames_r + 1;
+                end else if (REAL_FLOW) begin
+                    assert (left_tag == TAG_IDLE_C)
+                    else $fatal(1, "Frame tagged inesperado no stream TX. tag=%0d left=%0d right=%0d",
+                                left_tag, left_payload, right_payload);
+                end
+            end else begin
+                if ((serial_frames_seen_r == 0) && (left_tag == TAG_IDLE_C)) begin
+                    assert (left_payload == '0 && right_payload == '0)
+                    else $fatal(1, "Frame IDLE inicial do stream TX deveria carregar zeros. left=%0d right=%0d",
+                                left_payload, right_payload);
+                end else begin
+                    assert (left_tag === expected_tag_mem[serial_expected_read_idx_r])
+                    else $fatal(1, "TAG do stream TX mismatch idx=%0d exp=%0d got=%0d",
+                                serial_expected_read_idx_r, expected_tag_mem[serial_expected_read_idx_r], left_tag);
+
+                    assert (left_payload === expected_left_mem[serial_expected_read_idx_r])
+                    else $fatal(1, "LEFT do stream TX mismatch idx=%0d exp=%0d got=%0d",
+                                serial_expected_read_idx_r, expected_left_mem[serial_expected_read_idx_r], left_payload);
+
+                    assert (right_payload === expected_right_mem[serial_expected_read_idx_r])
+                    else $fatal(1, "RIGHT do stream TX mismatch idx=%0d exp=%0d got=%0d",
+                                serial_expected_read_idx_r, expected_right_mem[serial_expected_read_idx_r], right_payload);
+
+                    serial_expected_read_idx_r = serial_expected_read_idx_r + 1;
+                    serial_frames_seen_r       = serial_frames_seen_r + 1;
+                end
+            end
+        end
+    endtask
+
+    assign gpio_0_d0  = tb_clk_drive;
+    assign gpio_0_d1  = tb_rst_drive;
+    assign gpio_0_d2  = tb_capture_leds_drive;
+    assign gpio_0_d4  = tb_capture_hex_drive;
+    assign gpio_0_d5  = tb_capture_gpio_drive;
+    assign gpio_0_d6  = tb_capture_clear_drive;
+    assign gpio_0_d7  = tb_dbg_stage0_drive;
+    assign gpio_0_d8  = tb_dbg_stage1_drive;
+    assign gpio_0_d9  = tb_dbg_page0_drive;
     assign gpio_0_d10 = tb_dbg_page1_drive;
 
-    always #5 tb_clk_drive = ~tb_clk_drive;
+    always #CLK_HALF tb_clk_drive = ~tb_clk_drive;
 
     top_level_test #(
         .FFT_LENGTH(FFT_LENGTH),
         .FFT_DW(FFT_DW),
         .N_POINTS(N_POINTS),
         .N_EXAMPLES(N_EXAMPLES),
-        .I2S_CLOCK_DIV(4)
+        .I2S_CLOCK_DIV(I2S_CLOCK_DIV)
     ) dut (
         .key0(key0), .key1(key1), .key2(key2), .key3(key3), .reset_n(reset_n),
         .sw0(sw0), .sw1(sw1), .sw2(sw2), .sw3(sw3), .sw4(sw4), .sw5(sw5), .sw6(sw6), .sw7(sw7), .sw8(sw8), .sw9(sw9),
@@ -95,237 +580,363 @@ module tb_top_level_test;
         .gpio_1_d35(gpio_1_d35)
     );
 
-    always @(posedge tb_clk_drive) begin
-        if (dut.sact_istream_o)
-            sample_count <= sample_count + 1;
-        if (dut.fft_tx_valid_o && (!fft_tx_valid_prev || (dut.fft_tx_index_o != fft_tx_index_prev)))
-            fft_bin_count <= fft_bin_count + 1;
-
-        fft_tx_valid_prev <= dut.fft_tx_valid_o;
-        fft_tx_index_prev <= dut.fft_tx_index_o;
+    always @(dut.tx_i2s_sck_o or gpio_1_d27 or tb_rst_drive) begin
+        if (!tb_rst_drive) begin
+            assert (gpio_1_d27 === dut.tx_i2s_sck_o)
+            else $fatal(1, "GPIO_1_D27 nao reflete tx_i2s_sck_o. pin=%0b dut=%0b", gpio_1_d27, dut.tx_i2s_sck_o);
+        end
     end
 
-    task automatic set_stage_page(input logic [1:0] stage_sel, input logic [1:0] page_sel);
-        begin
-            key3 = ~stage_sel[1];
-            key2 = ~stage_sel[0];
-            key1 = ~page_sel[1];
-            key0 = ~page_sel[0];
-            tb_dbg_stage1_drive = stage_sel[1];
-            tb_dbg_stage0_drive = stage_sel[0];
-            tb_dbg_page1_drive  = page_sel[1];
-            tb_dbg_page0_drive  = page_sel[0];
-            @(posedge tb_clk_drive);
+    always @(dut.tx_i2s_ws_o or gpio_1_d29 or tb_rst_drive) begin
+        if (!tb_rst_drive) begin
+            assert (gpio_1_d29 === dut.tx_i2s_ws_o)
+            else $fatal(1, "GPIO_1_D29 nao reflete tx_i2s_ws_o. pin=%0b dut=%0b", gpio_1_d29, dut.tx_i2s_ws_o);
         end
-    endtask
+    end
 
-    task automatic clear_capture_regs;
-        begin
-            tb_capture_clear_drive = 1'b1;
-            @(posedge tb_clk_drive);
-            tb_capture_clear_drive = 1'b0;
-            @(posedge tb_clk_drive);
+    always @(dut.tx_i2s_sd_o or gpio_1_d31 or tb_rst_drive) begin
+        if (!tb_rst_drive) begin
+            assert (gpio_1_d31 === dut.tx_i2s_sd_o)
+            else $fatal(1, "GPIO_1_D31 nao reflete tx_i2s_sd_o. pin=%0b dut=%0b", gpio_1_d31, dut.tx_i2s_sd_o);
         end
-    endtask
+    end
 
-    task automatic pulse_capture_all;
-        begin
-            tb_capture_leds_drive = 1'b1;
-            tb_capture_hex_drive  = 1'b1;
-            tb_capture_gpio_drive = 1'b1;
-            @(posedge tb_clk_drive);
-            tb_capture_leds_drive = 1'b0;
-            tb_capture_hex_drive  = 1'b0;
-            tb_capture_gpio_drive = 1'b0;
-            @(posedge tb_clk_drive);
+    always @(posedge dut.u_aces.u_audio_to_fft_pipeline.sample_valid_24 or posedge tb_rst_drive) begin
+        if (tb_rst_drive) begin
+            sample24_count_r       <= 0;
+            extra_sample24_count_r <= 0;
+        end else if (example_in_progress_r) begin
+            if (REAL_FLOW && (sample24_count_r < N_POINTS)) begin
+                if (sample24_count_r < 8)
+                    $display("[%0t] sample24 idx=%0d got=%0d exp=%0d stim_point=%0d stim_sample=%0d",
+                             $time,
+                             sample24_count_r,
+                             $signed(dut.sample_24_dbg_o),
+                             expected_sample24_mem[flat_sample_idx(active_example_r, sample24_count_r)],
+                             dut.stim_current_point_o,
+                             $signed(dut.stim_current_sample_dbg_o));
+
+                assert ($signed(dut.sample_24_dbg_o) == expected_sample24_mem[flat_sample_idx(active_example_r, sample24_count_r)])
+                else $fatal(1,
+                            "sample_24 mismatch exemplo=%0d idx=%0d exp=%0d got=%0d stim_point=%0d stim_sample=%0d stim_state=%0d bit_index=%0d ws=%0b sck=%0b sd=%0b",
+                            active_example_r, sample24_count_r,
+                            expected_sample24_mem[flat_sample_idx(active_example_r, sample24_count_r)],
+                            $signed(dut.sample_24_dbg_o),
+                            dut.stim_current_point_o,
+                            $signed(dut.stim_current_sample_dbg_o),
+                            dut.stim_state_dbg_o,
+                            dut.stim_bit_index_o,
+                            dut.i2s_ws_o,
+                            dut.i2s_sck_o,
+                            dut.stim_sd_o);
+                sample24_count_r <= sample24_count_r + 1;
+            end else if (REAL_FLOW) begin
+                extra_sample24_count_r <= extra_sample24_count_r + 1;
+            end
         end
-    endtask
+    end
 
-    function automatic snapshot_t get_live_snapshot;
-        snapshot_t snap;
-        begin
-            snap.leds = dut.dbg_led_live;
-            snap.hex  = dut.dbg_hex_live;
-            snap.gpio = dut.dbg_gpio_live;
-            return snap;
-        end
-    endfunction
+    always @(posedge tb_clk_drive or posedge tb_rst_drive) begin
+        int hold_idx;
+        logic signed [I2S_SAMPLE_W-1:0] bfpexp_payload;
+        real corrected_real_r;
+        real corrected_imag_r;
 
-    function automatic snapshot_t get_capture_snapshot;
-        snapshot_t snap;
-        begin
-            snap.leds = {ledr9, ledr8, ledr7, ledr6, ledr5, ledr4, ledr3, ledr2, ledr1, ledr0};
-            snap.hex  = dut.dbg_hex_capture_r;
-            snap.gpio = {gpio_1_d4, gpio_1_d3, gpio_1_d2, gpio_0_d3};
-            return snap;
-        end
-    endfunction
+        if (tb_rst_drive) begin
+            sample18_count_r             <= 0;
+            extra_sample18_count_r       <= 0;
+            fft_bin_count_r              <= 0;
+            extra_fft_bin_count_r        <= 0;
+            serial_expected_write_idx_r  <= 0;
+            serial_expected_read_idx_r   <= 0;
+            serial_frames_seen_r         <= 0;
+            extra_serial_frames_r        <= 0;
+            fft_run_count_r              <= 0;
+            frame_bfpexp_valid_r         <= 1'b0;
+            serial_bfpexp_enqueued_r     <= 1'b0;
+            stim_done_seen_r             <= 1'b0;
+            fft_done_seen_r              <= 1'b0;
+            tx_overflow_seen_r           <= 1'b0;
+            fft_frame_done_r             <= 1'b0;
+            sact_prev_r                  <= 1'b0;
+            fft_run_seen_r               <= 1'b0;
+            fft_ingest_gate_pending_r    <= 1'b0;
+            release_fft_ingest_gate();
+        end else begin
+            if (dut.fft_run_o) begin
+                fft_run_seen_r <= 1'b1;
+                fft_run_count_r <= fft_run_count_r + 1;
 
-    function automatic logic snapshots_match(
-        input snapshot_t a,
-        input snapshot_t b
-    );
-        begin
-            snapshots_match = (a.hex === b.hex);
-        end
-    endfunction
-
-    task automatic capture_and_check(
-        input logic [1:0] stage_sel,
-        input logic [1:0] page_sel,
-        input string label
-    );
-        snapshot_t live_before;
-        snapshot_t live_after;
-        snapshot_t captured;
-        begin
-            set_stage_page(stage_sel, page_sel);
-            live_before = get_live_snapshot();
-            pulse_capture_all();
-            captured = get_capture_snapshot();
-            live_after = get_live_snapshot();
-
-            // Sinais de debug podem mudar no mesmo ciclo do pulso de captura.
-            // Aqui validamos o payload HEX capturado, que eh o dado mais estavel por pagina.
-            assert (snapshots_match(captured, live_before) || snapshots_match(captured, live_after))
-            else begin
-                $display("%s snapshot capturado nao bate.", label);
-                $display("%s expected(before): leds=%b hex=0x%06h gpio=%b", label, live_before.leds, live_before.hex, live_before.gpio);
-                $display("%s expected(after):  leds=%b hex=0x%06h gpio=%b", label, live_after.leds,  live_after.hex,  live_after.gpio);
-                $fatal(1, "%s got:              leds=%b hex=0x%06h gpio=%b", label, captured.leds, captured.hex, captured.gpio);
+                if (!fft_ingest_gated_r && !fft_ingest_gate_pending_r && (fft_run_count_r == 1))
+                    fft_ingest_gate_pending_r <= 1'b1;
             end
 
-            $display("[%0t] %s | stage=%0d page=%0d | leds=%b hex=0x%06h gpio=%b | sample_count=%0d fft_bin_count=%0d current_example=%0d current_point=%0d",
-                     $time, label, stage_sel, page_sel, captured.leds, captured.hex, captured.gpio,
-                     sample_count, fft_bin_count, dut.stim_current_example_o, dut.stim_current_point_o);
-        end
-    endtask
+            if (dut.stim_done_o)
+                stim_done_seen_r <= 1'b1;
 
-    task automatic start_example(input int example_idx);
-        logic [EXAMPLE_SEL_W-1:0] example_bits;
+            if (dut.fft_done_o)
+                fft_done_seen_r <= 1'b1;
+
+            if (dut.tx_overflow_o) begin
+                tx_overflow_seen_r <= 1'b1;
+                $display("[%0t] tx_overflow debug: fifo_overflow=%0b adapter_overflow=%0b fifo_level=%0d word_valid=%0b read_inflight=%0b tx_valid=%0b tx_ready=%0b serial_rd=%0d serial_wr=%0d fft_bins=%0d extra_fft=%0d",
+                         $time,
+                         dut.u_aces.tx_fifo_overflow_o,
+                         dut.u_aces.tx_overflow_from_adapter_o,
+                         dut.u_aces.tx_fifo_level_r,
+                         dut.u_aces.tx_fifo_word_valid_r,
+                         dut.u_aces.tx_fifo_read_inflight_r,
+                         dut.u_aces.tx_fft_valid_i,
+                         dut.u_aces.tx_fft_ready_o,
+                         serial_expected_read_idx_r,
+                         serial_expected_write_idx_r,
+                         fft_bin_count_r,
+                         extra_fft_bin_count_r);
+                $fatal(1, "tx_overflow_o nao deveria ativar durante o top-level test.");
+            end
+
+            if (example_in_progress_r && dut.sact_istream_o && !sact_prev_r) begin
+                if (REAL_FLOW && (sample18_count_r < N_POINTS)) begin
+                    assert ($signed(dut.sample_mic_o) == expected_sample18_mem[flat_sample_idx(active_example_r, sample18_count_r)])
+                    else $fatal(1, "sample_mic mismatch exemplo=%0d idx=%0d exp=%0d got=%0d",
+                                active_example_r, sample18_count_r,
+                                expected_sample18_mem[flat_sample_idx(active_example_r, sample18_count_r)],
+                                $signed(dut.sample_mic_o));
+
+                    assert ($signed(dut.sdw_istream_real_o) == expected_sample18_mem[flat_sample_idx(active_example_r, sample18_count_r)])
+                    else $fatal(1, "sdw_istream_real mismatch exemplo=%0d idx=%0d exp=%0d got=%0d",
+                                active_example_r, sample18_count_r,
+                                expected_sample18_mem[flat_sample_idx(active_example_r, sample18_count_r)],
+                                $signed(dut.sdw_istream_real_o));
+
+                    assert ($signed(dut.sdw_istream_imag_o) == 0)
+                    else $fatal(1, "sdw_istream_imag deveria ser zero. got=%0d", $signed(dut.sdw_istream_imag_o));
+
+                    sample18_count_r <= sample18_count_r + 1;
+                end else if (REAL_FLOW) begin
+                    extra_sample18_count_r <= extra_sample18_count_r + 1;
+                    sample18_count_r       <= sample18_count_r + 1;
+                end else begin
+                    sample18_count_r <= sample18_count_r + 1;
+                end
+            end
+
+            if (fft_ingest_gate_pending_r && !fft_ingest_gated_r) begin
+                gate_fft_ingest_after_window();
+                fft_ingest_gate_pending_r <= 1'b0;
+            end
+
+            sact_prev_r <= dut.sact_istream_o;
+
+            if (example_in_progress_r && dut.fft_tx_valid_o) begin
+                if (fft_bin_count_r < FFT_LENGTH) begin
+                    assert (dut.fft_tx_index_o == fft_bin_count_r[FFT_N-1:0])
+                    else $fatal(1, "fft_tx_index_o mismatch exemplo=%0d exp=%0d got=%0d",
+                                active_example_r, fft_bin_count_r, dut.fft_tx_index_o);
+
+                    if (!frame_bfpexp_valid_r) begin
+                        frame_bfpexp_r       <= dut.bfpexp_o;
+                        frame_bfpexp_valid_r <= 1'b1;
+                    end else begin
+                        assert (dut.bfpexp_o == frame_bfpexp_r)
+                        else $fatal(1, "bfpexp mudou durante a janela FFT. exp=%0d got=%0d",
+                                    frame_bfpexp_r, dut.bfpexp_o);
+                    end
+
+                    corrected_real_r = apply_bfpexp(dut.fft_tx_real_o, dut.bfpexp_o);
+                    corrected_imag_r = apply_bfpexp(dut.fft_tx_imag_o, dut.bfpexp_o);
+                    measured_fft_real_mem[fft_bin_count_r] = corrected_real_r;
+                    measured_fft_imag_mem[fft_bin_count_r] = corrected_imag_r;
+
+                    if (!REAL_FLOW) begin
+                        assert ($signed(dut.fft_tx_real_o) == (fft_bin_count_r + 1))
+                        else $fatal(1, "Mock FFT real mismatch idx=%0d exp=%0d got=%0d",
+                                    fft_bin_count_r, fft_bin_count_r + 1, $signed(dut.fft_tx_real_o));
+
+                        assert ($signed(dut.fft_tx_imag_o) == expected_mock_imag(fft_bin_count_r))
+                        else $fatal(1, "Mock FFT imag mismatch idx=%0d exp=%0d got=%0d",
+                                    fft_bin_count_r, expected_mock_imag(fft_bin_count_r), $signed(dut.fft_tx_imag_o));
+                    end
+
+                    assert (dut.fft_tx_last_o == (fft_bin_count_r == FFT_LENGTH-1))
+                    else $fatal(1, "fft_tx_last_o mismatch idx=%0d got=%0b",
+                                fft_bin_count_r, dut.fft_tx_last_o);
+
+                    fft_bin_count_r <= fft_bin_count_r + 1;
+
+                    if (fft_bin_count_r == FFT_LENGTH-1)
+                        fft_frame_done_r <= 1'b1;
+                end else if (REAL_FLOW) begin
+                    extra_fft_bin_count_r <= extra_fft_bin_count_r + 1;
+                end
+            end
+        end
+    end
+
+    always @(posedge tb_clk_drive or posedge tb_rst_drive) begin
+        logic signed [I2S_SAMPLE_W-1:0] bfpexp_payload;
+        int hold_idx;
         begin
-            example_bits = example_idx[EXAMPLE_SEL_W-1:0];
-            wait (dut.stim_ready_o == 1'b1);
-            sw3 = example_bits[2];
-            sw2 = example_bits[1];
-            sw1 = example_bits[0];
-            sw4 = 1'b0;
-            sw5 = 1'b0;
-            sw6 = 1'b0;
-            @(posedge tb_clk_drive);
-            sw0 = 1'b1;
-            @(posedge tb_clk_drive);
-            sw0 = 1'b0;
+            if (tb_rst_drive) begin
+                // Nada a fazer: o estado do scoreboard e resetado por
+                // reset_example_scoreboard/apply_reset_sequence.
+            end else if (example_in_progress_r && dut.u_aces.tx_fft_valid_i && dut.u_aces.tx_fft_ready_o) begin
+                if (!serial_bfpexp_enqueued_r) begin
+                    bfpexp_payload = extend_bfpexp_payload(dut.u_aces.tx_bfpexp_i);
+                    for (hold_idx = 0; hold_idx < BFPEXP_HOLD_FRAMES; hold_idx++)
+                        enqueue_expected_frame(TAG_BFPEXP_C, bfpexp_payload, bfpexp_payload);
+                    serial_bfpexp_enqueued_r <= 1'b1;
+                end
 
-            wait (dut.stim_busy_o == 1'b1);
-            assert (dut.stim_current_example_o == example_bits)
-            else $fatal(1, "Stimulus manager iniciou exemplo errado. exp=%0d got=%0d", example_idx, dut.stim_current_example_o);
-
-            $display("[%0t] Iniciando exemplo %0d/%0d", $time, example_idx, N_EXAMPLES-1);
+                if (serial_expected_write_idx_r < SERIAL_FRAMES_PER_EX)
+                    enqueue_expected_frame(TAG_FFT_C, dut.u_aces.tx_fft_real_i, dut.u_aces.tx_fft_imag_i);
+            end
         end
-    endtask
+    end
 
-    task automatic wait_for_first_sample_of_example(input int previous_sample_count, input int example_idx);
+    always @(posedge dut.tx_i2s_sck_o or negedge dut.tx_i2s_sck_o or posedge tb_rst_drive) begin
+        if (tb_rst_drive) begin
+            tx_sck_toggle_count_r     <= 0;
+            tx_sck_timing_armed_r     <= 1'b0;
+            tx_last_sck_toggle_time_r <= 0;
+        end else begin
+            if (tx_sck_timing_armed_r) begin
+                assert (($realtime - tx_last_sck_toggle_time_r) == TX_SCK_TOGGLE_PERIOD)
+                else $fatal(1, "TX SCK mudou fora do periodo esperado: dt=%0t exp=%0t",
+                            $realtime - tx_last_sck_toggle_time_r, TX_SCK_TOGGLE_PERIOD);
+            end else begin
+                tx_sck_timing_armed_r <= 1'b1;
+            end
+
+            tx_sck_toggle_count_r     <= tx_sck_toggle_count_r + 1;
+            tx_sck_toggle_total_r     <= tx_sck_toggle_total_r + 1;
+            tx_last_sck_toggle_time_r <= $realtime;
+        end
+    end
+
+    always @(posedge dut.tx_i2s_sck_o or posedge tb_rst_drive) begin
+        logic [I2S_SLOT_W-1:0] completed_word;
         begin
-            wait (sample_count > previous_sample_count);
-            assert (dut.stim_current_example_o == example_idx[EXAMPLE_SEL_W-1:0])
-            else $fatal(1, "A primeira amostra nao pertence ao exemplo esperado. exp=%0d got=%0d", example_idx, dut.stim_current_example_o);
+            if (tb_rst_drive) begin
+                tx_mon_slot_ws_r         <= 1'b0;
+                tx_mon_slot_shift_r      <= '0;
+                tx_mon_slot_count_r      <= 0;
+                tx_mon_prev_slot_valid_r <= 1'b0;
+                tx_mon_prev_slot_ws_r    <= 1'b0;
+                tx_mon_right_word_r      <= '0;
+                tx_mon_have_right_r      <= 1'b0;
+            end else begin
+                if (tx_mon_slot_count_r == 0) begin
+                    tx_mon_slot_ws_r    <= dut.tx_i2s_ws_o;
+                    tx_mon_slot_shift_r <= {{(I2S_SLOT_W-1){1'b0}}, dut.tx_i2s_sd_o};
+                    tx_mon_slot_count_r <= 1;
+                end else begin
+                    assert (dut.tx_i2s_ws_o == tx_mon_slot_ws_r)
+                    else $fatal(1, "TX WS mudou no meio do slot I2S.");
+
+                    completed_word = {tx_mon_slot_shift_r[I2S_SLOT_W-2:0], dut.tx_i2s_sd_o};
+
+                    if (tx_mon_slot_count_r == I2S_SLOT_W-1) begin
+                        if (tx_mon_prev_slot_valid_r) begin
+                            assert (tx_mon_prev_slot_ws_r != tx_mon_slot_ws_r)
+                            else $fatal(1, "TX WS nao alternou entre slots consecutivos.");
+                        end
+
+                        tx_mon_prev_slot_valid_r <= 1'b1;
+                        tx_mon_prev_slot_ws_r    <= tx_mon_slot_ws_r;
+                        tx_mon_slot_count_r      <= 0;
+                        tx_mon_slot_shift_r      <= '0;
+
+                        if (tx_mon_slot_ws_r) begin
+                            tx_mon_right_word_r <= completed_word;
+                            tx_mon_have_right_r <= 1'b1;
+                        end else if (tx_mon_have_right_r) begin
+                            check_decoded_frame(completed_word, tx_mon_right_word_r);
+                            tx_mon_have_right_r <= 1'b0;
+                        end
+                    end else begin
+                        tx_mon_slot_shift_r <= completed_word;
+                        tx_mon_slot_count_r <= tx_mon_slot_count_r + 1;
+                    end
+                end
+            end
         end
-    endtask
-
-    task automatic run_example_and_capture(input int example_idx);
-        int sample_base;
-        int fft_base;
-        begin
-            sample_base = sample_count;
-            fft_base    = fft_bin_count;
-
-            start_example(example_idx);
-
-            capture_and_check(2'b00, 2'b00, $sformatf("ex%0d stim overview apos start", example_idx));
-            capture_and_check(2'b00, 2'b01, $sformatf("ex%0d stim estado/bit index", example_idx));
-            capture_and_check(2'b00, 2'b10, $sformatf("ex%0d stim amostra ROM", example_idx));
-
-            wait_for_first_sample_of_example(sample_base, example_idx);
-            capture_and_check(2'b01, 2'b00, $sformatf("ex%0d i2s amostra24", example_idx));
-            capture_and_check(2'b01, 2'b01, $sformatf("ex%0d i2s sample18", example_idx));
-            capture_and_check(2'b01, 2'b10, $sformatf("ex%0d i2s fft_sample", example_idx));
-
-            wait (dut.fft_run_o == 1'b1);
-            capture_and_check(2'b10, 2'b00, $sformatf("ex%0d ingest real", example_idx));
-            capture_and_check(2'b10, 2'b01, $sformatf("ex%0d ingest imag", example_idx));
-            capture_and_check(2'b10, 2'b10, $sformatf("ex%0d ingest status", example_idx));
-
-            wait (dut.fft_tx_valid_o == 1'b1);
-            capture_and_check(2'b11, 2'b00, $sformatf("ex%0d fft tx index", example_idx));
-            capture_and_check(2'b11, 2'b01, $sformatf("ex%0d fft tx real", example_idx));
-            capture_and_check(2'b11, 2'b10, $sformatf("ex%0d fft tx imag", example_idx));
-
-            wait (dut.stim_ready_o == 1'b1);
-            @(posedge tb_clk_drive);
-            capture_and_check(2'b00, 2'b00, $sformatf("ex%0d stim done", example_idx));
-
-            wait ((fft_bin_count - fft_base) >= FFT_LENGTH);
-
-            assert (((sample_count - sample_base) >= N_POINTS) && ((sample_count - sample_base) <= N_POINTS + 4))
-            else $fatal(1, "Exemplo %0d deveria gerar %0d..%0d amostras ingeridas, gerou %0d", example_idx, N_POINTS, N_POINTS + 4, sample_count - sample_base);
-
-            assert (((fft_bin_count - fft_base) >= FFT_LENGTH) && ((fft_bin_count - fft_base) <= FFT_LENGTH + 1))
-            else $fatal(1, "Exemplo %0d deveria gerar %0d..%0d bins FFT, gerou %0d", example_idx, FFT_LENGTH, FFT_LENGTH + 1, fft_bin_count - fft_base);
-
-            assert (dut.stim_current_example_o == example_idx[EXAMPLE_SEL_W-1:0])
-            else $fatal(1, "Stimulus manager terminou em exemplo inesperado. exp=%0d got=%0d", example_idx, dut.stim_current_example_o);
-
-            assert (dut.stim_current_point_o == '0)
-            else $fatal(1, "Stimulus manager deveria voltar ao ponto 0 em idle. got=%0d", dut.stim_current_point_o);
-
-            $display("[%0t] Exemplo %0d concluido com %0d amostras e %0d bins FFT", $time, example_idx, sample_count - sample_base, fft_bin_count - fft_base);
-        end
-    endtask
+    end
 
     initial begin
         key0 = 1'b1; key1 = 1'b1; key2 = 1'b1; key3 = 1'b1; reset_n = 1'b1;
-        // No topo, sw7 seleciona a origem de audio:
-        // 0 -> pino fisico do microfone
-        // 1 -> gerador sintetico `stim_sd_o`
-        // O bench precisa forcar a ROM interna para evitar capturar 'Z'
-        // do GPIO tri-state e testar o fluxo deterministico esperado.
         sw0 = 1'b0; sw1 = 1'b0; sw2 = 1'b0; sw3 = 1'b0; sw4 = 1'b0; sw5 = 1'b0; sw6 = 1'b0; sw7 = 1'b1; sw8 = 1'b0; sw9 = 1'b0;
         clock_50 = 1'b0; clock2_50 = 1'b0; clock3_50 = 1'b0; clock4_50 = 1'b0;
-        tb_clk_drive = 1'b0;
-        tb_rst_drive = 1'b1;
-        tb_capture_leds_drive = 1'b0;
-        tb_capture_hex_drive  = 1'b0;
-        tb_capture_gpio_drive = 1'b0;
+
+        tb_clk_drive           = 1'b0;
+        tb_rst_drive           = 1'b1;
+        tb_capture_leds_drive  = 1'b0;
+        tb_capture_hex_drive   = 1'b0;
+        tb_capture_gpio_drive  = 1'b0;
         tb_capture_clear_drive = 1'b0;
-        tb_dbg_stage0_drive = 1'b0;
-        tb_dbg_stage1_drive = 1'b0;
-        tb_dbg_page0_drive  = 1'b0;
-        tb_dbg_page1_drive  = 1'b0;
-        fft_tx_valid_prev = 1'b0;
-        fft_tx_index_prev = '0;
-        sample_count = 0;
-        fft_bin_count = 0;
+        tb_dbg_stage0_drive    = 1'b0;
+        tb_dbg_stage1_drive    = 1'b0;
+        tb_dbg_page0_drive     = 1'b0;
+        tb_dbg_page1_drive     = 1'b0;
+
+        active_example_r            = 0;
+        example_in_progress_r       = 1'b0;
+        sample24_count_r            = 0;
+        sample18_count_r            = 0;
+        extra_sample24_count_r      = 0;
+        extra_sample18_count_r      = 0;
+        fft_bin_count_r             = 0;
+        extra_fft_bin_count_r       = 0;
+        serial_expected_write_idx_r = 0;
+        serial_expected_read_idx_r  = 0;
+        serial_frames_seen_r        = 0;
+        extra_serial_frames_r       = 0;
+        fft_run_count_r             = 0;
+        frame_bfpexp_r              = '0;
+        frame_bfpexp_valid_r        = 1'b0;
+        serial_bfpexp_enqueued_r    = 1'b0;
+        stim_done_seen_r            = 1'b0;
+        fft_done_seen_r             = 1'b0;
+        tx_overflow_seen_r          = 1'b0;
+        fft_frame_done_r            = 1'b0;
+        sact_prev_r                 = 1'b0;
+        fft_ingest_gated_r          = 1'b0;
+        fft_ingest_gate_pending_r   = 1'b0;
+        tx_sck_toggle_count_r       = 0;
+        tx_sck_toggle_total_r       = 0;
+        tx_sck_timing_armed_r       = 1'b0;
+        tx_last_sck_toggle_time_r   = 0;
+        tx_mon_slot_ws_r            = 1'b0;
+        tx_mon_slot_shift_r         = '0;
+        tx_mon_slot_count_r         = 0;
+        tx_mon_prev_slot_valid_r    = 1'b0;
+        tx_mon_prev_slot_ws_r       = 1'b0;
+        tx_mon_right_word_r         = '0;
+        tx_mon_have_right_r         = 1'b0;
+
+`ifdef TB_TOP_LEVEL_REAL_FLOW
+        load_expected_samples();
+        load_expected_fft();
+`endif
 
         repeat (8) @(posedge tb_clk_drive);
         tb_rst_drive = 1'b0;
-        clear_capture_regs();
+        repeat (8) @(posedge tb_clk_drive);
 
-        for (int example_idx = 0; example_idx < N_EXAMPLES; example_idx++) begin
-            run_example_and_capture(example_idx);
+        for (int example_idx = 0; example_idx < EXAMPLES_TO_RUN; example_idx++) begin
+            run_example_and_check(example_idx);
             wait (dut.stim_ready_o == 1'b1);
-            repeat (8) @(posedge tb_clk_drive);
+            repeat (16) @(posedge tb_clk_drive);
         end
 
-        assert ((sample_count >= (N_EXAMPLES * N_POINTS)) && (sample_count <= (N_EXAMPLES * (N_POINTS + 4))))
-        else $fatal(1, "Esperadas %0d..%0d amostras ingeridas no total, obtidas %0d",
-                N_EXAMPLES * N_POINTS, N_EXAMPLES * (N_POINTS + 4), sample_count);
+        assert (tx_sck_toggle_total_r > 64)
+        else $fatal(1, "Poucos toggles observados em tx_i2s_sck_o ao longo do teste: %0d", tx_sck_toggle_total_r);
 
-        assert ((fft_bin_count >= (N_EXAMPLES * FFT_LENGTH)) && (fft_bin_count <= (N_EXAMPLES * (FFT_LENGTH + 1))))
-        else $fatal(1, "Esperados %0d..%0d bins FFT no total, obtidos %0d",
-                N_EXAMPLES * FFT_LENGTH, N_EXAMPLES * (FFT_LENGTH + 1), fft_bin_count);
-
-        $display("tb_top_level_test PASSED com %0d exemplos reais do signal_rom_generator", N_EXAMPLES);
+`ifdef TB_TOP_LEVEL_REAL_FLOW
+        $display("tb_top_level_test PASSED no fluxo real com %0d exemplos e comparacao FFT vs Python", EXAMPLES_TO_RUN);
+`else
+        $display("tb_top_level_test PASSED no fluxo mock com smoke/protocolo do stream TX");
+`endif
         $finish;
     end
 

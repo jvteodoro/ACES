@@ -721,17 +721,20 @@ class SignalRomGenerator:
         return "\n".join(lines).rstrip() + "\n"
 
 
-def main() -> None:
-    # ============================================================
-    # Configuração fluente
-    # ============================================================
+def build_default_signal_rom_generator(
+    *,
+    output_dir: str | Path = "../build_rom",
+    output_format: OutputFormat = OutputFormat.MIF,
+    verbose: bool = True,
+    save_plots: bool = True,
+) -> SignalRomGenerator:
     cfg = (
         SignalRomConfig()
         .with_n_points(512)
         .with_sample_bits(24)
         .with_sample_rate_hz(48_828)
-        .with_output_format(OutputFormat.MIF)   # troque para HEX se quiser
-        .with_output_dir("../build_rom")
+        .with_output_format(output_format)
+        .with_output_dir(output_dir)
         .with_output_basename("signals_rom")
         .with_window_policy(WindowPolicy.PAD_ZERO)
         .with_quantization_mode(QuantizationMode.FULL_SCALE)
@@ -740,17 +743,14 @@ def main() -> None:
         .with_signed_decimal_mif(False)
         .with_clamp_on_overflow(True)
         .with_overwrite(True)
-        .with_verbose(True)
-        .with_save_plots(True)
+        .with_verbose(verbose)
+        .with_save_plots(save_plots)
         .with_plot_dpi(150)
     )
 
     factory = SignalFactory(cfg)
     generator = SignalRomGenerator(cfg)
 
-    # ============================================================
-    # Exemplos
-    # ============================================================
     generator.add_examples([
         factory.sine(freq_hz=1000.0, amplitude=0.9, name="sine_1k"),
         factory.sine(freq_hz=3000.0, amplitude=0.9, name="sine_3k"),
@@ -768,6 +768,17 @@ def main() -> None:
         factory.impulse(amplitude=1.0, index=0, name="impulse_0"),
         factory.dc(level=0.25, name="dc_0p25"),
     ])
+
+    return generator
+
+
+def main() -> None:
+    generator = build_default_signal_rom_generator(
+        output_dir="../build_rom",
+        output_format=OutputFormat.MIF,
+        verbose=True,
+        save_plots=True,
+    )
 
     # ============================================================
     # Exemplo WAV

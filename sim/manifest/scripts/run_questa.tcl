@@ -43,24 +43,47 @@ proc write_absolute_filelist {root local_dir source_path output_path} {
     set in [open $source_path r]
     set out [open $output_path w]
 
-    # Include Intel/Altera primitive simulation sources when available.
+    # Include Intel/Altera simulation libraries when available.
+    set emitted_sim_libs {}
     foreach sim_lib [list \
+        "C:/altera_lite/25.1std/quartus/eda/sim_lib/sgate.v" \
+        "C:/altera_lite/25.1std/quartus/eda/sim_lib/altera_primitives.v" \
+        "C:/altera_lite/25.1std/quartus/eda/sim_lib/220model.v" \
+        "C:/altera_lite/25.1std/quartus/eda/sim_lib/altera_mf.v" \
+        "C:/altera_lite/25.1std/quartus/eda/sim_lib/altera_lnsim.sv" \
+        "C:/altera_lite/25.1std/quartus/eda/sim_lib/cycloneive_atoms.v" \
+        "C:/altera_lite/25.1std/quartus/eda/sim_lib/cyclonev_atoms.v" \
+        "/mnt/c/altera_lite/25.1std/quartus/eda/sim_lib/sgate.v" \
+        "/mnt/c/altera_lite/25.1std/quartus/eda/sim_lib/altera_primitives.v" \
+        "/mnt/c/altera_lite/25.1std/quartus/eda/sim_lib/220model.v" \
+        "/mnt/c/altera_lite/25.1std/quartus/eda/sim_lib/altera_mf.v" \
+        "/mnt/c/altera_lite/25.1std/quartus/eda/sim_lib/altera_lnsim.sv" \
+        "/mnt/c/altera_lite/25.1std/quartus/eda/sim_lib/cycloneive_atoms.v" \
+        "/mnt/c/altera_lite/25.1std/quartus/eda/sim_lib/cyclonev_atoms.v" \
+        "/opt/intelFPGA/20.1/modelsim_ase/altera/verilog/src/sgate.v" \
+        "/opt/intelFPGA/20.1/modelsim_ase/altera/verilog/src/altera_primitives.v" \
         "/opt/intelFPGA/20.1/modelsim_ase/altera/verilog/src/220model.v" \
         "/opt/intelFPGA/20.1/modelsim_ase/altera/verilog/src/altera_mf.v" \
         "/opt/intelFPGA/20.1/modelsim_ase/altera/verilog/src/altera_lnsim.sv" \
     ] {
         if {[file exists $sim_lib]} {
-            puts $out [normalize_for_hdl $sim_lib]
+            set normalized_lib [normalize_for_hdl $sim_lib]
+            if {[lsearch -exact $emitted_sim_libs $normalized_lib] < 0} {
+                puts $out $normalized_lib
+                lappend emitted_sim_libs $normalized_lib
+            }
         }
     }
 
     set staged_signals_rom [normalize_for_hdl [stage_runtime_asset         [file join $root tools signals_rom.mif]         [file join $local_dir signals_rom.mif]]]
     set staged_signals_hex [normalize_for_hdl [stage_runtime_asset         [file join $root tools signals_rom_mirror.hex]         [file join $local_dir signals_rom_mirror.hex]]]
     set staged_twrom_mif [normalize_for_hdl [stage_runtime_asset         [file join $root submodules R2FFT quartus twrom.mif]         [file join $local_dir twrom.mif]]]
+    set staged_twrom_512x18_mif [normalize_for_hdl [stage_runtime_asset         [file join $root tb data twrom_512x18.mif]         [file join $local_dir twrom_512x18.mif]]]
 
     set staged_signals_rom_ip [normalize_for_hdl [stage_ip_wrapper         [file join $root rtl ip rom signals_rom_ip.v]         [file join $local_dir staged_ip signals_rom_ip.v]         [list "../../../tools/signals_rom.mif" $staged_signals_rom]]]
 
     set staged_twrom_v [normalize_for_hdl [stage_ip_wrapper         [file join $root submodules R2FFT quartus twrom.v]         [file join $local_dir staged_ip twrom.v]         [list "twrom.mif" $staged_twrom_mif]]]
+    set staged_twrom_512x18_v [normalize_for_hdl [stage_ip_wrapper         [file join $root tb real_ip r2fft_twrom_altsyncram.sv]         [file join $local_dir staged_ip r2fft_twrom_altsyncram.sv]         [list "__TWROM_512X18_INIT_FILE__" $staged_twrom_512x18_mif]]]
 
     try {
         while {[gets $in line] >= 0} {
@@ -69,8 +92,12 @@ proc write_absolute_filelist {root local_dir source_path output_path} {
                 puts $out $line
             } elseif {$trimmed eq "rtl/ip/rom/signals_rom_ip.v"} {
                 puts $out $staged_signals_rom_ip
+            } elseif {$trimmed eq "tb/real_ip/r2fft_twrom_altsyncram.sv"} {
+                puts $out $staged_twrom_512x18_v
             } elseif {$trimmed eq "rtl/ip/fft/twrom.v" || $trimmed eq "submodules/R2FFT/quartus/twrom.v"} {
                 puts $out $staged_twrom_v
+            } elseif {[string match {+*} $trimmed] || [string match {-*} $trimmed]} {
+                puts $out $trimmed
             } elseif {[file pathtype $trimmed] eq "relative"} {
                 puts $out [file normalize [file join $root $trimmed]]
             } else {
@@ -107,6 +134,7 @@ array set filelists {
     aces_audio_to_fft_pipeline     mock_integration_aces_audio_to_fft_pipeline.f
     aces                           mock_integration_aces.f
     top_level_test mock_integration_top_level_test.f
+    top_level_fft_isolated real_ip_top_level_fft_isolated.f
 }
 
 array set tops {
@@ -123,6 +151,7 @@ array set tops {
     aces_audio_to_fft_pipeline     tb_aces_audio_to_fft_pipeline
     aces                           tb_aces
     top_level_test tb_top_level_test
+    top_level_fft_isolated tb_top_level_fft_isolated
 }
 
 array set wave_dos {
@@ -130,13 +159,17 @@ array set wave_dos {
 }
 
 if {$flow eq "real"} {
-    if {$test_name ne "top_level_test"} {
-        fail "Real flow is currently defined only for top_level_test."
+    if {$test_name ni [list top_level_test top_level_fft_isolated]} {
+        fail "Real flow is currently defined only for top_level_test and top_level_fft_isolated."
     }
     if {![file exists [file join $repo_root submodules R2FFT quartus r2fft_tribuf_impl.sv]]} {
         fail "Real flow requires initialized submodules/R2FFT sources. Run 'git submodule update --init --recursive' before launching the real top-level test."
     }
-    set filelist_name real_ip_top_level_test.f
+    if {$test_name eq "top_level_test"} {
+        set filelist_name real_ip_top_level_test.f
+    } else {
+        set filelist_name $filelists($test_name)
+    }
 } elseif {[info exists filelists($test_name)]} {
     set filelist_name $filelists($test_name)
 } else {
@@ -201,10 +234,10 @@ if {$gui_mode} {
         set sim_do "view wave; log -r sim:/*; add wave -r sim:/*; run -all"
     }
 
-    set sim_cmd [list vsim -voptargs=+acc -L altera_mf work.$top -do $sim_do]
+    set sim_cmd [list vsim -voptargs=+acc work.$top -do $sim_do]
 } else {
     set sim_do "run -all; quit -code 0"
-    set sim_cmd [list vsim -c -L altera_mf work.$top -do $sim_do]
+    set sim_cmd [list vsim -c work.$top -do $sim_do]
 }
 puts "Launching: $sim_cmd"
 if {[catch {eval $sim_cmd} result]} {

@@ -6,6 +6,7 @@ module fft_dma_reader #(
     input  logic clk,
     input  logic rst,
     input  logic done_i,
+    input  logic run_i,
 
     output logic dmaact_o,
     output logic [$clog2(FFT_LENGTH)-1:0] dmaa_o,
@@ -22,7 +23,8 @@ module fft_dma_reader #(
 
     typedef enum logic [1:0] {
         IDLE,
-        ISSUE,
+        ISSUE_PULSE,
+        WAIT_LATENCY,
         CAPTURE
     } state_t;
 
@@ -30,6 +32,15 @@ module fft_dma_reader #(
 
     logic [$clog2(FFT_LENGTH)-1:0] addr;
     logic [$clog2(READ_LATENCY+1)-1:0] lat_cnt;
+    logic done_d;
+    logic run_d;
+    logic pending_output_r;
+
+    wire done_pulse;
+    wire run_pulse;
+
+    assign done_pulse = done_i & ~done_d;
+    assign run_pulse  = run_i & ~run_d;
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -43,23 +54,40 @@ module fft_dma_reader #(
             fft_bin_imag_o  <= '0;
             fft_bin_last_o  <= 1'b0;
             lat_cnt         <= '0;
+            done_d          <= 1'b0;
+            run_d           <= 1'b0;
+            pending_output_r<= 1'b0;
         end else begin
             fft_bin_valid_o <= 1'b0;
             fft_bin_last_o  <= 1'b0;
+            done_d          <= done_i;
+            run_d           <= run_i;
+
+            if (done_pulse)
+                pending_output_r <= 1'b1;
 
             case (state)
                 IDLE: begin
                     dmaact_o <= 1'b0;
-                    if (done_i) begin
+                    if (run_pulse && pending_output_r) begin
+                        pending_output_r <= 1'b0;
                         addr     <= '0;
                         dmaa_o   <= '0;
                         dmaact_o <= 1'b1;
-                        lat_cnt  <= '0;
-                        state    <= ISSUE;
+                        state    <= ISSUE_PULSE;
                     end
                 end
 
-                ISSUE: begin
+                ISSUE_PULSE: begin
+                    dmaact_o <= 1'b0;
+                    lat_cnt  <= '0;
+                    if (READ_LATENCY <= 0)
+                        state <= CAPTURE;
+                    else
+                        state <= WAIT_LATENCY;
+                end
+
+                WAIT_LATENCY: begin
                     if (lat_cnt == READ_LATENCY-1) begin
                         state <= CAPTURE;
                     end else begin
@@ -80,8 +108,8 @@ module fft_dma_reader #(
                     end else begin
                         addr    <= addr + 1'b1;
                         dmaa_o  <= addr + 1'b1;
-                        lat_cnt <= '0;
-                        state   <= ISSUE;
+                        dmaact_o <= 1'b1;
+                        state   <= ISSUE_PULSE;
                     end
                 end
 

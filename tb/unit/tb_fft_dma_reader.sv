@@ -9,6 +9,7 @@ module tb_fft_dma_reader;
     logic clk;
     logic rst;
     logic done_i;
+    logic run_i;
     logic dmaact_o;
     logic [$clog2(FFT_LENGTH)-1:0] dmaa_o;
     logic signed [FFT_DW-1:0] dmadr_real_i;
@@ -38,6 +39,7 @@ module tb_fft_dma_reader;
         .clk(clk),
         .rst(rst),
         .done_i(done_i),
+        .run_i(run_i),
         .dmaact_o(dmaact_o),
         .dmaa_o(dmaa_o),
         .dmadr_real_i(dmadr_real_i),
@@ -76,6 +78,7 @@ module tb_fft_dma_reader;
         clk          = 1'b0;
         rst          = 1'b1;
         done_i       = 1'b0;
+        run_i        = 1'b0;
         capture_count= 0;
 
         repeat (3) @(posedge clk);
@@ -85,6 +88,11 @@ module tb_fft_dma_reader;
         done_i = 1'b1;
         @(posedge clk);
         done_i = 1'b0;
+
+        repeat (2) @(posedge clk);
+        run_i = 1'b1;
+        @(posedge clk);
+        run_i = 1'b0;
 
         wait (capture_count == FFT_LENGTH);
         @(posedge clk);

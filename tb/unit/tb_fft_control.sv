@@ -33,21 +33,27 @@ module tb_fft_control;
         @(posedge clk);
         assert (run == 1'b0) else $fatal(1, "run nao deveria subir sem buffer cheio");
 
+        sact_istream_i = 1'b0;
         status         = 2'b10;
+        @(posedge clk);
+        assert (run == 1'b0) else $fatal(1, "run ainda nao deveria subir no primeiro ciclo com buffer cheio");
+
         @(posedge clk);
         assert (run == 1'b1) else $fatal(1, "run deveria subir quando status==S_FBUFFER");
 
-        sact_istream_i = 1'b0;
         status         = 2'b00;
         @(posedge clk);
         assert (run == 1'b0) else $fatal(1, "run deveria cair ao voltar para IDLE");
 
         @(posedge clk);
         sact_istream_i = 1'b1;
-        status         = 2'b10;
+        status         = 2'b00;
         @(posedge clk);
         sact_istream_i = 1'b0;
         status         = 2'b10;
+        @(posedge clk);
+        assert (run == 1'b0) else $fatal(1, "run ainda nao deveria subir antes do estado FULL");
+
         @(posedge clk);
         assert (run == 1'b1) else $fatal(1, "run deveria persistir por um ciclo em FFT_FULL");
 

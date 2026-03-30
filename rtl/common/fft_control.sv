@@ -25,18 +25,11 @@ module fft_control(
             FFT_ISTREAM: begin
                 if (status == S_FBUFFER)
                     state_n = FFT_FULL;
-                else if (!sact_istream_i) begin
-                    state_n = FFT_IDLE;
-                end
-                else begin
+                else
                     state_n = FFT_ISTREAM;
-                end
             end
             FFT_FULL: begin
-                if (sact_istream_i)
-                    state_n = FFT_ISTREAM;
-                else
-                    state_n = FFT_IDLE;
+                state_n = FFT_IDLE;
             end
             default: state_n = FFT_IDLE;
         endcase

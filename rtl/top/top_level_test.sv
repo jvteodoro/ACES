@@ -636,8 +636,9 @@ module top_level_test #(
 //    assign gpio_1_d3 = dbg_gpio_capture_r[2];
 //    assign gpio_1_d4 = dbg_gpio_capture_r[3] ^ (sw9 & unused_inputs_probe);
     
-//   assign gpio_1_d27 = tx_i2s_sck_o;
-//   assign gpio_1_d29 = tx_i2s_ws_o;
-//   assign gpio_1_d31 = tx_i2s_sd_o;
+    // Exporta o stream I2S de FFT para o header conectado ao Raspberry Pi.
+    assign gpio_1_d27 = tx_i2s_sck_o;
+    assign gpio_1_d29 = tx_i2s_ws_o;
+    assign gpio_1_d31 = tx_i2s_sd_o;
 
 endmodule

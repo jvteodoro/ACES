@@ -1,6 +1,4 @@
-# Real-IP-oriented manifest for the board top-level using the checked-in R2FFT submodule.
-# Ensure `submodules/R2FFT` is initialized before running the real flow.
-+define+TB_TOP_LEVEL_REAL_FLOW
+# Real-IP-oriented manifest for isolated FFT diagnosis in the board top-level.
 rtl/ip/rom/signals_rom_ip.v
 rtl/common/hexa7seg.v
 rtl/frontend/i2s_master_clock_gen.sv
@@ -36,4 +34,4 @@ tb/real_ip/r2fft_twrom_altsyncram.sv
 submodules/R2FFT/quartus/r2fft_impl.sv
 submodules/R2FFT/quartus/r2fft_tribuf_impl.sv
 rtl/top/top_level_test.sv
-tb/integration/tb_top_level_test.sv
+tb/integration/tb_top_level_fft_isolated.sv

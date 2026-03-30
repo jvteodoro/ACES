@@ -12,7 +12,6 @@ module i2s_rx_adapter_24 (
     logic ws_prev;
 
     logic capturing;
-    logic skip_bit;              // atraso de 1 bit do I2S
     logic [4:0] bit_count;       // 0..23
     logic [23:0] shift_reg;
 
@@ -20,7 +19,6 @@ module i2s_rx_adapter_24 (
         if (rst) begin
             ws_prev         <= 1'b0;
             capturing       <= 1'b0;
-            skip_bit        <= 1'b0;
             bit_count       <= 5'd0;
             shift_reg       <= 24'd0;
             sample_24_o     <= 24'sd0;
@@ -31,25 +29,20 @@ module i2s_rx_adapter_24 (
             // Detecta início do canal esquerdo: WS 1 -> 0
             if (ws_prev == 1'b1 && ws_i == 1'b0) begin
                 capturing <= 1'b1;
-                // O flanco em que WS muda para o canal esquerdo já consome
-                // o bit de atraso do protocolo I2S. A proxima borda de SCK
-                skip_bit  <= 1'b1;   // primeiro ciclo após WS é descartado
                 bit_count <= 5'd0;
-                //shift_reg <= 24'd0;  // evita resíduo da amostra anterior
+                shift_reg <= 24'd0;  // evita resíduo da amostra anterior
             end
             else if (capturing) begin
-                if (skip_bit) begin
-                    skip_bit <= 1'b0;
+                // O bit de atraso do I2S coincide com a borda em que WS muda
+                // para o canal esquerdo. Como essa borda entra no ramo acima,
+                // o próximo posedge de SCK já contém o MSB da amostra.
+                if (bit_count == 5'd23) begin
+                    sample_24_o    <= {shift_reg[22:0], sd_i};
+                    sample_valid_o <= 1'b1;
+                    capturing      <= 1'b0;
                 end else begin
-                    if (bit_count == 5'd22) begin
-                        // captura o último bit corretamente
-                        sample_24_o    <= {shift_reg[22:0], sd_i};
-                        sample_valid_o <= 1'b1;
-                        capturing      <= 1'b0;
-                    end else begin
-                        shift_reg <= {shift_reg[22:0], sd_i};
-                        bit_count <= bit_count + 1'b1;
-                    end
+                    shift_reg <= {shift_reg[22:0], sd_i};
+                    bit_count <= bit_count + 1'b1;
                 end
             end
 
