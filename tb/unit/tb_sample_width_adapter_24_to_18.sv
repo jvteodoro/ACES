@@ -37,10 +37,15 @@ module tb_sample_width_adapter_24_to_18;
 
     initial begin
         check(24'sd0,         1'b0, 18'sd0,      1'b0);
+        check(24'sd63,        1'b1, 18'sd0,      1'b1);
         check(24'sd64,        1'b1, 18'sd1,      1'b1);
         check(24'sd128,       1'b1, 18'sd2,      1'b1);
+        check(-24'sd1,        1'b1, -18'sd1,     1'b1);
         check(-24'sd64,       1'b1, -18'sd1,     1'b1);
+        check(-24'sd65,       1'b1, -18'sd2,     1'b1);
         check(-24'sd128,      1'b1, -18'sd2,     1'b1);
+        check(24'sh7FFFFF,    1'b1, 18'sh1FFFF,  1'b1);
+        check(24'sh800000,    1'b1, -18'sd131072,1'b1);
         check(24'sd8388480,   1'b1, 18'sd131070, 1'b1);
         check(-24'sd8388480,  1'b1, -18'sd131070,1'b1);
 

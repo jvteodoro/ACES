@@ -2,158 +2,214 @@
 
 module tb_i2s_rx_adapter_24;
 
-    localparam int ROM_DEPTH = 10;
-    localparam time SCK_HALF = 50ns;
+    localparam int  MAX_CAPTURES = 8;
+    localparam time SCK_HALF     = 40ns;
 
     logic rst;
     logic sck_i;
     logic ws_i;
     logic sd_i;
+    logic lr_i;
 
-    logic sample_valid_o;
+    logic               sample_valid_o;
     logic signed [23:0] sample_24_o;
+    logic               frame_error_o;
+    logic               active_o;
 
-    logic signed [23:0] rom [0:ROM_DEPTH-1];
-    logic signed [23:0] captured_samples[$];
-    logic signed [23:0] captured_sample;
-
-    integer i;
+    logic signed [23:0] captured_samples [0:MAX_CAPTURES-1];
+    int                 capture_count;
+    bit                 saw_active;
 
     i2s_rx_adapter_24 dut (
         .rst(rst),
         .sck_i(sck_i),
         .ws_i(ws_i),
         .sd_i(sd_i),
+        .lr_i(lr_i),
         .sample_valid_o(sample_valid_o),
-        .sample_24_o(sample_24_o)
+        .sample_24_o(sample_24_o),
+        .frame_error_o(frame_error_o),
+        .active_o(active_o)
     );
 
-    initial begin
-        rom[0] = 24'sh000001;
-        rom[1] = 24'sh123456;
-        rom[2] = -24'sh000001;
-        rom[3] = 24'sh400000;
-        rom[4] = -24'sh400000;
-        rom[5] = 24'sh7ABCDE;
-        rom[6] = -24'sh123456;
-        rom[7] = 24'sh000000;
-        rom[8] = 24'sh5BDAD5;
-        rom[9] = 24'sh640466;
-    end
-
-    task automatic sck_pulse;
+    task automatic sck_cycle(
+        input time  drive_delay,
+        input logic ws_val,
+        input logic sd_val
+    );
         begin
-            #SCK_HALF sck_i = 1'b1;
-            #SCK_HALF sck_i = 1'b0;
+            assert (drive_delay < SCK_HALF)
+            else $fatal(1, "drive_delay=%0t precisa ser menor que SCK_HALF=%0t",
+                        drive_delay, SCK_HALF);
+
+            #drive_delay;
+            ws_i = ws_val;
+            sd_i = sd_val;
+
+            #(SCK_HALF - drive_delay);
+            sck_i = 1'b1;
+            #SCK_HALF;
+            sck_i = 1'b0;
         end
     endtask
 
-    task automatic send_one_sample(
-        input logic signed [23:0] sample_in
+    task automatic send_slot(
+        input logic               slot_ws,
+        input logic signed [23:0] sample_in,
+        input time                drive_delay
     );
         integer bit_idx;
         begin
-            // canal direito antes
-            ws_i = 1'b1;
-            sd_i = 1'b0;
-            repeat (32) begin
-                sck_pulse();
-            end
+            sck_cycle(drive_delay, slot_ws, 1'b0);
 
-            // transição 1 -> 0 inicia canal esquerdo
-            ws_i = 1'b0;
-
-            // atraso de 1 bit do I2S
-            sd_i = 1'b0;
-            sck_pulse();
-
-            // 24 bits MSB-first
             for (bit_idx = 23; bit_idx >= 0; bit_idx--) begin
-                sd_i = sample_in[bit_idx];
-                sck_pulse();
+                sck_cycle(drive_delay, slot_ws, sample_in[bit_idx]);
             end
 
-            // padding
             repeat (7) begin
-                sd_i = 1'b0;
-                sck_pulse();
+                sck_cycle(drive_delay, slot_ws, 1'b0);
             end
         end
     endtask
 
-    task automatic wait_for_captured_sample(
-        output logic signed [23:0] sample_out,
-        input  logic signed [23:0] expected_sample
+    task automatic send_stereo_frame(
+        input logic signed [23:0] left_sample,
+        input logic signed [23:0] right_sample,
+        input time                left_delay,
+        input time                right_delay
     );
-        bit got_sample;
         begin
-            got_sample = 1'b0;
+            send_slot(1'b1, right_sample, right_delay);
+            send_slot(1'b0, left_sample,  left_delay);
+        end
+    endtask
 
-            fork
-                begin : wait_sample_block
-                    wait (captured_samples.size() > 0);
-                    sample_out = captured_samples.pop_front();
-                    got_sample = 1'b1;
-                end
+    task automatic reset_dut(input logic lr_sel);
+        integer idx;
+        begin
+            rst   = 1'b1;
+            sck_i = 1'b0;
+            ws_i  = 1'b1;
+            sd_i  = 1'b0;
+            lr_i  = lr_sel;
 
-                begin : timeout_block
-                    #100_000ns;
-                    $fatal(1, "Timeout esperando sample_valid_o para sample 0x%06h", expected_sample[23:0]);
-                end
-            join_any
+            capture_count = 0;
+            saw_active    = 1'b0;
 
-            disable wait_sample_block;
-            disable timeout_block;
+            for (idx = 0; idx < MAX_CAPTURES; idx++) begin
+                captured_samples[idx] = '0;
+            end
 
-            if (!got_sample) begin
-                $fatal(1, "sample_valid_o nao foi observado para sample 0x%06h", expected_sample[23:0]);
+            #200ns;
+            rst = 1'b0;
+            #100ns;
+        end
+    endtask
+
+    task automatic expect_capture_count(input int expected_count);
+        begin
+            assert (capture_count == expected_count)
+            else $fatal(1, "Esperado %0d captures, obtido %0d",
+                        expected_count, capture_count);
+        end
+    endtask
+
+    task automatic expect_sample(
+        input int                 idx,
+        input logic signed [23:0] expected_sample
+    );
+        begin
+            assert (captured_samples[idx] === expected_sample)
+            else $fatal(1, "Mismatch idx=%0d exp=0x%06h got=0x%06h",
+                        idx, expected_sample[23:0], captured_samples[idx][23:0]);
+        end
+    endtask
+
+    task automatic expect_no_error;
+        begin
+            assert (!frame_error_o)
+            else $fatal(1, "frame_error_o nao deveria ter sido acionado");
+
+            assert (saw_active)
+            else $fatal(1, "active_o nunca ficou alto durante a captura");
+        end
+    endtask
+
+    task automatic send_broken_left_slot(
+        input logic signed [23:0] sample_in,
+        input int                 valid_bits,
+        input time                drive_delay
+    );
+        integer bit_idx;
+        begin
+            send_slot(1'b1, 24'sd0, drive_delay);
+
+            sck_cycle(drive_delay, 1'b0, 1'b0);
+
+            for (bit_idx = 23; bit_idx > 23 - valid_bits; bit_idx--) begin
+                sck_cycle(drive_delay, 1'b0, sample_in[bit_idx]);
+            end
+
+            repeat (4) begin
+                sck_cycle(drive_delay, 1'b1, 1'b0);
             end
         end
     endtask
 
-    // Monitora a saída no negedge de SCK, quando o pulso de sample_valid_o e
-    // sample_24_o já estão estáveis após as NBAs do DUT.
     always @(negedge sck_i or posedge rst) begin
         if (rst) begin
-            captured_samples.delete();
-        end else if (sample_valid_o) begin
-            captured_samples.push_back(sample_24_o);
+            capture_count = 0;
+            saw_active    = 1'b0;
+        end else begin
+            if (active_o) begin
+                saw_active = 1'b1;
+            end
+
+            if (sample_valid_o) begin
+                assert (capture_count < MAX_CAPTURES)
+                else $fatal(1, "Mais captures do que o limite do TB");
+
+                captured_samples[capture_count] = sample_24_o;
+                capture_count = capture_count + 1;
+            end
         end
     end
 
     initial begin
-        rst   = 1'b1;
-        sck_i = 1'b0;
-        ws_i  = 1'b1;
-        sd_i  = 1'b0;
-
-        #200;
-        rst = 1'b0;
-        #100;
-
         $display("==== INICIO DO TESTE I2S RX ADAPTER 24 ====");
 
-        for (i = 0; i < ROM_DEPTH; i++) begin
-            $display("Enviando ROM[%0d] = 0x%06h (%0d)", i, rom[i][23:0], rom[i]);
+        reset_dut(1'b0);
 
-            if (captured_samples.size() != 0) begin
-                $fatal(1, "Fila de samples monitorados nao esvaziou antes do idx=%0d", i);
-                captured_samples.delete();
-            end
+        send_stereo_frame(24'sh123456, 24'sh654321, 0ns, 11ns);
+        send_stereo_frame(-24'sh000240, 24'sh040302, 13ns, 5ns);
+        send_stereo_frame(24'sh7ABCDE, -24'sh000001, 31ns, 7ns);
 
-            send_one_sample(rom[i]);
-            wait_for_captured_sample(captured_sample, rom[i]);
+        expect_capture_count(3);
+        expect_sample(0, 24'sh123456);
+        expect_sample(1, -24'sh000240);
+        expect_sample(2, 24'sh7ABCDE);
+        expect_no_error();
 
-            if (captured_sample !== rom[i]) begin
-                $fatal(1, "ERRO idx=%0d esperado=0x%06h obtido=0x%06h",
-                       i, rom[i][23:0], captured_sample[23:0]);
-            end else begin
-                $display("OK idx=%0d recebido=0x%06h (%0d)",
-                         i, captured_sample[23:0], captured_sample);
-            end
+        reset_dut(1'b1);
 
-            #200ns;
-        end
+        send_stereo_frame(24'sh111111, -24'sh100000, 7ns, 0ns);
+        send_stereo_frame(24'sh222222, 24'sh000123, 9ns, 17ns);
+        send_stereo_frame(-24'sh000321, -24'sh345678, 5ns, 29ns);
+
+        expect_capture_count(3);
+        expect_sample(0, -24'sh100000);
+        expect_sample(1, 24'sh000123);
+        expect_sample(2, -24'sh345678);
+        expect_no_error();
+
+        reset_dut(1'b0);
+        send_broken_left_slot(24'sh456789, 8, 13ns);
+
+        assert (capture_count == 0)
+        else $fatal(1, "Slot quebrado nao deveria gerar sample_valid_o");
+
+        assert (frame_error_o)
+        else $fatal(1, "frame_error_o deveria indicar slot interrompido");
 
         $display("tb_i2s_rx_adapter_24 PASSED");
         #200ns;

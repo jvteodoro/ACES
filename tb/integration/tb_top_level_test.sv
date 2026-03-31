@@ -234,8 +234,7 @@ module tb_top_level_test;
 
     task automatic gate_fft_ingest_after_window;
         begin
-            force dut.u_aces.u_audio_to_fft_pipeline.valid_reg = 1'b0;
-            force dut.u_aces.u_audio_to_fft_pipeline.valid_d = 1'b0;
+            force dut.u_aces.u_audio_to_fft_pipeline.sample_pulse_clk = 1'b0;
             fft_ingest_gated_r = 1'b1;
         end
     endtask
@@ -243,8 +242,7 @@ module tb_top_level_test;
     task automatic release_fft_ingest_gate;
         begin
             if (fft_ingest_gated_r) begin
-                release dut.u_aces.u_audio_to_fft_pipeline.valid_reg;
-                release dut.u_aces.u_audio_to_fft_pipeline.valid_d;
+                release dut.u_aces.u_audio_to_fft_pipeline.sample_pulse_clk;
                 fft_ingest_gated_r = 1'b0;
             end
         end
