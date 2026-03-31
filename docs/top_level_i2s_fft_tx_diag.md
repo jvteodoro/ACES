@@ -108,9 +108,59 @@ Observacoes:
 
 ## Comportamento esperado no software
 
+### Comandos prontos no host
+
+No Raspberry Pi, entre na pasta do receiver antes de rodar os testes:
+
+```bash
+cd submodules/ACES-RPi-interface/rpi3b_i2s_fft
+```
+
+Captura tagged minima para validar o contrato deste topo:
+
+```bash
+.venv/bin/python analyzer_from_fpga_fft.py -r 48000 \
+    --frame-bins 512 --useful-bins 256 \
+    --use-i2s-tags --tag-shift 30 --tag-mask 0x3 --payload-bits 18 \
+    --tag-idle 0 --tag-bfpexp 1 --tag-fft 2
+```
+
+Se quiser aceitar FFT mesmo quando o host nao tiver observado um `BFPEXP` antes do
+inicio da captura, rode a variante relaxada:
+
+```bash
+.venv/bin/python analyzer_from_fpga_fft.py -r 48000 \
+    --frame-bins 512 --useful-bins 256 \
+    --use-i2s-tags --tag-shift 30 --tag-mask 0x3 --payload-bits 18 \
+    --tag-idle 0 --tag-bfpexp 1 --tag-fft 2 \
+    --allow-fft-without-bfpexp
+```
+
+Para gerar automaticamente os arquivos `.jsonl` e o `scenario_summary.tsv` usados
+nas secoes abaixo:
+
+```bash
+./run_channel_debug_matrix.sh \
+    --seconds 8 \
+    --frame-bins 512 --useful-bins 256 \
+    --tag-shift 30 --tag-mask 0x3 --payload-bits 18 \
+    --extra-tag-shifts 29
+```
+
+Se houver uma GPIO de apoio para marcar `BFPEXP`, acrescente por exemplo:
+
+```bash
+./run_channel_debug_matrix.sh \
+    --seconds 8 \
+    --frame-bins 512 --useful-bins 256 \
+    --tag-shift 30 --tag-mask 0x3 --payload-bits 18 \
+    --bfpexp-flag-line 23 \
+    --extra-tag-shifts 29
+```
+
 ### 1. Nivel bruto de palavra
 
-Com `--use-i2s-tags --tag-shift 30 --payload-bits 18`, o software deve decodificar:
+Com o comando tagged acima, o software deve decodificar:
 
 - `BFPEXP` sempre como `(-18, -18)`
 - `FFT` sempre como `(87381, -43691)`
@@ -120,7 +170,8 @@ esta no transporte, no alinhamento, ou na decodificacao.
 
 ### 2. Nivel de janela logica
 
-Com `--frame-bins 512`, o receptor tagged deve montar frames com:
+Com os comandos acima usando `--frame-bins 512`, o receptor tagged deve montar
+frames com:
 
 - um `BFPEXP` antes da janela,
 - exatamente `512` pares `FFT`,
