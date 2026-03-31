@@ -66,6 +66,7 @@ sim/manifest/scripts/run_questa.sh sample_bridge_and_ingest
 sim/manifest/scripts/run_questa.sh aces_audio_to_fft_pipeline
 sim/manifest/scripts/run_questa.sh top_level_test mock
 sim/manifest/scripts/run_questa.sh top_level_test
+sim/manifest/scripts/run_questa.sh top_level_fft_isolated real
 ```
 
 For a real-IP-oriented top-level run:
@@ -90,6 +91,7 @@ Windows PowerShell equivalents:
 .\sim\manifest\scripts\run_questa.ps1 fft_dma_reader
 .\sim\manifest\scripts\regression_mock.ps1
 .\sim\manifest\scripts\run_questa.ps1 top_level_test real
+.\sim\manifest\scripts\run_questa.ps1 top_level_fft_isolated real
 ```
 
 If you work from VS Code Remote WSL but have Questa and Quartus installed only on Windows, keep using the POSIX wrappers from the WSL terminal:
@@ -167,6 +169,7 @@ That populates `sim/portable/questa_package/` and produces `sim/portable/aces_qu
 - [Repository structure](docs/repository_structure.md)
 - [Simulation guide](docs/simulation.md)
 - [Testbench guide](docs/testbenches.md)
+- [Top-level FFT diagnosis](docs/top_level_fft_diagnosis.md)
 - [Portable flow](docs/portable_flow.md)
 - [Development guide](docs/development_guide.md)
 - [Coding guidelines](docs/coding_guidelines.md)
