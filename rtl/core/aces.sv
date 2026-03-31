@@ -186,6 +186,7 @@ module aces #(
         .mic_sck_i(mic_sck_o),
         .mic_ws_i(mic_ws_o),
         .mic_sd_i(mic_sd_i),
+        .mic_lr_i(mic_lr_sel_i),
         .clk(clk),
 
         .sample_valid_mic_o(sample_valid_mic_o),

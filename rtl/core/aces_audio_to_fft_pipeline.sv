@@ -7,6 +7,7 @@ module aces_audio_to_fft_pipeline #(
     input  logic mic_sck_i,
     input  logic mic_ws_i,
     input  logic mic_sd_i,
+    input  logic mic_lr_i,
 
     // clock sistema
     input  logic clk,
@@ -26,97 +27,92 @@ module aces_audio_to_fft_pipeline #(
     output logic signed [SAMPLE_W-1:0] sdw_istream_imag_o
 );
 
-    //-----------------------------------------
-    // sinais internos
-    //-----------------------------------------
+    // -------------------------------------------------------------------------
+    // domínio mic_sck_i
+    // -------------------------------------------------------------------------
 
     logic signed [23:0] sample_24;
-    logic sample_valid_24;
+    logic               sample_valid_24;
 
     logic signed [SAMPLE_W-1:0] sample_18;
-    logic sample_valid_18;
+    logic                       sample_valid_18;
 
-    logic signed [SAMPLE_W-1:0] sample_reg;
-    logic valid_reg;
-
-    logic valid_d;
-
-    //-----------------------------------------
-    // I2S receiver
-    //-----------------------------------------
+    logic signed [SAMPLE_W-1:0] sample_hold_mic;
+    logic                       sample_toggle_mic;
 
     i2s_rx_adapter_24 u_i2s_rx (
         .rst(rst),
         .sck_i(mic_sck_i),
         .ws_i(mic_ws_i),
         .sd_i(mic_sd_i),
-
-        .sample_24_o(sample_24),
-        .sample_valid_o(sample_valid_24)
+        .lr_i(mic_lr_i),
+        .sample_valid_o(sample_valid_24),
+        .sample_24_o(sample_24)
     );
 
     assign sample_24_dbg_o = sample_24;
 
-    //-----------------------------------------
-    // width adapter 24 → 18
-    //-----------------------------------------
-
     sample_width_adapter_24_to_18 u_width_adapter (
         .sample_24_i(sample_24),
         .valid_24_i(sample_valid_24),
-
         .sample_18_o(sample_18),
         .valid_18_o(sample_valid_18)
     );
 
-    //-----------------------------------------
-    // sincronização com clock do sistema
-    //-----------------------------------------
+    always_ff @(posedge mic_sck_i or posedge rst) begin
+        if (rst) begin
+            sample_hold_mic  <= '0;
+            sample_toggle_mic <= 1'b0;
+        end else begin
+            if (sample_valid_18) begin
+                sample_hold_mic  <= sample_18;
+                sample_toggle_mic <= ~sample_toggle_mic;
+            end
+        end
+    end
+
+    // -------------------------------------------------------------------------
+    // CDC para domínio clk
+    // -------------------------------------------------------------------------
+
+    logic toggle_sync_1, toggle_sync_2, toggle_seen_clk;
+    logic signed [SAMPLE_W-1:0] sample_reg;
+    logic                       sample_pulse_clk;
+
+    wire new_sample_clk;
+    assign new_sample_clk = (toggle_sync_2 != toggle_seen_clk);
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
-            sample_reg <= '0;
-            valid_reg  <= 1'b0;
-        end
-        else begin
-            valid_reg <= sample_valid_18;
+            toggle_sync_1  <= 1'b0;
+            toggle_sync_2  <= 1'b0;
+            toggle_seen_clk <= 1'b0;
+            sample_reg     <= '0;
+            sample_pulse_clk <= 1'b0;
+        end else begin
+            toggle_sync_1   <= sample_toggle_mic;
+            toggle_sync_2   <= toggle_sync_1;
+            sample_pulse_clk <= 1'b0;
 
-            if (sample_valid_18)
-                sample_reg <= sample_18;
+            if (new_sample_clk) begin
+                sample_reg      <= sample_hold_mic;
+                sample_pulse_clk <= 1'b1;
+                toggle_seen_clk <= toggle_sync_2;
+            end
         end
     end
 
-    //-----------------------------------------
-    // geração de pulso de 1 ciclo
-    //-----------------------------------------
+    // -------------------------------------------------------------------------
+    // saídas
+    // -------------------------------------------------------------------------
 
-    always_ff @(posedge clk or posedge rst) begin
-        if (rst)
-            valid_d <= 1'b0;
-        else
-            valid_d <= valid_reg;
-    end
-
-    wire valid_pulse;
-
-    assign valid_pulse = valid_reg & ~valid_d;
-
-    //-----------------------------------------
-    // saídas debug
-    //-----------------------------------------
-
-    assign sample_valid_mic_o = valid_reg;
+    assign sample_valid_mic_o = sample_pulse_clk;
     assign sample_mic_o       = sample_reg;
 
-    assign fft_sample_valid_o = valid_reg;
+    assign fft_sample_valid_o = sample_pulse_clk;
     assign fft_sample_o       = sample_reg;
 
-    //-----------------------------------------
-    // interface FFT
-    //-----------------------------------------
-
-    assign sact_istream_o     = valid_pulse;
-
+    assign sact_istream_o     = sample_pulse_clk;
     assign sdw_istream_real_o = sample_reg;
     assign sdw_istream_imag_o = '0;
 
