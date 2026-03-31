@@ -118,8 +118,12 @@ module tb_top_level_test;
     int tx_mon_slot_count_r;
     bit tx_mon_prev_slot_valid_r;
     logic tx_mon_prev_slot_ws_r;
+    logic [I2S_SLOT_W-1:0] tx_mon_left_word_r;
     logic [I2S_SLOT_W-1:0] tx_mon_right_word_r;
+    logic tx_mon_pending_ws_r;
     bit tx_mon_have_right_r;
+    bit tx_mon_have_left_r;
+    bit tx_mon_pending_start_r;
 
     function automatic int flat_sample_idx(input int example_idx, input int sample_idx);
         flat_sample_idx = example_idx * N_POINTS + sample_idx;
@@ -813,6 +817,7 @@ module tb_top_level_test;
     end
 
     always @(posedge dut.tx_i2s_sck_o or posedge tb_rst_drive) begin
+        logic ws_changed;
         logic [I2S_SLOT_W-1:0] completed_word;
         begin
             if (tb_rst_drive) begin
@@ -821,42 +826,71 @@ module tb_top_level_test;
                 tx_mon_slot_count_r      <= 0;
                 tx_mon_prev_slot_valid_r <= 1'b0;
                 tx_mon_prev_slot_ws_r    <= 1'b0;
+                tx_mon_left_word_r       <= '0;
                 tx_mon_right_word_r      <= '0;
+                tx_mon_pending_ws_r      <= 1'b0;
                 tx_mon_have_right_r      <= 1'b0;
+                tx_mon_have_left_r       <= 1'b0;
+                tx_mon_pending_start_r   <= 1'b0;
             end else begin
-                if (tx_mon_slot_count_r == 0) begin
-                    tx_mon_slot_ws_r    <= dut.tx_i2s_ws_o;
-                    tx_mon_slot_shift_r <= {{(I2S_SLOT_W-1){1'b0}}, dut.tx_i2s_sd_o};
-                    tx_mon_slot_count_r <= 1;
-                end else begin
-                    assert (dut.tx_i2s_ws_o == tx_mon_slot_ws_r)
-                    else $fatal(1, "TX WS mudou no meio do slot I2S.");
+                ws_changed = tx_mon_prev_slot_valid_r && (dut.tx_i2s_ws_o != tx_mon_prev_slot_ws_r);
 
+                if (tx_mon_pending_start_r) begin
+                    assert (!ws_changed)
+                    else $fatal(1, "TX WS alternou novamente antes do MSB esperado.");
+
+                    assert (dut.tx_i2s_ws_o == tx_mon_pending_ws_r)
+                    else $fatal(1, "TX WS nao permaneceu estavel entre a borda de alinhamento e o MSB.");
+
+                    tx_mon_slot_ws_r       <= tx_mon_pending_ws_r;
+                    tx_mon_slot_shift_r    <= {{(I2S_SLOT_W-1){1'b0}}, dut.tx_i2s_sd_o};
+                    tx_mon_slot_count_r    <= 1;
+                    tx_mon_pending_start_r <= 1'b0;
+                end else if (tx_mon_slot_count_r != 0) begin
                     completed_word = {tx_mon_slot_shift_r[I2S_SLOT_W-2:0], dut.tx_i2s_sd_o};
 
                     if (tx_mon_slot_count_r == I2S_SLOT_W-1) begin
-                        if (tx_mon_prev_slot_valid_r) begin
-                            assert (tx_mon_prev_slot_ws_r != tx_mon_slot_ws_r)
-                            else $fatal(1, "TX WS nao alternou entre slots consecutivos.");
-                        end
+                        assert (ws_changed)
+                        else $fatal(1, "TX WS nao antecipou o ultimo bit do slot I2S.");
 
-                        tx_mon_prev_slot_valid_r <= 1'b1;
-                        tx_mon_prev_slot_ws_r    <= tx_mon_slot_ws_r;
-                        tx_mon_slot_count_r      <= 0;
-                        tx_mon_slot_shift_r      <= '0;
+                        tx_mon_slot_count_r <= 0;
+                        tx_mon_slot_shift_r <= '0;
 
                         if (tx_mon_slot_ws_r) begin
+                            assert (!tx_mon_have_right_r)
+                            else $fatal(1, "Dois slots direitos consecutivos no monitor TX.");
+
                             tx_mon_right_word_r <= completed_word;
                             tx_mon_have_right_r <= 1'b1;
-                        end else if (tx_mon_have_right_r) begin
-                            check_decoded_frame(completed_word, tx_mon_right_word_r);
-                            tx_mon_have_right_r <= 1'b0;
+                            tx_mon_have_left_r  <= 1'b0;
+                        end else begin
+                            if (tx_mon_have_right_r) begin
+                                check_decoded_frame(completed_word, tx_mon_right_word_r);
+                                tx_mon_have_right_r <= 1'b0;
+                            end else begin
+                                tx_mon_left_word_r <= completed_word;
+                                tx_mon_have_left_r <= 1'b1;
+                            end
                         end
                     end else begin
+                        assert (!ws_changed)
+                        else $fatal(1, "TX WS alternou antes do ultimo bit do slot I2S.");
+
                         tx_mon_slot_shift_r <= completed_word;
                         tx_mon_slot_count_r <= tx_mon_slot_count_r + 1;
                     end
                 end
+
+                if (ws_changed) begin
+                    assert (!tx_mon_pending_start_r)
+                    else $fatal(1, "Borda de TX WS chegou enquanto um novo slot ja estava pendente.");
+
+                    tx_mon_pending_start_r <= 1'b1;
+                    tx_mon_pending_ws_r    <= dut.tx_i2s_ws_o;
+                end
+
+                tx_mon_prev_slot_valid_r <= 1'b1;
+                tx_mon_prev_slot_ws_r    <= dut.tx_i2s_ws_o;
             end
         end
     end

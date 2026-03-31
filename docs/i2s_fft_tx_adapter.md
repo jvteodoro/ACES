@@ -113,6 +113,12 @@ Tag values:
 
 The payload is sent MSB-first.
 
+The serialized timing follows Philips I2S semantics:
+
+- `WS` changes one bit before the next word MSB
+- the 32-bit packed word itself still stays intact on `SD`
+- the receiver must therefore treat the `WS` edge as advance notice of the next slot, not as the first bit of that slot
+
 ## When the adapter changes state
 
 The serializer clock runs continuously, but the payload only changes at a frame boundary. In this RTL, that boundary occurs after a complete I2S frame has finished, not immediately when `pending_valid_r` rises.
@@ -257,7 +263,7 @@ The RTL is synthesizable and uses:
 The unit testbench validates:
 
 - the `SCK` divider period
-- `WS` stability within each 32-bit slot
+- `WS` advancing exactly one bit before the next 32-bit word
 - alternating slot/channel structure
 - insertion and repetition of `BFPEXP` frames
 - correct tagged payload sequence across two FFT windows

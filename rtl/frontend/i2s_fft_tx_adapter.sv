@@ -131,6 +131,9 @@ module i2s_fft_tx_adapter #(
     assign fifo_full_o   = pending_valid_r;
     assign fifo_empty_o  = !pending_valid_r;
     assign fifo_level_o  = pending_valid_r ? ONE_FIFO_LEVEL_C : '0;
+    // Philips I2S: WS antecipa em 1 bit o proximo MSB. Mantemos os 32 bits
+    // completos no slot e adiantamos apenas a indicacao de canal em WS.
+    assign i2s_ws_o      = (slot_bit_r == I2S_SLOT_W-1) ? ~channel_r : channel_r;
     assign i2s_sd_o      = active_valid_r ? i2s_slot_bit(active_tag_r, channel_r ? active_right_r : active_left_r, slot_bit_r) : 1'b0;
 
     initial begin
@@ -150,7 +153,6 @@ module i2s_fft_tx_adapter #(
 
             div_cnt_r                   <= '0;
             i2s_sck_o                   <= 1'b0;
-            i2s_ws_o                    <= 1'b1;
             channel_r                   <= 1'b1;
             slot_bit_r                  <= '0;
 
@@ -215,7 +217,6 @@ module i2s_fft_tx_adapter #(
                         slot_bit_r <= '0;
                         next_channel = ~channel_r;
                         channel_r <= next_channel;
-                        i2s_ws_o <= next_channel;
 
                         if (channel_r == 1'b0)
                             frame_boundary = 1'b1;

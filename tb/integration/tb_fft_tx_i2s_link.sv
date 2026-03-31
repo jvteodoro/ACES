@@ -59,8 +59,12 @@ module tb_fft_tx_i2s_link;
     int mon_slot_count_r;
     logic mon_prev_slot_valid_r;
     logic mon_prev_slot_ws_r;
+    logic [I2S_SLOT_W-1:0] mon_left_word_r;
     logic [I2S_SLOT_W-1:0] mon_right_word_r;
+    logic mon_pending_ws_r;
     bit mon_have_right_r;
+    bit mon_have_left_r;
+    bit mon_pending_start_r;
 
     logic [TAG_W-1:0] captured_tag_mem [0:CAPTURE_DEPTH-1];
     logic signed [I2S_SAMPLE_W-1:0] captured_left_mem [0:CAPTURE_DEPTH-1];
@@ -281,6 +285,7 @@ module tb_fft_tx_i2s_link;
     end
 
     always @(posedge i2s_sck_o or posedge rst) begin
+        logic ws_changed;
         logic [I2S_SLOT_W-1:0] completed_word;
 
         if (rst) begin
@@ -289,54 +294,85 @@ module tb_fft_tx_i2s_link;
             mon_slot_count_r      <= 0;
             mon_prev_slot_valid_r <= 1'b0;
             mon_prev_slot_ws_r    <= 1'b0;
+            mon_left_word_r       <= '0;
             mon_right_word_r      <= '0;
+            mon_pending_ws_r      <= 1'b0;
             mon_have_right_r      <= 1'b0;
+            mon_have_left_r       <= 1'b0;
+            mon_pending_start_r   <= 1'b0;
             captured_write_idx    <= 0;
         end else begin
-            if (mon_slot_count_r == 0) begin
-                mon_slot_ws_r    <= i2s_ws_o;
-                mon_slot_shift_r <= {{(I2S_SLOT_W-1){1'b0}}, i2s_sd_o};
-                mon_slot_count_r <= 1;
-            end else begin
-                assert (i2s_ws_o == mon_slot_ws_r)
-                else $fatal(1, "WS mudou no meio do slot I2S na integracao.");
+            ws_changed = mon_prev_slot_valid_r && (i2s_ws_o != mon_prev_slot_ws_r);
 
+            if (mon_pending_start_r) begin
+                assert (!ws_changed)
+                else $fatal(1, "WS alternou novamente antes do MSB esperado na integracao.");
+
+                assert (i2s_ws_o == mon_pending_ws_r)
+                else $fatal(1, "WS nao permaneceu estavel entre a borda de alinhamento e o MSB na integracao.");
+
+                mon_slot_ws_r       <= mon_pending_ws_r;
+                mon_slot_shift_r    <= {{(I2S_SLOT_W-1){1'b0}}, i2s_sd_o};
+                mon_slot_count_r    <= 1;
+                mon_pending_start_r <= 1'b0;
+            end else if (mon_slot_count_r != 0) begin
                 completed_word = {mon_slot_shift_r[I2S_SLOT_W-2:0], i2s_sd_o};
 
                 if (mon_slot_count_r == I2S_SLOT_W-1) begin
-                    if (mon_prev_slot_valid_r) begin
-                        assert (mon_prev_slot_ws_r != mon_slot_ws_r)
-                        else $fatal(1, "WS nao alternou entre slots consecutivos na integracao.");
-                    end
+                    assert (ws_changed)
+                    else $fatal(1, "WS nao antecipou o ultimo bit do slot I2S na integracao.");
 
-                    mon_prev_slot_valid_r <= 1'b1;
-                    mon_prev_slot_ws_r    <= mon_slot_ws_r;
-                    mon_slot_count_r      <= 0;
-                    mon_slot_shift_r      <= '0;
+                    mon_slot_count_r <= 0;
+                    mon_slot_shift_r <= '0;
 
                     if (mon_slot_ws_r) begin
+                        assert (!mon_have_right_r)
+                        else $fatal(1, "Dois slots direitos consecutivos sem slot esquerdo correspondente na integracao.");
+
                         mon_right_word_r <= completed_word;
                         mon_have_right_r <= 1'b1;
-                    end else if (mon_have_right_r) begin
-                        if (captured_write_idx >= CAPTURE_DEPTH) begin
-                            $fatal(1, "CAPTURE_DEPTH insuficiente no monitor de integracao.");
-                        end else begin
-                            assert (decode_tag(completed_word) == decode_tag(mon_right_word_r))
-                            else $fatal(1, "Tags diferentes entre canais no frame de integracao idx=%0d",
-                                        captured_write_idx);
+                        mon_have_left_r  <= 1'b0;
+                    end else begin
+                        if (mon_have_right_r) begin
+                            if (captured_write_idx >= CAPTURE_DEPTH) begin
+                                $fatal(1, "CAPTURE_DEPTH insuficiente no monitor de integracao.");
+                            end else begin
+                                assert (decode_tag(completed_word) == decode_tag(mon_right_word_r))
+                                else $fatal(1, "Tags diferentes entre canais no frame de integracao idx=%0d",
+                                            captured_write_idx);
 
-                            captured_tag_mem[captured_write_idx]   <= decode_tag(completed_word);
-                            captured_left_mem[captured_write_idx]  <= decode_payload(completed_word);
-                            captured_right_mem[captured_write_idx] <= decode_payload(mon_right_word_r);
-                            captured_write_idx                     <= captured_write_idx + 1;
-                            mon_have_right_r                      <= 1'b0;
+                                captured_tag_mem[captured_write_idx]   <= decode_tag(completed_word);
+                                captured_left_mem[captured_write_idx]  <= decode_payload(completed_word);
+                                captured_right_mem[captured_write_idx] <= decode_payload(mon_right_word_r);
+                                captured_write_idx                     <= captured_write_idx + 1;
+                                mon_have_right_r                      <= 1'b0;
+                            end
+                        end else begin
+                            // O primeiro left apos o lock pode ficar sem right
+                            // correspondente porque o serializador inicia em right.
+                            mon_left_word_r <= completed_word;
+                            mon_have_left_r <= 1'b1;
                         end
                     end
                 end else begin
+                    assert (!ws_changed)
+                    else $fatal(1, "WS alternou antes do ultimo bit do slot I2S na integracao.");
+
                     mon_slot_shift_r <= completed_word;
                     mon_slot_count_r <= mon_slot_count_r + 1;
                 end
             end
+
+            if (ws_changed) begin
+                assert (!mon_pending_start_r)
+                else $fatal(1, "Borda de WS chegou enquanto um novo slot ja estava pendente na integracao.");
+
+                mon_pending_start_r <= 1'b1;
+                mon_pending_ws_r    <= i2s_ws_o;
+            end
+
+            mon_prev_slot_valid_r <= 1'b1;
+            mon_prev_slot_ws_r    <= i2s_ws_o;
         end
     end
 

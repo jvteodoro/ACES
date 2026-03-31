@@ -338,9 +338,9 @@ The selected-and-captured debug information is routed to these board-visible dev
 | `GPIO_1_D2` | GPIO debug snapshot bit `1`. |
 | `GPIO_1_D3` | GPIO debug snapshot bit `2`. |
 | `GPIO_1_D4` | GPIO debug snapshot bit `3`. |
-| `GPIO_1_D17` | tagged TX I2S SCK output from ACES (`tx_i2s_sck_o`). |
-| `GPIO_1_D19` | tagged TX I2S WS output from ACES (`tx_i2s_ws_o`). |
-| `GPIO_1_D20` | tagged TX I2S SD output from ACES (`tx_i2s_sd_o`). |
+| `GPIO_1_D27` | tagged TX I2S SCK output from ACES (`tx_i2s_sck_o`). |
+| `GPIO_1_D29` | tagged TX I2S WS output from ACES (`tx_i2s_ws_o`). |
+| `GPIO_1_D31` | tagged TX I2S SD output from ACES (`tx_i2s_sd_o`). |
 
 That explicit nibble ordering is important when the Analog Discovery script reconstructs a multi-digit value from the seven-segment displays: `HEX0` is always the least-significant nibble and `HEX5` is always the most-significant nibble.
 

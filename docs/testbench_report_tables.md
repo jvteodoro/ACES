@@ -162,7 +162,7 @@ O testbench cobre reset, enchimento, leitura, overflow e o caso crítico de `pus
 
 ## 4.3.12 Cenário de Teste 12 — `tb_i2s_fft_tx_adapter`
 
-Este cenário valida o adaptador que converte bins da FFT em palavras I2S etiquetadas. O objetivo é verificar não apenas os valores transmitidos, mas também a temporização do serializador: período de `SCK`, estabilidade de `WS` dentro de cada slot e ordenação dos frames entre janelas FFT.
+Este cenário valida o adaptador que converte bins da FFT em palavras I2S etiquetadas. O objetivo é verificar não apenas os valores transmitidos, mas também a temporização do serializador: período de `SCK`, avanço de `WS` um bit antes do próximo `MSB` e ordenação dos frames entre janelas FFT.
 
 O bench usa duas janelas FFT com expoentes distintos e decodifica o barramento serial em palavras novamente, permitindo checar a sequência completa de frames `BFPEXP` e `FFT` com asserts estruturais e temporais.
 
@@ -172,7 +172,7 @@ O bench usa duas janelas FFT com expoentes distintos e decodifica o barramento s
 | --- | --- | --- | --- |
 | Cinco bins organizados em duas janelas FFT | Inserção de `BFPEXP` antes de cada janela e bins serializados em ordem | Sim, se a sequência decodificada casar com a esperada | Registrar frame ausente, fora de ordem ou com tag incorreta |
 | `CLOCK_DIV = 2` durante a transmissão | `i2s_sck_o` deve alternar com período lógico constante | Sim, se nenhuma assertiva temporal falhar | Registrar jitter lógico ou divisor incorreto |
-| Slots I2S completos de 32 bits | `i2s_ws_o` deve permanecer estável dentro do slot e alternar entre slots | Sim, se o framing permanecer consistente | Registrar mudança de `WS` no meio do slot ou alternância ausente |
+| Slots I2S completos de 32 bits | `i2s_ws_o` deve antecipar exatamente o último bit do slot atual, sinalizando o próximo canal sem deslocar payload | Sim, se o framing Philips I2S permanecer consistente | Registrar antecipação ausente, precoce ou desalinhamento do payload |
 | Handshake com registrador pendente de 1 entrada | `fft_ready_o`, `fifo_full_o`, `fifo_empty_o` e `fifo_level_o` devem refletir o estado interno | Sim, se os sinais permanecerem coerentes | Registrar backpressure incorreto ou flag inconsistente |
 
 ## 4.3.13 Cenário de Teste 13 — `tb_fft_tx_i2s_link`
