@@ -45,6 +45,7 @@ Current examples in this repository:
 
 - `tb_aces_audio_to_fft_pipeline` verifies receive-side frontend composition.
 - `tb_fft_tx_i2s_link` verifies burst-to-serial behavior across `fft_tx_bridge_fifo` and `i2s_fft_tx_adapter`.
+- `tb_top_level_i2s_fft_tx_diag` verifies the board-facing tagged-I2S diagnostic top-level with a deterministic fixed-pattern source.
 - `tb_top_level_fft_isolated` verifies the real FFT control/readout path inside the top-level wrapper while isolating it from the rest of the end-to-end bench.
 
 ## Mock vs Real-IP Testbenches

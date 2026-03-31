@@ -134,6 +134,7 @@ array set filelists {
     aces_audio_to_fft_pipeline     mock_integration_aces_audio_to_fft_pipeline.f
     aces                           mock_integration_aces.f
     top_level_test mock_integration_top_level_test.f
+    top_level_i2s_fft_tx_diag mock_integration_top_level_i2s_fft_tx_diag.f
     top_level_fft_isolated real_ip_top_level_fft_isolated.f
 }
 
@@ -151,6 +152,7 @@ array set tops {
     aces_audio_to_fft_pipeline     tb_aces_audio_to_fft_pipeline
     aces                           tb_aces
     top_level_test tb_top_level_test
+    top_level_i2s_fft_tx_diag tb_top_level_i2s_fft_tx_diag
     top_level_fft_isolated tb_top_level_fft_isolated
 }
 

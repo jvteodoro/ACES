@@ -64,6 +64,7 @@ sim/manifest/scripts/run_questa.sh i2s_stimulus_manager
 sim/manifest/scripts/run_questa.sh sample_bridge_and_ingest
 sim/manifest/scripts/run_questa.sh aces_audio_to_fft_pipeline
 sim/manifest/scripts/run_questa.sh aces
+sim/manifest/scripts/run_questa.sh top_level_i2s_fft_tx_diag
 sim/manifest/scripts/run_questa.sh top_level_test mock
 sim/manifest/scripts/run_questa.sh top_level_test
 ```
@@ -90,6 +91,7 @@ Windows PowerShell equivalents:
 .\sim\manifest\scripts\run_questa.ps1 fft_dma_reader
 .\sim\manifest\scripts\run_questa.ps1 sample_bridge_and_ingest
 .\sim\manifest\scripts\run_questa.ps1 aces_audio_to_fft_pipeline
+.\sim\manifest\scripts\run_questa.ps1 top_level_i2s_fft_tx_diag
 .\sim\manifest\scripts\run_questa.ps1 top_level_test mock
 .\sim\manifest\scripts\run_questa.ps1 top_level_test
 ```

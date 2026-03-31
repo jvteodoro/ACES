@@ -6,10 +6,11 @@ ACES is an FPGA audio/DSP repository organized around reproducible simulation, p
 
 If you are new to the repository, read these first:
 
-1. [Project overview](docs/overview.md)
-2. [Repository structure](docs/repository_structure.md)
-3. [Simulation guide](docs/simulation.md)
-4. [Portable flow guide](docs/portable_flow.md)
+1. [Current state and rationale](docs/current_state.md)
+2. [Project overview](docs/overview.md)
+3. [Repository structure](docs/repository_structure.md)
+4. [Simulation guide](docs/simulation.md)
+5. [Portable flow guide](docs/portable_flow.md)
 
 ## Repository layout
 
@@ -31,6 +32,7 @@ tb/
 tools/         ROM-generation artifacts and utility inputs/outputs.
 utils/         Python scripts for generating ROM contents and validating FFT behavior.
 docs/          Modular project documentation and legacy reference material.
+submodules/    Explicit external dependencies and related host-side integration code.
 
 sim/
   manifest/    Versioned source-of-truth filelists, scripts, and wave setups.
@@ -51,6 +53,23 @@ ACES supports two complementary simulation flows:
    - uses the checked-in Quartus ROM wrapper,
    - uses the checked-in `submodules/R2FFT` implementation together with the repository-owned ROM/IP collateral,
    - keeps the external dependency explicit instead of silently mixing mock and real assets.
+
+## Host-side integration
+
+The repository now also documents and maintains the Raspberry Pi-side FFT receiver under
+`submodules/ACES-RPi-interface/rpi3b_i2s_fft/`.
+
+That host-side package is responsible for:
+
+- decoding the tagged or raw I2S FFT stream exported by ACES,
+- saving and comparing reference events,
+- plotting saved FFT history,
+- running offline Python regression without requiring a live Raspberry Pi + FPGA setup.
+
+For the host-side protocol and offline test workflow, see:
+
+- [Current state and rationale](docs/current_state.md)
+- [`rpi3b_i2s_fft` README](submodules/ACES-RPi-interface/rpi3b_i2s_fft/README.md)
 
 ## Local Questa usage
 
@@ -164,8 +183,10 @@ That populates `sim/portable/questa_package/` and produces `sim/portable/aces_qu
 
 ## Documentation
 
+- [Current state and rationale](docs/current_state.md)
 - [Overview](docs/overview.md)
 - [Architecture](docs/architecture.md)
+- [I2S FFT TX adapter](docs/i2s_fft_tx_adapter.md)
 - [Repository structure](docs/repository_structure.md)
 - [Simulation guide](docs/simulation.md)
 - [Testbench guide](docs/testbenches.md)
@@ -175,6 +196,7 @@ That populates `sim/portable/questa_package/` and produces `sim/portable/aces_qu
 - [Coding guidelines](docs/coding_guidelines.md)
 - [Verification methodology](docs/verification_methodology.md)
 - [FAQ](docs/faq.md)
+- [`ACES-RPi-interface` host-side README](submodules/ACES-RPi-interface/rpi3b_i2s_fft/README.md)
 - [Legacy reference material](docs/legacy/)
 
 ## Legacy material
