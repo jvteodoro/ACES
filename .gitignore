@@ -43,8 +43,6 @@ work/
 
 # Generic scratch
 *.bak
-*.dwf3work
-*.dwf3staticio
 
 # DVT
 *.dvt
