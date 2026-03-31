@@ -9,7 +9,8 @@ The strategy is:
 1. verify narrow contracts in unit tests,
 2. verify boundaries in integration tests,
 3. use deterministic stimulus wherever possible,
-4. combine HDL assertions with software-side numerical validation.
+4. combine HDL assertions with software-side numerical validation,
+5. validate host-side protocol handling offline before board bring-up.
 
 ## Layered Testing Strategy
 
@@ -30,6 +31,16 @@ Used for subsystem behavior such as:
 
 ### Flow-level verification
 Used when packaging or real-IP-oriented simulation setup must be checked for structural correctness.
+
+### Host-side offline verification
+Used for the Python receiver/analyzer path that consumes the FPGA FFT export stream.
+
+Examples:
+
+- does tagged-word decoding match the RTL packing contract?
+- does the receiver re-synchronize correctly after a broken frame?
+- do analyzer buffers and event snapshots behave correctly without live hardware?
+- does headless plotting keep working in non-GUI environments?
 
 ## Assertions in ACES
 
@@ -83,6 +94,9 @@ The Python utilities and ROM collateral support a second validation axis:
 
 This is especially valuable for FFT work, where pass/fail is often numerical rather than purely protocol-oriented.
 
+The host-side package under `submodules/ACES-RPi-interface/` now extends that role by providing
+offline regression for the transport/parser layer itself, not only numerical post-processing.
+
 ## FFT Validation and `fftBfpExp`
 
 When validating FFT outputs, `fftBfpExp` must be handled explicitly.
@@ -101,7 +115,8 @@ If a comparison script ignores block floating-point exponent correction, the res
 2. run the nearest integration bench,
 3. inspect waveforms if timing or ordering is suspicious,
 4. compare FFT-relevant numerical results with Python-side expectations when applicable,
-5. only then move to real-IP-oriented flows or portable handoff.
+5. run the host-side offline regression if the change touches stream format, parsing, buffering, plotting, or event comparison,
+6. only then move to real-IP-oriented flows or portable handoff or board bring-up.
 
 ## What to Update When Behavior Changes
 
@@ -112,10 +127,13 @@ If you change any of the following, update tests and docs together:
 - FFT ingest pulse semantics,
 - FFT output ordering,
 - block floating-point interpretation,
+- tagged I2S framing or payload packing,
+- host-side receiver assumptions,
 - portable simulation expectations.
 
 ## Related Reading
 
+- [current_state.md](current_state.md)
 - [architecture.md](architecture.md)
 - [simulation.md](simulation.md)
 - [testbenches.md](testbenches.md)

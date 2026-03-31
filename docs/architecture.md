@@ -12,6 +12,8 @@ I2S source (real mic or stimulus ROM)
     -> FFT ingest stream
     -> FFT core integration
     -> DMA-style FFT readout
+    -> tagged I2S transmit path
+    -> host-side FFT receiver / analysis
 ```
 
 ## Major Blocks
@@ -120,6 +122,17 @@ Responsibilities:
 
 See `docs/i2s_fft_tx_adapter.md` for the detailed contract.
 
+### 10. Host-side FFT receiver and analysis
+The maintained host-side consumer lives under `submodules/ACES-RPi-interface/rpi3b_i2s_fft/`.
+
+Responsibilities:
+
+- decode raw or tagged I2S FFT transport,
+- reconstruct FFT windows from `(real, imag)` pairs,
+- derive magnitude and MFCC-like features for event comparison,
+- save reference events and visualize saved FFT history,
+- provide offline regression that checks protocol handling without Raspberry Pi + FPGA hardware.
+
 ## Data Flow in More Detail
 
 ### Frontend path
@@ -136,6 +149,13 @@ See `docs/i2s_fft_tx_adapter.md` for the detailed contract.
 4. Bins are read sequentially and exposed with index/valid metadata.
 5. `fft_tx_bridge_fifo` buffers `(real, imag, last, bfpexp)` entries.
 6. `i2s_fft_tx_adapter` emits tagged I2S words and inserts BFPEXP-tagged frames at each FFT-window start.
+
+### Host path
+1. The external host samples the continuous I2S stream exported by ACES.
+2. In tagged mode, software waits for `BFPEXP` then counts FFT-tagged pairs.
+3. In raw mode, framing may be inferred from GPIO handshake or an external framing convention.
+4. Software converts `(real, imag)` pairs into magnitude bins and feature vectors.
+5. Analyzer logic compares live history against saved reference events.
 
 ## Timing Considerations
 
@@ -184,6 +204,12 @@ The repository should never silently mix a mock FFT path with a real-IP expectat
 
 ### Invariant 8: generated artifacts do not become source of truth
 `sim/local/` and generated portable outputs must remain disposable; the versioned truth lives in `rtl/`, `tb/`, `docs/`, and `sim/manifest/`.
+
+### Invariant 9: FPGA/host framing must stay documented on both sides
+If the tagged word format, BFPEXP behavior, or raw framing assumptions change, both RTL-side and Python-side documentation/tests must be updated together.
+
+### Invariant 10: host-side offline regression must reflect the real framing contract
+Offline tests are not allowed to drift into a mock protocol unrelated to the actual serializer contract. They should validate the same tag/payload assumptions the RTL exports.
 
 ## Extension Guidance
 

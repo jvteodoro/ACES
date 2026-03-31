@@ -33,6 +33,8 @@ In practical terms, the repository helps engineers:
 - Unit, integration, and mock simulation assets separated under `tb/`.
 - A versioned Questa-oriented simulation manifest under `sim/manifest/`.
 - Portable packaging flow that produces a redistributable Questa package under `sim/portable/`.
+- A maintained Raspberry Pi-side FFT receiver and analysis package under `submodules/ACES-RPi-interface/`.
+- Offline Python regression for the host-side protocol/parser path without requiring live hardware.
 - Explicit separation between:
   - **manifest**: versioned source of truth,
   - **local**: machine-specific generated outputs,
@@ -67,6 +69,9 @@ I2S mic pins / ROM-backed stimulus
               |
               v
     I2S GPIO pins (SCK, WS, SD) / DMA validation path
+              |
+              v
+  ACES-RPi-interface host receiver and offline regression
 ```
 
 ## Intended Use Cases
@@ -86,11 +91,15 @@ Use the real-IP-oriented flow when you want to keep the repository’s RTL/testb
 ### Spectral output validation
 Use the integrated I2S TX path (bridge FIFO → TX adapter → GPIO outputs) to export tagged FFT bins in real time, validate serialization logic, and verify that BFPEXP metadata is correctly framed alongside spectral data.
 
+### Host-side integration and validation
+Use `submodules/ACES-RPi-interface/rpi3b_i2s_fft/` when you want a maintained consumer for the FPGA FFT stream, including offline parser regression before board bring-up.
+
 ### Onboarding and AI-assisted maintenance
 Use the repository layout and docs suite to understand where active RTL lives, which tests are meant to run, and where generated simulator artifacts should be kept. The modular pipeline architecture and explicit design invariants support automated codebase exploration and refactoring.
 
 ## Where to Go Next
 
+- See [current_state.md](current_state.md) for the consolidated rationale behind the current repository organization and workflow.
 - See [architecture.md](architecture.md) for the detailed pipeline structure and design invariants.
 - See [repository_structure.md](repository_structure.md) for how the repo is organized.
 - See [simulation.md](simulation.md) for the day-to-day Questa workflow.

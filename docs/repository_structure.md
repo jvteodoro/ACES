@@ -13,6 +13,7 @@ The ACES repository is intentionally divided into active source, executable veri
 | `tools/` | Generated ROM collateral and other checked-in support artifacts needed by flows/documents. | Yes |
 | `utils/` | Python utilities for signal generation and validation. | Yes |
 | `docs/` | Human- and AI-facing project documentation. | Yes |
+| `submodules/` | Explicit external dependencies and related companion code such as host-side FFT integration. | Yes, with submodule-specific ownership |
 | `sim/manifest/` | Source-of-truth simulation manifests, scripts, and wave setups. | Yes |
 | `sim/local/` | Disposable machine-local simulator outputs. | No, except placeholder keep file |
 | `sim/portable/` | Generated redistribution packages and ZIP outputs. | No |
@@ -74,6 +75,21 @@ Mock implementations that keep local simulation self-contained.
 
 This split matters because contributors should not have to guess whether a file is production RTL or simulation scaffolding.
 
+## `submodules/`
+
+`submodules/` is now part of the maintained repository story rather than an incidental dependency folder.
+
+Examples:
+
+- `submodules/R2FFT/`: checked-in real FFT implementation used by the real-IP-oriented flow.
+- `submodules/ACES-RPi-interface/`: host-side Raspberry Pi receiver, analyzer, plotting utilities, and offline regression for the FPGA FFT export path.
+
+The key rule is that submodules must remain explicit:
+
+- if a flow depends on them, docs and launchers should say so,
+- if a contract crosses the FPGA/host boundary, both sides should be documented together,
+- if host-side parsing changes, its offline tests should be updated in the submodule.
+
 ## `sim/`
 
 ### `sim/manifest/`
@@ -123,6 +139,7 @@ The split between manifest and generated outputs makes it clearer which simulati
 
 ## Related Reading
 
+- [current_state.md](current_state.md)
 - [overview.md](overview.md)
 - [simulation.md](simulation.md)
 - [portable_flow.md](portable_flow.md)
