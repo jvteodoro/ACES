@@ -124,6 +124,10 @@ module i2s_fft_tx_adapter #(
     assign overflow_o    = 1'b0;
     assign fifo_level_o  = '0;
     assign i2s_sd_o      = active_valid_r ? i2s_slot_bit(active_tag_r, channel_r ? active_right_r : active_left_r, slot_bit_r) : 1'b0;
+    // Philips I2S expects WS to move one bit clock before the next word MSB.
+    // Keep SD on the current channel for the last bit while WS already points
+    // to the upcoming channel, so the Raspberry Pi word boundaries stay aligned.
+    assign i2s_ws_o      = (slot_bit_r == I2S_SLOT_W-1) ? ~channel_r : channel_r;
 
     initial begin
         if (I2S_SAMPLE_W > (I2S_SLOT_W - TAG_W))
@@ -138,7 +142,6 @@ module i2s_fft_tx_adapter #(
 
             div_cnt_r                   <= '0;
             i2s_sck_o                   <= 1'b0;
-            i2s_ws_o                    <= 1'b1;
             channel_r                   <= 1'b1;
             slot_bit_r                  <= '0;
 
@@ -155,10 +158,7 @@ module i2s_fft_tx_adapter #(
             pending_bfpexp_r            <= '0;
         end else begin
             logic frame_boundary;
-            logic next_channel;
-
             frame_boundary = 1'b0;
-            next_channel   = channel_r;
 
             if (!pending_valid_r && fft_valid_i) begin
                 pending_valid_r  <= 1'b1;
@@ -176,9 +176,7 @@ module i2s_fft_tx_adapter #(
 
                     if (slot_bit_r == I2S_SLOT_W-1) begin
                         slot_bit_r <= '0;
-                        next_channel = ~channel_r;
-                        channel_r <= next_channel;
-                        i2s_ws_o <= next_channel;
+                        channel_r <= ~channel_r;
 
                         if (channel_r == 1'b0)
                             frame_boundary = 1'b1;

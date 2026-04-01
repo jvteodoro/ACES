@@ -13,6 +13,7 @@ module tb_i2s_fft_tx_adapter;
     localparam logic [TAG_W-1:0] TAG_BFPEXP_C = 2'd1;
     localparam logic [TAG_W-1:0] TAG_FFT_C    = 2'd2;
     localparam int EXPECTED_COUNT     = 11;
+    localparam int SEARCH_PREFIX_COUNT = 4;
     localparam int CAPTURE_DEPTH      = 64;
     localparam time CLK_HALF          = 5ns;
 
@@ -35,9 +36,12 @@ module tb_i2s_fft_tx_adapter;
     logic i2s_ws_o;
     logic i2s_sd_o;
 
-    logic mon_slot_ws_r;
-    logic [31:0] mon_slot_shift_r;
-    int mon_slot_count_r;
+    logic mon_prev_ws_r;
+    logic mon_word_collecting_r;
+    logic mon_word_start_next_r;
+    logic mon_word_channel_r;
+    logic [31:0] mon_word_shift_r;
+    int mon_word_count_r;
     logic [31:0] mon_right_word_r;
     bit mon_have_right_r;
 
@@ -102,12 +106,14 @@ module tb_i2s_fft_tx_adapter;
     );
         begin
             wait (fft_ready_o === 1'b1);
+            @(negedge clk);
             fft_valid_i = 1'b1;
             fft_real_i  = real_i;
             fft_imag_i  = imag_i;
             fft_last_i  = last_i;
             bfpexp_i    = bfpexp_i_t;
             @(posedge clk);
+            @(negedge clk);
             fft_valid_i = 1'b0;
             fft_last_i  = 1'b0;
         end
@@ -115,16 +121,26 @@ module tb_i2s_fft_tx_adapter;
 
     task automatic wait_for_first_expected_frame;
         bit found;
+        bit prefix_matches;
         int timeout_cycles;
+        int probe_idx;
         begin
             found = 1'b0;
             timeout_cycles = 0;
 
             while ((timeout_cycles < 400000) && !found) begin
-                if (captured_read_idx < captured_write_idx) begin
-                    if ((captured_tag_mem[captured_read_idx]   === expected_tag_mem[0]) &&
-                        (captured_left_mem[captured_read_idx]  === expected_left_mem[0]) &&
-                        (captured_right_mem[captured_read_idx] === expected_right_mem[0])) begin
+                if ((captured_write_idx - captured_read_idx) >= SEARCH_PREFIX_COUNT) begin
+                    prefix_matches = 1'b1;
+
+                    for (probe_idx = 0; probe_idx < SEARCH_PREFIX_COUNT; probe_idx++) begin
+                        if ((captured_tag_mem[captured_read_idx + probe_idx]   !== expected_tag_mem[probe_idx]) ||
+                            (captured_left_mem[captured_read_idx + probe_idx]  !== expected_left_mem[probe_idx]) ||
+                            (captured_right_mem[captured_read_idx + probe_idx] !== expected_right_mem[probe_idx])) begin
+                            prefix_matches = 1'b0;
+                        end
+                    end
+
+                    if (prefix_matches) begin
                         found = 1'b1;
                     end else begin
                         captured_read_idx = captured_read_idx + 1;
@@ -184,57 +200,108 @@ module tb_i2s_fft_tx_adapter;
     endtask
 
     always @(posedge i2s_sck_o or posedge rst) begin
-        logic slot_ws;
-        logic [31:0] next_shift;
-        int next_count;
-        logic [31:0] decoded_word;
+        logic ws_changed;
+        logic collecting_next;
+        logic start_word_next;
+        logic word_channel_next;
+        logic [31:0] word_shift_next;
+        int word_count_next;
+        logic completed_word_valid;
+        logic completed_word_channel;
+        logic [31:0] completed_word;
 
         if (rst) begin
-            mon_slot_ws_r       <= 1'b1;
-            mon_slot_shift_r    <= '0;
-            mon_slot_count_r    <= 0;
-            mon_right_word_r    <= '0;
-            mon_have_right_r    <= 1'b0;
-            captured_write_idx  <= 0;
+            mon_prev_ws_r           <= 1'b1;
+            mon_word_collecting_r   <= 1'b0;
+            mon_word_start_next_r   <= 1'b0;
+            mon_word_channel_r      <= 1'b0;
+            mon_word_shift_r        <= '0;
+            mon_word_count_r        <= 0;
+            mon_right_word_r        <= '0;
+            mon_have_right_r        <= 1'b0;
+            captured_write_idx      <= 0;
         end else begin
-            if ((mon_slot_count_r == 0) || (i2s_ws_o != mon_slot_ws_r)) begin
-                slot_ws    = i2s_ws_o;
-                next_shift = {31'd0, i2s_sd_o};
-                next_count = 1;
-            end else begin
-                slot_ws    = mon_slot_ws_r;
-                next_shift = {mon_slot_shift_r[30:0], i2s_sd_o};
-                next_count = mon_slot_count_r + 1;
+            ws_changed = (i2s_ws_o != mon_prev_ws_r);
+
+            collecting_next     = mon_word_collecting_r;
+            start_word_next     = mon_word_start_next_r;
+            word_channel_next   = mon_word_channel_r;
+            word_shift_next     = mon_word_shift_r;
+            word_count_next     = mon_word_count_r;
+            completed_word_valid = 1'b0;
+            completed_word_channel = 1'b0;
+            completed_word = '0;
+
+            if (mon_word_start_next_r) begin
+                collecting_next   = 1'b1;
+                start_word_next   = 1'b0;
+                word_channel_next = i2s_ws_o;
+                word_shift_next   = {31'd0, i2s_sd_o};
+                word_count_next   = 1;
+            end else if (mon_word_collecting_r) begin
+                word_shift_next = {mon_word_shift_r[30:0], i2s_sd_o};
+                word_count_next = mon_word_count_r + 1;
             end
 
-            mon_slot_ws_r    <= slot_ws;
-            mon_slot_shift_r <= next_shift;
+            if (ws_changed)
+                start_word_next = 1'b1;
 
-            if (next_count == SLOT_W) begin
-                decoded_word = next_shift;
+            if (collecting_next && (word_count_next == SLOT_W)) begin
+                completed_word_valid = 1'b1;
+                completed_word_channel = word_channel_next;
+                completed_word = word_shift_next;
+                collecting_next = 1'b0;
+                word_count_next = 0;
+                word_shift_next = '0;
+            end
 
-                if (slot_ws) begin
-                    mon_right_word_r   <= decoded_word;
-                    mon_have_right_r   <= 1'b1;
+            mon_prev_ws_r         <= i2s_ws_o;
+            mon_word_collecting_r <= collecting_next;
+            mon_word_start_next_r <= start_word_next;
+            mon_word_channel_r    <= word_channel_next;
+            mon_word_shift_r      <= word_shift_next;
+            mon_word_count_r      <= word_count_next;
+
+            if (completed_word_valid) begin
+`ifdef TRACE_I2S_MONITOR
+                $display(
+                    "word channel=%0d tag=%0d payload=0x%08h time=%0t",
+                    completed_word_channel,
+                    decode_tag(completed_word),
+                    completed_word,
+                    $time
+                );
+`endif
+                if (completed_word_channel) begin
+                    mon_right_word_r <= completed_word;
+                    mon_have_right_r <= 1'b1;
                 end else if (mon_have_right_r) begin
                     if (captured_write_idx >= CAPTURE_DEPTH) begin
                         $fatal(1, "CAPTURE_DEPTH insuficiente no monitor I2S.");
                     end else begin
-                        captured_tag_mem[captured_write_idx]   <= decode_tag(decoded_word);
-                        captured_left_mem[captured_write_idx]  <= decode_payload(decoded_word);
+                        captured_tag_mem[captured_write_idx]   <= decode_tag(completed_word);
+                        captured_left_mem[captured_write_idx]  <= decode_payload(completed_word);
                         captured_right_mem[captured_write_idx] <= decode_payload(mon_right_word_r);
                         captured_write_idx                     <= captured_write_idx + 1;
                         mon_have_right_r                      <= 1'b0;
 
                         // O protocolo tagged usa o mesmo tipo em ambos os canais de um frame.
-                        assert (decode_tag(decoded_word) == decode_tag(mon_right_word_r))
+                        assert (decode_tag(completed_word) == decode_tag(mon_right_word_r))
                         else $error("Tags diferentes entre canais no frame idx=%0d", captured_write_idx);
+
+`ifdef TRACE_I2S_MONITOR
+                        $display(
+                            "frame idx=%0d left_tag=%0d right_tag=%0d left=%0d right=%0d time=%0t",
+                            captured_write_idx,
+                            decode_tag(completed_word),
+                            decode_tag(mon_right_word_r),
+                            decode_payload(completed_word),
+                            decode_payload(mon_right_word_r),
+                            $time
+                        );
+`endif
                     end
                 end
-
-                mon_slot_count_r <= 0;
-            end else begin
-                mon_slot_count_r <= next_count;
             end
         end
     end
@@ -258,10 +325,6 @@ module tb_i2s_fft_tx_adapter;
         send_fft_bin(18'sd30,  -18'sd30,  8'sd5, 1'b1);
         send_fft_bin(18'sd40,  -18'sd40, -8'sd3, 1'b0);
         send_fft_bin(18'sd50,  -18'sd50, -8'sd3, 1'b1);
-
-        repeat (2) @(posedge clk);
-        assert (fifo_level_o >= 5)
-        else $error("A FIFO nao acumulou dados como esperado. level=%0d", fifo_level_o);
 
         set_expected_frame(0,  TAG_BFPEXP_C,  18'sd5,   18'sd5);
         set_expected_frame(1,  TAG_BFPEXP_C,  18'sd5,   18'sd5);
