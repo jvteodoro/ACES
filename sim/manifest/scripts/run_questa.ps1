@@ -8,7 +8,9 @@ param(
 
     [switch]$Gui,
 
-    [switch]$KeepExistingSessions
+    [switch]$KeepExistingSessions,
+
+    [string]$VsimPlusargs = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -55,6 +57,7 @@ $env:ACES_FLOW = $Flow
 $env:ACES_REPO_ROOT = $repoRoot
 $env:ACES_LOCAL_DIR = $localDir
 $env:ACES_GUI = if ($Gui) { '1' } else { '0' }
+$env:ACES_VSIM_PLUSARGS = $VsimPlusargs
 
 Push-Location $repoRoot
 try {

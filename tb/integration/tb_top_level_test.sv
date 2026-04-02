@@ -125,6 +125,12 @@ module tb_top_level_test;
     bit tx_mon_have_left_r;
     bit tx_mon_pending_start_r;
 
+    integer dump_sample24_fd_r;
+    integer dump_fft_input_fd_r;
+    integer dump_fft_output_fd_r;
+    integer dump_tx_frames_fd_r;
+    bit dump_files_open_r;
+
     function automatic int flat_sample_idx(input int example_idx, input int sample_idx);
         flat_sample_idx = example_idx * N_POINTS + sample_idx;
     endfunction
@@ -202,6 +208,66 @@ module tb_top_level_test;
         end
     endtask
 
+    task automatic close_diag_files;
+        begin
+            if (dump_sample24_fd_r != 0) begin
+                $fclose(dump_sample24_fd_r);
+                dump_sample24_fd_r = 0;
+            end
+            if (dump_fft_input_fd_r != 0) begin
+                $fclose(dump_fft_input_fd_r);
+                dump_fft_input_fd_r = 0;
+            end
+            if (dump_fft_output_fd_r != 0) begin
+                $fclose(dump_fft_output_fd_r);
+                dump_fft_output_fd_r = 0;
+            end
+            if (dump_tx_frames_fd_r != 0) begin
+                $fclose(dump_tx_frames_fd_r);
+                dump_tx_frames_fd_r = 0;
+            end
+            dump_files_open_r = 1'b0;
+        end
+    endtask
+
+    task automatic open_diag_files(input int example_idx);
+        string path_s;
+        begin
+            close_diag_files();
+            if (REAL_FLOW) begin
+                path_s = $sformatf("top_level_test_example_%0d_sample24.csv", example_idx);
+                dump_sample24_fd_r = $fopen(path_s, "w");
+                if (dump_sample24_fd_r == 0)
+                    $fatal(1, "Nao foi possivel abrir %s para dump diagnostico", path_s);
+                $fdisplay(dump_sample24_fd_r,
+                          "sample24_idx,stim_point,stim_rom_addr,stim_state,stim_sample_dbg,got_sample24,expected_sample24,in_expected_window");
+
+                path_s = $sformatf("top_level_test_example_%0d_fft_input.csv", example_idx);
+                dump_fft_input_fd_r = $fopen(path_s, "w");
+                if (dump_fft_input_fd_r == 0)
+                    $fatal(1, "Nao foi possivel abrir %s para dump diagnostico", path_s);
+                $fdisplay(dump_fft_input_fd_r,
+                          "sample18_idx,got_sample18,expected_sample18,sdw_real,sdw_imag,fft_run,fft_status,in_expected_window");
+
+                path_s = $sformatf("top_level_test_example_%0d_fft_output.csv", example_idx);
+                dump_fft_output_fd_r = $fopen(path_s, "w");
+                if (dump_fft_output_fd_r == 0)
+                    $fatal(1, "Nao foi possivel abrir %s para dump diagnostico", path_s);
+                $fdisplay(dump_fft_output_fd_r,
+                          "bin_seq,tx_index,tx_real_raw,tx_imag_raw,bfpexp,corrected_real,corrected_imag,expected_real,expected_imag,abs_err,last,in_expected_window");
+
+                path_s = $sformatf("top_level_test_example_%0d_tx_frames.csv", example_idx);
+                dump_tx_frames_fd_r = $fopen(path_s, "w");
+                if (dump_tx_frames_fd_r == 0)
+                    $fatal(1, "Nao foi possivel abrir %s para dump diagnostico", path_s);
+                $fdisplay(dump_tx_frames_fd_r,
+                          "frame_seq,event,actual_tag,actual_left,actual_right,expected_idx,expected_tag,expected_left,expected_right,left_word_hex,right_word_hex");
+
+                dump_files_open_r = 1'b1;
+            end
+        end
+    endtask
+
     task automatic reset_example_scoreboard(input int example_idx);
         int bin_idx;
         begin
@@ -233,6 +299,8 @@ module tb_top_level_test;
                 measured_fft_real_mem[bin_idx] = 0.0;
                 measured_fft_imag_mem[bin_idx] = 0.0;
             end
+
+            open_diag_files(example_idx);
         end
     endtask
 
@@ -482,6 +550,7 @@ module tb_top_level_test;
             start_example(example_idx);
             wait_for_example_completion(example_idx);
             check_example_summary(example_idx);
+            close_diag_files();
             example_in_progress_r = 1'b0;
             apply_reset_sequence();
         end
@@ -495,29 +564,81 @@ module tb_top_level_test;
         logic [TAG_W-1:0] right_tag;
         logic signed [I2S_SAMPLE_W-1:0] left_payload;
         logic signed [I2S_SAMPLE_W-1:0] right_payload;
+        int expected_idx_i;
+        int frame_seq_i;
+        logic [TAG_W-1:0] expected_tag_i;
+        logic signed [I2S_SAMPLE_W-1:0] expected_left_i;
+        logic signed [I2S_SAMPLE_W-1:0] expected_right_i;
+        string event_s;
         begin
             left_tag      = decode_tag(left_word_i);
             right_tag     = decode_tag(right_word_i);
             left_payload  = decode_payload(left_word_i);
             right_payload = decode_payload(right_word_i);
+            expected_idx_i   = -1;
+            frame_seq_i      = serial_frames_seen_r + extra_serial_frames_r;
+            expected_tag_i   = '0;
+            expected_left_i  = '0;
+            expected_right_i = '0;
+            event_s          = "unclassified";
+
+            if (serial_expected_read_idx_r < serial_expected_write_idx_r) begin
+                expected_idx_i   = serial_expected_read_idx_r;
+                expected_tag_i   = expected_tag_mem[serial_expected_read_idx_r];
+                expected_left_i  = expected_left_mem[serial_expected_read_idx_r];
+                expected_right_i = expected_right_mem[serial_expected_read_idx_r];
+            end
+
+            if (serial_expected_read_idx_r >= serial_expected_write_idx_r) begin
+                if (REAL_FLOW && fft_frame_done_r)
+                    event_s = "extra_after_done";
+                else if (REAL_FLOW)
+                    event_s = "unexpected_before_done";
+                else
+                    event_s = "no_expectation";
+            end else if ((serial_frames_seen_r == 0) && (left_tag == TAG_IDLE_C)) begin
+                event_s = "initial_idle";
+            end else begin
+                event_s = "matched";
+            end
+
+            if (dump_files_open_r) begin
+                $fdisplay(dump_tx_frames_fd_r,
+                          "%0d,%s,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%08x,%08x",
+                          frame_seq_i,
+                          event_s,
+                          left_tag,
+                          $signed(left_payload),
+                          $signed(right_payload),
+                          expected_idx_i,
+                          expected_tag_i,
+                          $signed(expected_left_i),
+                          $signed(expected_right_i),
+                          left_word_i,
+                          right_word_i);
+            end
 
             assert (left_tag == right_tag)
             else $fatal(1, "Tags diferentes entre canais do stream TX: left=%0d right=%0d", left_tag, right_tag);
 
             if (serial_expected_read_idx_r >= serial_expected_write_idx_r) begin
                 if (REAL_FLOW && fft_frame_done_r) begin
+                    event_s = "extra_after_done";
                     extra_serial_frames_r = extra_serial_frames_r + 1;
                 end else if (REAL_FLOW) begin
+                    event_s = "unexpected_before_done";
                     assert (left_tag == TAG_IDLE_C)
                     else $fatal(1, "Frame tagged inesperado no stream TX. tag=%0d left=%0d right=%0d",
                                 left_tag, left_payload, right_payload);
                 end
             end else begin
                 if ((serial_frames_seen_r == 0) && (left_tag == TAG_IDLE_C)) begin
+                    event_s = "initial_idle";
                     assert (left_payload == '0 && right_payload == '0)
                     else $fatal(1, "Frame IDLE inicial do stream TX deveria carregar zeros. left=%0d right=%0d",
                                 left_payload, right_payload);
                 end else begin
+                    event_s = "matched";
                     assert (left_tag === expected_tag_mem[serial_expected_read_idx_r])
                     else $fatal(1, "TAG do stream TX mismatch idx=%0d exp=%0d got=%0d",
                                 serial_expected_read_idx_r, expected_tag_mem[serial_expected_read_idx_r], left_tag);
@@ -534,19 +655,21 @@ module tb_top_level_test;
                     serial_frames_seen_r       = serial_frames_seen_r + 1;
                 end
             end
+
         end
     endtask
 
-    assign gpio_0_d0  = tb_clk_drive;
-    assign gpio_0_d1  = tb_rst_drive;
-    assign gpio_0_d2  = tb_capture_leds_drive;
-    assign gpio_0_d4  = tb_capture_hex_drive;
-    assign gpio_0_d5  = tb_capture_gpio_drive;
-    assign gpio_0_d6  = tb_capture_clear_drive;
-    assign gpio_0_d7  = tb_dbg_stage0_drive;
-    assign gpio_0_d8  = tb_dbg_stage1_drive;
-    assign gpio_0_d9  = tb_dbg_page0_drive;
-    assign gpio_0_d10 = tb_dbg_page1_drive;
+    assign clock_50   = tb_clk_drive;
+    assign reset_n    = ~tb_rst_drive;
+    assign gpio_1_d1  = tb_rst_drive;
+    assign gpio_1_d5  = tb_capture_leds_drive;
+    assign gpio_1_d7  = tb_capture_hex_drive;
+    assign gpio_1_d9  = tb_capture_gpio_drive;
+    assign gpio_1_d11 = tb_capture_clear_drive;
+    assign gpio_1_d13 = tb_dbg_stage0_drive;
+    assign gpio_1_d15 = tb_dbg_stage1_drive;
+    assign gpio_1_d17 = tb_dbg_page0_drive;
+    assign gpio_1_d19 = tb_dbg_page1_drive;
 
     always #CLK_HALF tb_clk_drive = ~tb_clk_drive;
 
@@ -609,6 +732,18 @@ module tb_top_level_test;
             extra_sample24_count_r <= 0;
         end else if (example_in_progress_r) begin
             if (REAL_FLOW && (sample24_count_r < N_POINTS)) begin
+                if (dump_files_open_r) begin
+                    $fdisplay(dump_sample24_fd_r,
+                              "%0d,%0d,%0d,%0d,%0d,%0d,%0d,1",
+                              sample24_count_r,
+                              dut.stim_current_point_o,
+                              dut.stim_rom_addr_dbg_o,
+                              dut.stim_state_dbg_o,
+                              $signed(dut.stim_current_sample_dbg_o),
+                              $signed(dut.sample_24_dbg_o),
+                              expected_sample24_mem[flat_sample_idx(active_example_r, sample24_count_r)]);
+                end
+
                 if (sample24_count_r < 8)
                     $display("[%0t] sample24 idx=%0d got=%0d exp=%0d stim_point=%0d stim_sample=%0d",
                              $time,
@@ -633,6 +768,17 @@ module tb_top_level_test;
                             dut.stim_sd_o);
                 sample24_count_r <= sample24_count_r + 1;
             end else if (REAL_FLOW) begin
+                if (dump_files_open_r) begin
+                    $fdisplay(dump_sample24_fd_r,
+                              "%0d,%0d,%0d,%0d,%0d,%0d,%0d,0",
+                              sample24_count_r + extra_sample24_count_r,
+                              dut.stim_current_point_o,
+                              dut.stim_rom_addr_dbg_o,
+                              dut.stim_state_dbg_o,
+                              $signed(dut.stim_current_sample_dbg_o),
+                              $signed(dut.sample_24_dbg_o),
+                              0);
+                end
                 extra_sample24_count_r <= extra_sample24_count_r + 1;
             end
         end
@@ -643,6 +789,9 @@ module tb_top_level_test;
         logic signed [I2S_SAMPLE_W-1:0] bfpexp_payload;
         real corrected_real_r;
         real corrected_imag_r;
+        real expected_real_r;
+        real expected_imag_r;
+        real abs_err_r;
 
         if (tb_rst_drive) begin
             sample18_count_r             <= 0;
@@ -699,6 +848,18 @@ module tb_top_level_test;
 
             if (example_in_progress_r && dut.sact_istream_o && !sact_prev_r) begin
                 if (REAL_FLOW && (sample18_count_r < N_POINTS)) begin
+                    if (dump_files_open_r) begin
+                        $fdisplay(dump_fft_input_fd_r,
+                                  "%0d,%0d,%0d,%0d,%0d,%0b,%0d,1",
+                                  sample18_count_r,
+                                  $signed(dut.sample_mic_o),
+                                  expected_sample18_mem[flat_sample_idx(active_example_r, sample18_count_r)],
+                                  $signed(dut.sdw_istream_real_o),
+                                  $signed(dut.sdw_istream_imag_o),
+                                  dut.fft_run_o,
+                                  dut.fft_status_o);
+                    end
+
                     assert ($signed(dut.sample_mic_o) == expected_sample18_mem[flat_sample_idx(active_example_r, sample18_count_r)])
                     else $fatal(1, "sample_mic mismatch exemplo=%0d idx=%0d exp=%0d got=%0d",
                                 active_example_r, sample18_count_r,
@@ -716,6 +877,18 @@ module tb_top_level_test;
 
                     sample18_count_r <= sample18_count_r + 1;
                 end else if (REAL_FLOW) begin
+                    if (dump_files_open_r) begin
+                        $fdisplay(dump_fft_input_fd_r,
+                                  "%0d,%0d,%0d,%0d,%0d,%0b,%0d,0",
+                                  sample18_count_r,
+                                  $signed(dut.sample_mic_o),
+                                  0,
+                                  $signed(dut.sdw_istream_real_o),
+                                  $signed(dut.sdw_istream_imag_o),
+                                  dut.fft_run_o,
+                                  dut.fft_status_o);
+                    end
+
                     extra_sample18_count_r <= extra_sample18_count_r + 1;
                     sample18_count_r       <= sample18_count_r + 1;
                 end else begin
@@ -747,8 +920,28 @@ module tb_top_level_test;
 
                     corrected_real_r = apply_bfpexp(dut.fft_tx_real_o, dut.bfpexp_o);
                     corrected_imag_r = apply_bfpexp(dut.fft_tx_imag_o, dut.bfpexp_o);
+                    expected_real_r   = expected_fft_real_mem[flat_fft_idx(active_example_r, fft_bin_count_r)];
+                    expected_imag_r   = expected_fft_imag_mem[flat_fft_idx(active_example_r, fft_bin_count_r)];
+                    abs_err_r         = $sqrt(((corrected_real_r - expected_real_r) * (corrected_real_r - expected_real_r)) +
+                                              ((corrected_imag_r - expected_imag_r) * (corrected_imag_r - expected_imag_r)));
                     measured_fft_real_mem[fft_bin_count_r] = corrected_real_r;
                     measured_fft_imag_mem[fft_bin_count_r] = corrected_imag_r;
+
+                    if (dump_files_open_r) begin
+                        $fdisplay(dump_fft_output_fd_r,
+                                  "%0d,%0d,%0d,%0d,%0d,%0f,%0f,%0f,%0f,%0f,%0b,1",
+                                  fft_bin_count_r,
+                                  dut.fft_tx_index_o,
+                                  $signed(dut.fft_tx_real_o),
+                                  $signed(dut.fft_tx_imag_o),
+                                  $signed(dut.bfpexp_o),
+                                  corrected_real_r,
+                                  corrected_imag_r,
+                                  expected_real_r,
+                                  expected_imag_r,
+                                  abs_err_r,
+                                  dut.fft_tx_last_o);
+                    end
 
                     if (!REAL_FLOW) begin
                         assert ($signed(dut.fft_tx_real_o) == (fft_bin_count_r + 1))
@@ -769,6 +962,21 @@ module tb_top_level_test;
                     if (fft_bin_count_r == FFT_LENGTH-1)
                         fft_frame_done_r <= 1'b1;
                 end else if (REAL_FLOW) begin
+                    if (dump_files_open_r) begin
+                        $fdisplay(dump_fft_output_fd_r,
+                                  "%0d,%0d,%0d,%0d,%0d,%0f,%0f,%0f,%0f,%0f,%0b,0",
+                                  fft_bin_count_r + extra_fft_bin_count_r,
+                                  dut.fft_tx_index_o,
+                                  $signed(dut.fft_tx_real_o),
+                                  $signed(dut.fft_tx_imag_o),
+                                  $signed(dut.bfpexp_o),
+                                  apply_bfpexp(dut.fft_tx_real_o, dut.bfpexp_o),
+                                  apply_bfpexp(dut.fft_tx_imag_o, dut.bfpexp_o),
+                                  0.0,
+                                  0.0,
+                                  0.0,
+                                  dut.fft_tx_last_o);
+                    end
                     extra_fft_bin_count_r <= extra_fft_bin_count_r + 1;
                 end
             end
@@ -896,9 +1104,14 @@ module tb_top_level_test;
     end
 
     initial begin
-        key0 = 1'b1; key1 = 1'b1; key2 = 1'b1; key3 = 1'b1; reset_n = 1'b1;
+        int first_example_idx;
+        int last_example_idx;
+        int selected_example_idx;
+        bit selected_example_valid;
+
+        key0 = 1'b1; key1 = 1'b1; key2 = 1'b1; key3 = 1'b1;
         sw0 = 1'b0; sw1 = 1'b0; sw2 = 1'b0; sw3 = 1'b0; sw4 = 1'b0; sw5 = 1'b0; sw6 = 1'b0; sw7 = 1'b1; sw8 = 1'b0; sw9 = 1'b0;
-        clock_50 = 1'b0; clock2_50 = 1'b0; clock3_50 = 1'b0; clock4_50 = 1'b0;
+        clock2_50 = 1'b0; clock3_50 = 1'b0; clock4_50 = 1'b0;
 
         tb_clk_drive           = 1'b0;
         tb_rst_drive           = 1'b1;
@@ -945,17 +1158,34 @@ module tb_top_level_test;
         tx_mon_prev_slot_ws_r       = 1'b0;
         tx_mon_right_word_r         = '0;
         tx_mon_have_right_r         = 1'b0;
+        dump_sample24_fd_r          = 0;
+        dump_fft_input_fd_r         = 0;
+        dump_fft_output_fd_r        = 0;
+        dump_tx_frames_fd_r         = 0;
+        dump_files_open_r           = 1'b0;
 
 `ifdef TB_TOP_LEVEL_REAL_FLOW
         load_expected_samples();
         load_expected_fft();
 `endif
 
+        selected_example_valid = $value$plusargs("TOP_LEVEL_TEST_EXAMPLE=%d", selected_example_idx);
+        if (selected_example_valid) begin
+            assert ((selected_example_idx >= 0) && (selected_example_idx < N_EXAMPLES))
+            else $fatal(1, "TOP_LEVEL_TEST_EXAMPLE fora da faixa: %0d", selected_example_idx);
+            first_example_idx = selected_example_idx;
+            last_example_idx  = selected_example_idx;
+            $display("tb_top_level_test: executando somente o exemplo %0d via plusarg", selected_example_idx);
+        end else begin
+            first_example_idx = 0;
+            last_example_idx  = EXAMPLES_TO_RUN - 1;
+        end
+
         repeat (8) @(posedge tb_clk_drive);
         tb_rst_drive = 1'b0;
         repeat (8) @(posedge tb_clk_drive);
 
-        for (int example_idx = 0; example_idx < EXAMPLES_TO_RUN; example_idx++) begin
+        for (int example_idx = first_example_idx; example_idx <= last_example_idx; example_idx++) begin
             run_example_and_check(example_idx);
             wait (dut.stim_ready_o == 1'b1);
             repeat (16) @(posedge tb_clk_drive);
@@ -965,10 +1195,12 @@ module tb_top_level_test;
         else $fatal(1, "Poucos toggles observados em tx_i2s_sck_o ao longo do teste: %0d", tx_sck_toggle_total_r);
 
 `ifdef TB_TOP_LEVEL_REAL_FLOW
-        $display("tb_top_level_test PASSED no fluxo real com %0d exemplos e comparacao FFT vs Python", EXAMPLES_TO_RUN);
+        $display("tb_top_level_test PASSED no fluxo real com exemplos [%0d:%0d] e comparacao FFT vs Python",
+                 first_example_idx, last_example_idx);
 `else
         $display("tb_top_level_test PASSED no fluxo mock com smoke/protocolo do stream TX");
 `endif
+        close_diag_files();
         $finish;
     end
 

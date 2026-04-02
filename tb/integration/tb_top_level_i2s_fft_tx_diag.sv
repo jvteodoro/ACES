@@ -7,7 +7,7 @@ module tb_top_level_i2s_fft_tx_diag;
     localparam int I2S_CLOCK_DIV             = 2;
     localparam int DIAG_WINDOW_BINS          = 4;
     localparam int DIAG_BFPEXP_HOLD_FRAMES   = 1;
-    localparam int CAPTURE_DEPTH             = 32;
+    localparam int CAPTURE_DEPTH             = 128;
     localparam int EXPECTED_COUNT            = 10;
     localparam int TAG_W                     = 2;
     localparam time CLK_HALF                 = 5ns;
@@ -16,8 +16,8 @@ module tb_top_level_i2s_fft_tx_diag;
     localparam logic [TAG_W-1:0] TAG_FFT_C    = 2'd2;
 
     localparam logic signed [FFT_DW-1:0] DIAG_FFT_REAL_C = 18'sh15555;
-    localparam logic signed [FFT_DW-1:0] DIAG_FFT_IMAG_C = -18'sh0AAAB;
-    localparam logic signed [FFT_DW-1:0] DIAG_BFPEXP_EXT_C = -18'sd18;
+    localparam logic signed [FFT_DW-1:0] DIAG_FFT_IMAG_C = 18'sh0AAAB;
+    localparam logic signed [FFT_DW-1:0] DIAG_BFPEXP_EXT_C = 18'sd18;
 
     localparam logic [I2S_SLOT_W-1:0] BFPEXP_WORD_C = {TAG_BFPEXP_C, 12'd0, DIAG_BFPEXP_EXT_C};
     localparam logic [I2S_SLOT_W-1:0] FFT_LEFT_WORD_C = {TAG_FFT_C, 12'd0, DIAG_FFT_REAL_C};
@@ -28,6 +28,8 @@ module tb_top_level_i2s_fft_tx_diag;
     logic gpio_1_d27;
     logic gpio_1_d29;
     logic gpio_1_d31;
+    bit sd_phase_checks_armed_r;
+    bit ws_phase_checks_armed_r;
 
     int sck_toggle_count;
 
@@ -220,11 +222,11 @@ module tb_top_level_i2s_fft_tx_diag;
         .gpio_0_d24(1'b0),
         .gpio_0_d25(1'b0),
         .gpio_0_d26(1'b0),
-        .gpio_0_d27(1'b0),
-        .gpio_0_d28(1'b0),
-        .gpio_0_d29(1'b0),
+        .gpio_0_d27(),
+        .gpio_0_d28(),
+        .gpio_0_d29(),
         .gpio_0_d30(1'b0),
-        .gpio_0_d31(1'b0),
+        .gpio_0_d31(),
         .gpio_0_d32(1'b0),
         .gpio_0_d33(1'b0),
         .gpio_0_d34(1'b0),
@@ -272,6 +274,32 @@ module tb_top_level_i2s_fft_tx_diag;
             sck_toggle_count <= 0;
         else
             sck_toggle_count <= sck_toggle_count + 1;
+    end
+
+    always @(gpio_1_d31 or posedge gpio_0_d1) begin
+        if (gpio_0_d1) begin
+            sd_phase_checks_armed_r <= 1'b0;
+        end else if (!sd_phase_checks_armed_r) begin
+            sd_phase_checks_armed_r <= 1'b1;
+        end else begin
+            assert (gpio_1_d27 == 1'b0)
+            else $fatal(1, "SD exportado pelo topo mudou fora da fase baixa do BCLK.");
+        end
+    end
+
+    always @(gpio_1_d29 or posedge gpio_0_d1) begin
+        if (gpio_0_d1) begin
+            ws_phase_checks_armed_r <= 1'b0;
+        end else if (!ws_phase_checks_armed_r) begin
+            ws_phase_checks_armed_r <= 1'b1;
+        end else begin
+            assert ((gpio_1_d27 == 1'b1) &&
+                    (dut.u_i2s_fft_tx_adapter.div_cnt_r == I2S_CLOCK_DIV-1) &&
+                    (dut.u_i2s_fft_tx_adapter.slot_bit_r == I2S_SLOT_W-2))
+            else $fatal(1,
+                        "WS exportado pelo topo mudou fora da janela antecipada antes do falling edge final do slot. sck=%0b div=%0d slot=%0d",
+                        gpio_1_d27, dut.u_i2s_fft_tx_adapter.div_cnt_r, dut.u_i2s_fft_tx_adapter.slot_bit_r);
+        end
     end
 
     always @(posedge gpio_1_d27 or posedge gpio_0_d1) begin

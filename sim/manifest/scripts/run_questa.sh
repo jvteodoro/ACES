@@ -5,9 +5,9 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=sim/manifest/scripts/windows_powershell_bridge.sh
 source "${SCRIPT_DIR}/windows_powershell_bridge.sh"
 
-if [[ $# -lt 1 || $# -gt 3 ]]; then
-  echo "Usage: $0 <test> [mock|real] [gui]" >&2
-  echo "  Ex.: $0 top_level_test real gui   # usa ROM/IP/FFT reais e abre GUI" >&2
+if [[ $# -lt 1 ]]; then
+  echo "Usage: $0 <test> [mock|real] [gui] [plusargs=<vsim-plusargs>]" >&2
+  echo "  Ex.: $0 top_level_test real plusargs=+TOP_LEVEL_TEST_EXAMPLE=0" >&2
   exit 2
 fi
 
@@ -27,6 +27,7 @@ find_root() {
 TEST_NAME="$1"
 FLOW="mock"
 GUI=0
+VSIM_PLUSARGS="${ACES_VSIM_PLUSARGS:-}"
 shift
 
 for arg in "$@"; do
@@ -37,9 +38,12 @@ for arg in "$@"; do
     gui)
       GUI=1
       ;;
+    plusargs=*)
+      VSIM_PLUSARGS="${arg#plusargs=}"
+      ;;
     *)
       echo "Unknown option: $arg" >&2
-      echo "Usage: $0 <test> [mock|real] [gui]" >&2
+      echo "Usage: $0 <test> [mock|real] [gui] [plusargs=<vsim-plusargs>]" >&2
       exit 2
       ;;
   esac
@@ -54,6 +58,7 @@ export ACES_FLOW="${FLOW}"
 export ACES_REPO_ROOT="${REPO_ROOT}"
 export ACES_LOCAL_DIR="${LOCAL_DIR}"
 export ACES_GUI="${GUI}"
+export ACES_VSIM_PLUSARGS="${VSIM_PLUSARGS}"
 
 cd "${REPO_ROOT}"
 if command -v vsim >/dev/null 2>&1; then
@@ -67,6 +72,9 @@ elif aces_should_use_windows_powershell; then
   ps_args=("${TEST_NAME}" "${FLOW}")
   if [[ "${GUI}" -eq 1 ]]; then
     ps_args+=(--switch Gui)
+  fi
+  if [[ -n "${VSIM_PLUSARGS}" ]]; then
+    ps_args+=(--named-arg VsimPlusargs "${VSIM_PLUSARGS}")
   fi
   aces_run_repo_powershell_script "${REPO_ROOT}" "sim/manifest/scripts/run_questa.ps1" "${ps_args[@]}"
 else

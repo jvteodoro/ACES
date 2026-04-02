@@ -83,14 +83,14 @@ module top_level_i2s_fft_tx_diag #(
     input logic gpio_0_d24, //PIN_L19
     input logic gpio_0_d25, //PIN_K17
     input logic gpio_0_d26, //PIN_K19
-    input logic gpio_0_d27, //PIN_P18
-    input logic gpio_0_d28, //PIN_R15
-    input logic gpio_0_d29, //PIN_R17
-    input logic gpio_0_d30, //PIN_R16
-    input logic gpio_0_d31, //PIN_T20
-    input logic gpio_0_d32, //PIN_T19
+    output logic gpio_0_d27, //PIN_P18
+    output logic gpio_0_d28, //PIN_R15
+    output logic gpio_0_d29, //PIN_R17
+    output logic gpio_0_d30, //PIN_R16
+    output logic gpio_0_d31, //PIN_T20
+    output logic gpio_0_d32, //PIN_T19
     input logic gpio_0_d33, //PIN_T18
-    input logic gpio_0_d34, //PIN_T17
+    output logic gpio_0_d34, //PIN_T17
     input logic gpio_0_d35, //PIN_T15
 
     output logic gpio_1_d0,  //PIN_H16
@@ -134,8 +134,8 @@ module top_level_i2s_fft_tx_diag #(
     localparam int BFPEXP_W = 8;
     localparam int BIN_IDX_W = (DIAG_WINDOW_BINS <= 1) ? 1 : $clog2(DIAG_WINDOW_BINS);
     localparam logic signed [FFT_DW-1:0] DIAG_FFT_REAL_C = 18'sh15555;
-    localparam logic signed [FFT_DW-1:0] DIAG_FFT_IMAG_C = -18'sh0AAAB;
-    localparam logic signed [BFPEXP_W-1:0] DIAG_BFPEXP_C = -8'sh12;
+    localparam logic signed [FFT_DW-1:0] DIAG_FFT_IMAG_C = 18'sh0AAAB;
+    localparam logic signed [BFPEXP_W-1:0] DIAG_BFPEXP_C = 8'sh12;
 
     logic clk;
     logic rst;
@@ -174,8 +174,8 @@ module top_level_i2s_fft_tx_diag #(
     logic diag_accept_w;
     logic diag_window_done_w;
 
-    assign clk = gpio_0_d0;
-    assign rst = gpio_0_d1;
+    assign clk = clock_50;
+    assign rst = gpio_1_d1;
 
     assign diag_fft_valid_i = diag_fft_ready_o;
     assign diag_fft_real_i  = DIAG_FFT_REAL_C;
@@ -304,27 +304,30 @@ module top_level_i2s_fft_tx_diag #(
     assign gpio_1_d20 = 1'b0;
 
     // Exporta o stream tagged I2S nos mesmos pinos usados pelo host no top_level_test.
+    assign gpio_0_d30 = tx_i2s_sck_o;
+    assign gpio_0_d32 = tx_i2s_ws_o;
+    assign gpio_0_d34 = tx_i2s_sd_o;
     assign gpio_1_d27 = tx_i2s_sck_o;
     assign gpio_1_d29 = tx_i2s_ws_o;
     assign gpio_1_d31 = tx_i2s_sd_o;
 
     // Mantem entradas opcionais observaveis para evitar podas agressivas e
     // preservar o mesmo envelope fisico do top_level_test.
-    assign unused_inputs_probe = ^{
-        key0, key1, key2, key3, reset_n,
-        sw2, sw3, sw4, sw5, sw6, sw7, sw8, sw9,
-        clock_50, clock2_50, clock3_50, clock4_50,
-        gpio_0_d2, gpio_0_d4, gpio_0_d5, gpio_0_d6, gpio_0_d7,
-        gpio_0_d8, gpio_0_d9, gpio_0_d10, gpio_0_d15, gpio_0_d16,
-        gpio_0_d18, gpio_0_d20, gpio_0_d21, gpio_0_d22, gpio_0_d23,
-        gpio_0_d24, gpio_0_d25, gpio_0_d26, gpio_0_d27, gpio_0_d28,
-        gpio_0_d29, gpio_0_d30, gpio_0_d31, gpio_0_d32, gpio_0_d33,
-        gpio_0_d34, gpio_0_d35,
-        gpio_1_d6, gpio_1_d7, gpio_1_d8, gpio_1_d9, gpio_1_d10,
-        gpio_1_d11, gpio_1_d12, gpio_1_d13, gpio_1_d14, gpio_1_d15,
-        gpio_1_d16, gpio_1_d18, gpio_1_d21, gpio_1_d22, gpio_1_d23,
-        gpio_1_d24, gpio_1_d25, gpio_1_d26, gpio_1_d28, gpio_1_d30,
-        gpio_1_d32, gpio_1_d33, gpio_1_d34, gpio_1_d35
-    };
+//    assign unused_inputs_probe = ^{
+//        key0, key1, key2, key3, reset_n,
+//        sw2, sw3, sw4, sw5, sw6, sw7, sw8, sw9,
+//        clock_50, clock2_50, clock3_50, clock4_50,
+//        gpio_0_d2, gpio_0_d4, gpio_0_d5, gpio_0_d6, gpio_0_d7,
+//        gpio_0_d8, gpio_0_d9, gpio_0_d10, gpio_0_d15, gpio_0_d16,
+//        gpio_0_d18, gpio_0_d20, gpio_0_d21, gpio_0_d22, gpio_0_d23,
+//        gpio_0_d24, gpio_0_d25, gpio_0_d26, gpio_0_d27, gpio_0_d28,
+//        gpio_0_d29, gpio_0_d30, gpio_0_d31, gpio_0_d32, gpio_0_d33,
+//        gpio_0_d34, gpio_0_d35,
+//        gpio_1_d6, gpio_1_d7, gpio_1_d8, gpio_1_d9, gpio_1_d10,
+//        gpio_1_d11, gpio_1_d12, gpio_1_d13, gpio_1_d14, gpio_1_d15,
+//        gpio_1_d16, gpio_1_d18, gpio_1_d21, gpio_1_d22, gpio_1_d23,
+//        gpio_1_d24, gpio_1_d25, gpio_1_d26, gpio_1_d28, gpio_1_d30,
+//        gpio_1_d32, gpio_1_d33, gpio_1_d34, gpio_1_d35
+//    };
 
 endmodule

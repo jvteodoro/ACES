@@ -59,79 +59,79 @@ module top_level_test #(
     // -----------------------------------------
     // expansion headers GPIO_0 / GPIO_1
     // -----------------------------------------
-    input logic gpio_0_d0,  //PIN_N16
-    input logic gpio_0_d1,  //PIN_B16
-    input logic gpio_0_d2,  //PIN_M16
-    output logic gpio_0_d3,  //PIN_C16
-    input logic gpio_0_d4,  //PIN_D17
+    inout logic gpio_0_d0,  //PIN_N16
+    inout logic gpio_0_d1,  //PIN_B16
+    inout logic gpio_0_d2,  //PIN_M16
+    inout logic gpio_0_d3,  //PIN_C16
+    inout logic gpio_0_d4,  //PIN_D17
     input logic gpio_0_d5,  //PIN_K20
-    input logic gpio_0_d6,  //PIN_K21
+    inout logic gpio_0_d6,  //PIN_K21
     input logic gpio_0_d7,  //PIN_K22
-    input logic gpio_0_d8,  //PIN_M20
+    inout logic gpio_0_d8,  //PIN_M20
     input logic gpio_0_d9,  //PIN_M21
-    input logic gpio_0_d10, //PIN_N21
-    output logic gpio_0_d11, //PIN_R22
+    inout logic gpio_0_d10, //PIN_N21
+    input logic gpio_0_d11, //PIN_R22
     output logic gpio_0_d12, //PIN_R21
-    output logic gpio_0_d13, //PIN_T22
+    input logic gpio_0_d13, //PIN_T22
     output logic gpio_0_d14, //PIN_N20
     input logic gpio_0_d15, //PIN_N19
-    input logic gpio_0_d16, //PIN_M22
-    output logic gpio_0_d17, //PIN_P19
-    input logic gpio_0_d18, //PIN_L22
-    output logic gpio_0_d19, //PIN_P17
-    input logic gpio_0_d20, //PIN_P16
-    input logic gpio_0_d21, //PIN_M18
-    input logic gpio_0_d22, //PIN_L18
-    input logic gpio_0_d23, //PIN_L17
-    input logic gpio_0_d24, //PIN_L19
-    input logic gpio_0_d25, //PIN_K17
-    input logic gpio_0_d26, //PIN_K19
-    input logic gpio_0_d27, //PIN_P18
-    input logic gpio_0_d28, //PIN_R15
-    input logic gpio_0_d29, //PIN_R17
-    input logic gpio_0_d30, //PIN_R16
-    input logic gpio_0_d31, //PIN_T20
-    input logic gpio_0_d32, //PIN_T19
-    input logic gpio_0_d33, //PIN_T18
-    input logic gpio_0_d34, //PIN_T17
+    output logic gpio_0_d16, //PIN_M22
+    input logic gpio_0_d17, //PIN_P19
+    output logic gpio_0_d18, //PIN_L22
+    input logic gpio_0_d19, //PIN_P17
+    inout logic gpio_0_d20, //PIN_P16
+    inout logic gpio_0_d21, //PIN_M18
+    inout logic gpio_0_d22, //PIN_L18
+    inout logic gpio_0_d23, //PIN_L17
+    inout logic gpio_0_d24, //PIN_L19
+    inout logic gpio_0_d25, //PIN_K17
+    inout logic gpio_0_d26, //PIN_K19
+    inout logic gpio_0_d27, //PIN_P18
+    inout logic gpio_0_d28, //PIN_R15
+    inout logic gpio_0_d29, //PIN_R17
+    inout logic gpio_0_d30, //PIN_R16
+    inout logic gpio_0_d31, //PIN_T20
+    inout logic gpio_0_d32, //PIN_T19
+    inout logic gpio_0_d33, //PIN_T18
+    inout logic gpio_0_d34, //PIN_T17
     input logic gpio_0_d35, //PIN_T15
 
     output logic gpio_1_d0,  //PIN_H16
-    output logic gpio_1_d1,  //PIN_A12
+    inout logic gpio_1_d1,  //PIN_A12
     output logic gpio_1_d2,  //PIN_H15
-    output logic gpio_1_d3,  //PIN_B12
+    inout logic gpio_1_d3,  //PIN_B12
     output logic gpio_1_d4,  //PIN_A13
-    output logic gpio_1_d5,  //PIN_B13
+    inout logic gpio_1_d5,  //PIN_B13
     input logic gpio_1_d6,  //PIN_C13
-    input logic gpio_1_d7,  //PIN_D13
-    input logic gpio_1_d8,  //PIN_G18
-    input logic gpio_1_d9,  //PIN_G17
-    input logic gpio_1_d10, //PIN_H18
-    input logic gpio_1_d11, //PIN_J18
-    input logic gpio_1_d12, //PIN_J19
-    input logic gpio_1_d13, //PIN_G11
-    input logic gpio_1_d14, //PIN_H10
-    input logic gpio_1_d15, //PIN_J11
-    input logic gpio_1_d16, //PIN_H14
-    output logic gpio_1_d17, //PIN_A15
-    input logic gpio_1_d18, //PIN_J13
-    output logic gpio_1_d19, //PIN_L8
-    output logic gpio_1_d20, //PIN_A14
-    input logic gpio_1_d21, //PIN_B15
-    input logic gpio_1_d22, //PIN_C15
-    input logic gpio_1_d23, //PIN_E14
-    input logic gpio_1_d24, //PIN_E15
-    input logic gpio_1_d25, //PIN_E16
-    input logic gpio_1_d26, //PIN_F14
+    inout logic gpio_1_d7,  //PIN_D13
+    inout logic gpio_1_d8,  //PIN_G18
+    inout logic gpio_1_d9,  //PIN_G17
+    inout logic gpio_1_d10, //PIN_H18
+    inout logic gpio_1_d11, //PIN_J18
+    inout logic gpio_1_d12, //PIN_J19
+    inout logic gpio_1_d13, //PIN_G11
+    inout logic gpio_1_d14, //PIN_H10
+    inout logic gpio_1_d15, //PIN_J11
+    inout logic gpio_1_d16, //PIN_H14
+    inout logic gpio_1_d17, //PIN_A15
+    inout logic gpio_1_d18, //PIN_J13
+    inout logic gpio_1_d19, //PIN_L8
+    inout logic gpio_1_d20, //PIN_A14
+    output logic gpio_1_d21, //PIN_B15
+    inout logic gpio_1_d22, //PIN_C15
+    output logic gpio_1_d23, //PIN_E14
+    inout logic gpio_1_d24, //PIN_E15
+    output logic gpio_1_d25, //PIN_E16
+    inout logic gpio_1_d26, //PIN_F14
     output logic gpio_1_d27, //PIN_F15
-    input logic gpio_1_d28, //PIN_F13
+    inout logic gpio_1_d28, //PIN_F13
     output logic gpio_1_d29, //PIN_F12
-    input logic gpio_1_d30, //PIN_G16
+    output logic gpio_1_d30, //PIN_G16
     output logic gpio_1_d31, //PIN_G15
-    input logic gpio_1_d32, //PIN_G13
-    input logic gpio_1_d33, //PIN_G12
-    input logic gpio_1_d34, //PIN_J17
-    input logic gpio_1_d35  //PIN_K16
+    output logic gpio_1_d32, //PIN_G13
+    inout logic gpio_1_d33, //PIN_G12
+    output logic gpio_1_d34, //PIN_J17
+    inout logic gpio_1_d35  //PIN_K16
 
 
 );
@@ -152,18 +152,20 @@ module top_level_test #(
     logic clk;
     logic rst;
 
-    assign clk = gpio_0_d0;
-    assign rst = gpio_0_d1; 
+    assign clk = clock_50;
+    // With the onboard 50 MHz clock selected, keep reset on a stable onboard source
+    // instead of an external GPIO that may now be left floating.
+    assign rst = gpio_1_d1;
 
     logic dbg_capture_leds_i;
     logic dbg_capture_hex_i;
     logic dbg_capture_gpio_i;
     logic dbg_capture_clear_i;
 
-    assign dbg_capture_leds_i  = gpio_0_d2;
-    assign dbg_capture_hex_i   = gpio_0_d4;
-    assign dbg_capture_gpio_i  = gpio_0_d5;
-    assign dbg_capture_clear_i = gpio_0_d6;
+    assign dbg_capture_leds_i  = gpio_1_d5;
+    assign dbg_capture_hex_i   = gpio_1_d7;
+    assign dbg_capture_gpio_i  = gpio_1_d9;
+    assign dbg_capture_clear_i = gpio_1_d11;
 
     // -----------------------------------------
     // debug do gerador
@@ -190,11 +192,11 @@ module top_level_test #(
     logic i2s_sd_o;
 	 logic mic_sd_o;
 
-	 assign gpio_1_d1 = mic_lr_sel_o;
-	 assign gpio_1_d3 = i2s_ws_o;
-	 assign gpio_1_d5 = i2s_sck_o;
+	 assign gpio_1_d0 = mic_lr_sel_o;
+	 assign gpio_1_d2 = i2s_ws_o;
+	 assign gpio_1_d4 = i2s_sck_o;
 	 //assign i2s_sd_o = gpio_1_d7;
-	 assign mic_sd_o = gpio_1_d7;
+	 assign mic_sd_o = gpio_1_d6;
 
 
     // -----------------------------------------
@@ -268,12 +270,13 @@ module top_level_test #(
     logic [3:0] hex4_i;
     logic [3:0] hex5_i;
 
-    assign dbg_stage_sel = {gpio_0_d8, gpio_0_d7};
-    assign dbg_page_sel  = {gpio_0_d10, gpio_0_d9};
-	 assign gpio_0_d11 = dbg_stage_sel[0];
-	 assign gpio_0_d12 = dbg_stage_sel[1];
-	 assign gpio_0_d13 = dbg_page_sel[0];
-	 assign gpio_0_d14 = dbg_page_sel[1];
+    assign dbg_stage_sel = {gpio_1_d13, gpio_1_d15};
+    assign dbg_page_sel  = {gpio_1_d17, gpio_1_d19};
+    // Keep the selector inputs dedicated to reads; mirror them on separate spare GPIOs.
+	 assign gpio_0_d12 = dbg_stage_sel[0];
+	 assign gpio_0_d14 = dbg_stage_sel[1];
+	 assign gpio_0_d16 = dbg_page_sel[0];
+	 assign gpio_0_d18 = dbg_page_sel[1];
 
     // Keep optional board pins observable by synthesis so Quartus does not
     // prune them as completely unused top-level inputs.
@@ -627,7 +630,7 @@ module top_level_test #(
         .state_dbg_o(stim_state_dbg_o)
     );
 
-    //assign i2s_sd_o = mic_sd_internal;
+    assign i2s_sd_o = mic_sd_internal;
 //    assign gpio_1_d17 = tx_i2s_sck_o;
 //    assign gpio_1_d19 = tx_i2s_ws_o;
 //    assign gpio_1_d20 = tx_i2s_sd_o;
@@ -636,9 +639,18 @@ module top_level_test #(
 //    assign gpio_1_d3 = dbg_gpio_capture_r[2];
 //    assign gpio_1_d4 = dbg_gpio_capture_r[3] ^ (sw9 & unused_inputs_probe);
     
-    // Exporta o stream I2S de FFT para o header conectado ao Raspberry Pi.
-    assign gpio_1_d27 = tx_i2s_sck_o;
-    assign gpio_1_d29 = tx_i2s_ws_o;
-    assign gpio_1_d31 = tx_i2s_sd_o;
+    // Exporta o stream I2S de FFT em grupos completos de pinos para facilitar
+    // tanto o cabeamento legado quanto o remapeado durante o bring-up.
+	 assign gpio_1_d21 = tx_i2s_sck_o;
+	 assign gpio_1_d23 = tx_i2s_ws_o;
+	 assign gpio_1_d25 = tx_i2s_sd_o;
+
+	 assign gpio_1_d27 = tx_i2s_sck_o;
+	 assign gpio_1_d29 = tx_i2s_ws_o;
+	 assign gpio_1_d31 = tx_i2s_sd_o;
+
+	 assign gpio_1_d30 = tx_i2s_sck_o;
+	 assign gpio_1_d32 = tx_i2s_ws_o;
+	 assign gpio_1_d34 = tx_i2s_sd_o;
 
 endmodule

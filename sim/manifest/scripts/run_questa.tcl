@@ -119,6 +119,7 @@ set test_name $::env(ACES_TEST_NAME)
 set flow $::env(ACES_FLOW)
 set gui_mode [expr {[info exists ::env(ACES_GUI)] && $::env(ACES_GUI) eq "1"}]
 set extra_filelist [expr {[info exists ::env(EXTRA_FILELIST)] ? $::env(EXTRA_FILELIST) : ""}]
+set sim_plusargs [expr {[info exists ::env(ACES_VSIM_PLUSARGS)] ? [split $::env(ACES_VSIM_PLUSARGS)] : [list]}]
 
 array set filelists {
     hexa7seg                       mock_unit_hexa7seg.f
@@ -236,10 +237,10 @@ if {$gui_mode} {
         set sim_do "view wave; log -r sim:/*; add wave -r sim:/*; run -all"
     }
 
-    set sim_cmd [list vsim -voptargs=+acc work.$top -do $sim_do]
+    set sim_cmd [concat [list vsim -voptargs=+acc work.$top] $sim_plusargs [list -do $sim_do]]
 } else {
     set sim_do "run -all; quit -code 0"
-    set sim_cmd [list vsim -c work.$top -do $sim_do]
+    set sim_cmd [concat [list vsim -c work.$top] $sim_plusargs [list -do $sim_do]]
 }
 puts "Launching: $sim_cmd"
 if {[catch {eval $sim_cmd} result]} {

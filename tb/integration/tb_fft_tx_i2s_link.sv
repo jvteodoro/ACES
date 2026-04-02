@@ -46,6 +46,8 @@ module tb_fft_tx_i2s_link;
     logic i2s_sck_o;
     logic i2s_ws_o;
     logic i2s_sd_o;
+    bit sd_phase_checks_armed_r;
+    bit ws_phase_checks_armed_r;
 
     int max_fifo_level_r;
     bit saw_fifo_overflow_r;
@@ -281,6 +283,32 @@ module tb_fft_tx_i2s_link;
 
             sck_toggle_count    <= sck_toggle_count + 1;
             last_sck_toggle_time = $realtime;
+        end
+    end
+
+    always @(i2s_sd_o or posedge rst) begin
+        if (rst) begin
+            sd_phase_checks_armed_r <= 1'b0;
+        end else if (!sd_phase_checks_armed_r) begin
+            sd_phase_checks_armed_r <= 1'b1;
+        end else begin
+            assert (i2s_sck_o == 1'b0)
+            else $fatal(1, "SD mudou fora da fase baixa do BCLK na integracao.");
+        end
+    end
+
+    always @(i2s_ws_o or posedge rst) begin
+        if (rst) begin
+            ws_phase_checks_armed_r <= 1'b0;
+        end else if (!ws_phase_checks_armed_r) begin
+            ws_phase_checks_armed_r <= 1'b1;
+        end else begin
+            assert ((i2s_sck_o == 1'b1) &&
+                    (u_adapter.div_cnt_r == CLOCK_DIV-1) &&
+                    (u_adapter.slot_bit_r == I2S_SLOT_W-2))
+            else $fatal(1,
+                        "WS mudou fora da janela antecipada antes do falling edge final do slot na integracao. sck=%0b div=%0d slot=%0d",
+                        i2s_sck_o, u_adapter.div_cnt_r, u_adapter.slot_bit_r);
         end
     end
 
