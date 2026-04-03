@@ -1,0 +1,13 @@
+#Digilent WaveForms Logic Analyzer I2S
+#Device Name: Discovery2
+#Serial Number: SN:210321A2E28D
+#Date Time: 2026-04-02 18:51:54.1000
+
+Time (s),Data
+-1.6e-07,R h80001B02
+1.008e-05,L h8001440E
+2.032e-05,R h800038F9
+3.056e-05,L h8003E718
+4.08e-05,R h80002668
+5.104e-05,L h8003DE02
+6.128e-05,R h80003133
