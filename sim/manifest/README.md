@@ -12,22 +12,22 @@
 
 ## Supported mock-flow tests
 
+- `hexa7seg`
 - `i2s_rx_adapter_24`
 - `sample_width_adapter_24_to_18`
 - `i2s_master_clock_gen`
-- `i2s_stimulus_manager`
 - `i2s_stimulus_manager_rom`
 - `fft_control`
 - `fft_dma_reader`
 - `fft_tx_bridge_fifo`
-- `i2s_fft_tx_adapter`
-- `fft_tx_i2s_link`
-- `aces_fft_ingest`
-- `sample_bridge_and_ingest`
+- `spi_fft_tx_adapter`
+- `fft_tx_spi_link`
 - `aces_audio_to_fft_pipeline`
 - `aces`
-- `aces_stimulus_manager`
+- `top_level_spi_fft_tx_diag`
 - `top_level_test`
+
+The obsolete tagged-I2S FFT transport manifests were removed from this branch. The maintained launch targets are SPI-oriented.
 
 ## Supported real-IP-oriented tests
 
@@ -47,11 +47,12 @@
 
 ```bash
 sim/manifest/scripts/run_questa.sh fft_tx_bridge_fifo
-sim/manifest/scripts/run_questa.sh i2s_fft_tx_adapter
-sim/manifest/scripts/run_questa.sh fft_tx_i2s_link
+sim/manifest/scripts/run_questa.sh spi_fft_tx_adapter
+sim/manifest/scripts/run_questa.sh fft_tx_spi_link
 sim/manifest/scripts/run_questa.sh i2s_rx_adapter_24
 sim/manifest/scripts/run_questa.sh fft_dma_reader
 sim/manifest/scripts/run_questa.sh aces_audio_to_fft_pipeline
+sim/manifest/scripts/run_questa.sh top_level_spi_fft_tx_diag
 sim/manifest/scripts/run_questa.sh top_level_test mock
 sim/manifest/scripts/run_questa.sh top_level_test
 sim/manifest/scripts/run_questa.sh top_level_fft_isolated real
@@ -62,9 +63,10 @@ Windows PowerShell:
 
 ```powershell
 .\sim\manifest\scripts\run_questa.ps1 fft_tx_bridge_fifo
-.\sim\manifest\scripts\run_questa.ps1 i2s_fft_tx_adapter
-.\sim\manifest\scripts\run_questa.ps1 fft_tx_i2s_link
+.\sim\manifest\scripts\run_questa.ps1 spi_fft_tx_adapter
+.\sim\manifest\scripts\run_questa.ps1 fft_tx_spi_link
 .\sim\manifest\scripts\run_questa.ps1 fft_dma_reader
+.\sim\manifest\scripts\run_questa.ps1 top_level_spi_fft_tx_diag
 .\sim\manifest\scripts\run_questa.ps1 top_level_test mock
 .\sim\manifest\scripts\run_questa.ps1 top_level_test
 .\sim\manifest\scripts\run_questa.ps1 top_level_fft_isolated real

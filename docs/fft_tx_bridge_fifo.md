@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`fft_tx_bridge_fifo` is the explicit buffering stage between FFT bin production and the slower I2S transmit backend.
+`fft_tx_bridge_fifo` is the explicit buffering stage between FFT bin production and the SPI FFT transmit backend.
 
 It keeps the per-bin fields aligned while decoupling bursty FFT readout from serial transmission latency.
 
@@ -10,7 +10,7 @@ It keeps the per-bin fields aligned while decoupling bursty FFT readout from ser
 
 - `rtl/common/fft_tx_bridge_fifo.sv`
 - `tb/unit/tb_fft_tx_bridge_fifo.sv`
-- `tb/integration/tb_fft_tx_i2s_link.sv`
+- `tb/integration/tb_fft_tx_spi_link.sv`
 
 ## Stored entry format
 
@@ -40,7 +40,7 @@ The invariant is that these fields never separate while inside the FIFO.
 
 The FIFO supports push and pop in the same cycle.
 
-That keeps throughput high at the bridge boundary and is particularly useful when the serializer is draining continuously while the FFT reader is still producing bins.
+That keeps throughput high at the bridge boundary and is particularly useful when the host is draining one SPI transaction while the FFT reader is still producing the next window.
 
 ## Status outputs
 
@@ -63,10 +63,10 @@ The unit bench checks:
 - overflow pulse on write while full,
 - simultaneous push/pop without order corruption.
 
-### Integration verification: `tb_fft_tx_i2s_link`
+### Integration verification: `tb_fft_tx_spi_link`
 
-The integration bench proves that the FIFO fulfills its decoupling role when connected directly to `i2s_fft_tx_adapter`:
+The integration bench proves that the FIFO fulfills its decoupling role when connected directly to `spi_fft_tx_adapter`:
 
 - the FIFO occupancy grows during a burst,
-- the downstream serializer drains at its own pace,
-- the serialized output still matches the expected FFT-window framing.
+- the downstream SPI backend drains at its own pace,
+- the SPI transaction payload still matches the expected FFT-window framing.

@@ -124,36 +124,36 @@ set sim_plusargs [expr {[info exists ::env(ACES_VSIM_PLUSARGS)] ? [split $::env(
 array set filelists {
     hexa7seg                       mock_unit_hexa7seg.f
     i2s_rx_adapter_24              mock_unit_i2s_rx_adapter_24.f
-    i2s_fft_tx_adapter             mock_unit_i2s_fft_tx_adapter.f
+    spi_fft_tx_adapter             mock_unit_spi_fft_tx_adapter.f
     sample_width_adapter_24_to_18  mock_unit_sample_width_adapter_24_to_18.f
     i2s_master_clock_gen           mock_unit_i2s_master_clock_gen.f
     i2s_stimulus_manager_rom       mock_unit_i2s_stimulus_manager_rom.f
     fft_control                    mock_unit_fft_control.f
     fft_dma_reader                 mock_unit_fft_dma_reader.f
     fft_tx_bridge_fifo             mock_unit_fft_tx_bridge_fifo.f
-    fft_tx_i2s_link                mock_integration_fft_tx_i2s_link.f
+    fft_tx_spi_link                mock_integration_fft_tx_spi_link.f
     aces_audio_to_fft_pipeline     mock_integration_aces_audio_to_fft_pipeline.f
     aces                           mock_integration_aces.f
     top_level_test mock_integration_top_level_test.f
-    top_level_i2s_fft_tx_diag mock_integration_top_level_i2s_fft_tx_diag.f
+    top_level_spi_fft_tx_diag mock_integration_top_level_spi_fft_tx_diag.f
     top_level_fft_isolated real_ip_top_level_fft_isolated.f
 }
 
 array set tops {
     hexa7seg                       tb_hexa7seg
     i2s_rx_adapter_24              tb_i2s_rx_adapter_24
-    i2s_fft_tx_adapter             tb_i2s_fft_tx_adapter
+    spi_fft_tx_adapter             tb_spi_fft_tx_adapter
     sample_width_adapter_24_to_18  tb_sample_width_adapter_24_to_18
     i2s_master_clock_gen           tb_i2s_master_clock_gen
     i2s_stimulus_manager_rom       tb_i2s_stimulus_manager_rom
     fft_control                    tb_fft_control
     fft_dma_reader                 tb_fft_dma_reader
     fft_tx_bridge_fifo             tb_fft_tx_bridge_fifo
-    fft_tx_i2s_link                tb_fft_tx_i2s_link
+    fft_tx_spi_link                tb_fft_tx_spi_link
     aces_audio_to_fft_pipeline     tb_aces_audio_to_fft_pipeline
     aces                           tb_aces
     top_level_test tb_top_level_test
-    top_level_i2s_fft_tx_diag tb_top_level_i2s_fft_tx_diag
+    top_level_spi_fft_tx_diag tb_top_level_spi_fft_tx_diag
     top_level_fft_isolated tb_top_level_fft_isolated
 }
 

@@ -19,8 +19,8 @@ The working assumption, backed by board validation, is that any mismatch observe
 The first symptoms observed during the real-IP-oriented top-level bring-up were:
 
 - `top_level_test real` compiled, but FFT bins read from the integrated path were zero or numerically wrong.
-- Earlier top-level checks counted FFT output using assumptions that did not match the real `i2s_fft_tx_adapter` contract.
-- The original failing behavior was hard to localize because receive, FFT, DMA, FIFO, and tagged I2S TX were all active in the same bench.
+- Earlier top-level checks counted FFT output using assumptions that did not match the legacy FFT export contract.
+- The original failing behavior was hard to localize because receive, FFT, DMA, FIFO, and the then-active serial FFT export path were all active in the same bench.
 - After the FFT-side fixes, the full-system bench still failed later in the run with `tx_overflow_o`, even though the isolated FFT path was already producing correct bins.
 
 ## Root causes that were identified
@@ -100,7 +100,7 @@ What changed in the bench:
 - `tb/integration/tb_top_level_test.sv` now counts `fft_run_o` pulses per example.
 - The bench waits until the **second** `fft_run_o` before suppressing additional ingest windows.
 - The suppression is applied at the ACES audio-to-FFT pipeline boundary used by the testbench, instead of changing the FFT core behavior.
-- The tagged-I2S checks were aligned with the real `i2s_fft_tx_adapter` contract, and the final TX clock activity check now counts toggles across the whole test instead of just the final reset interval.
+- The transport-side checks were aligned with the real export contract used at the time, and the final TX activity check now counts protocol progress across the whole test instead of just the final reset interval.
 
 This was the missing piece that allowed the integrated real-IP flow to finish cleanly.
 
@@ -175,7 +175,7 @@ At the end of this investigation, the high-value end-to-end checks are:
 - `fft_control mock`: passing
 - `fft_dma_reader mock`: passing
 
-This means the top-level FFT ingest, control, DMA readout, and tagged-I2S transmit path are now covered by both isolated and end-to-end benches.
+This means the top-level FFT ingest, control, DMA readout, and FFT export path are now covered by both isolated and end-to-end benches.
 
 That does **not** yet mean every repository bench is clean. The remaining task is broader regression hygiene across all supported module benches, especially older tests whose assumptions may predate the current integrated flow.
 
@@ -190,8 +190,8 @@ Passing benches:
 - `fft_control`
 - `fft_dma_reader`
 - `fft_tx_bridge_fifo`
-- `i2s_fft_tx_adapter`
-- `fft_tx_i2s_link`
+- `spi_fft_tx_adapter`
+- `fft_tx_spi_link`
 - `aces`
 - `top_level_test` in `mock` mode
 
@@ -218,4 +218,4 @@ The first and fourth failures should be interpreted carefully because they exerc
 - [Simulation guide](simulation.md)
 - [Testbench guide](testbenches.md)
 - [Verification methodology](verification_methodology.md)
-- [I2S FFT TX adapter](i2s_fft_tx_adapter.md)
+- [SPI FFT TX adapter](spi_fft_tx_adapter.md)

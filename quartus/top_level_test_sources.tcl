@@ -23,7 +23,7 @@ foreach relpath {
     rtl/common/fft_tx_bridge_fifo.sv
     rtl/frontend/i2s_master_clock_gen.sv
     rtl/frontend/i2s_rx_adapter_24.sv
-    rtl/frontend/i2s_fft_tx_adapter.sv
+    rtl/frontend/spi_fft_tx_adapter.sv
     rtl/core/aces_audio_to_fft_pipeline.sv
     rtl/core/aces.sv
     rtl/stimulus/i2s_stimulus_manager_rom.sv
@@ -56,7 +56,6 @@ foreach relpath {
 # depend on duplicate twrom/dpram definitions inside the restored snapshot.
 foreach relpath {
     rtl/ip/rom/signals_rom_ip.qip
-    rtl/ip/output_fifo/fft_output_fifo.qip
     rtl/ip/fft/dpram.qip
     rtl/ip/fft/twrom.qip
 } {

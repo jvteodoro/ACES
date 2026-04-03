@@ -2,7 +2,8 @@ module aces #(
     parameter int FFT_LENGTH   = 512,
     parameter int FFT_DW       = 18,
     parameter int I2S_CLOCK_DIV = 16,
-    parameter int TX_BRIDGE_FIFO_DEPTH = 2048
+    parameter int TX_BRIDGE_FIFO_DEPTH = 2048,
+    parameter int TX_BFPEXP_HOLD_FRAMES = 1
 )(
     input  logic clk,
     input  logic rst,
@@ -51,111 +52,26 @@ module aces #(
     output logic fft_tx_last_o,
 
     // -----------------------------
-    // transmissao serial FFT tagged
+    // transmissao SPI FFT tagged
     // -----------------------------
-    output logic tx_i2s_sck_o,
-    output logic tx_i2s_ws_o,
-    output logic tx_i2s_sd_o,
+    input  logic tx_spi_sclk_i,
+    input  logic tx_spi_cs_n_i,
+    output logic tx_spi_miso_o,
+    output logic tx_spi_window_ready_o,
     output logic tx_overflow_o
 );
 
     localparam int FFT_N = $clog2(FFT_LENGTH);
-    localparam int TX_FIFO_W = 44;
-    localparam int TX_FIFO_DEPTH = 1024;
-    localparam int TX_FIFO_LEVEL_W = $clog2(TX_FIFO_DEPTH + 1);
 
     logic dmaact_i;
     logic [FFT_N-1:0] dmaa_i;
     logic signed [FFT_DW-1:0] dmadr_real_o;
     logic signed [FFT_DW-1:0] dmadr_imag_o;
 
-    logic [TX_FIFO_W-1:0] tx_fifo_wdata;
-    logic [TX_FIFO_W-1:0] tx_fifo_rdata;
-    logic [TX_FIFO_W-1:0] tx_fifo_word_r;
-    logic [TX_FIFO_LEVEL_W-1:0] tx_fifo_level_r;
-    logic tx_fifo_wrreq;
-    logic tx_fifo_rdreq;
-    logic tx_fifo_wrfull;
-    logic tx_fifo_word_valid_r;
-    logic tx_fifo_read_inflight_r;
-    logic tx_fifo_overflow_o;
-
-    logic tx_fft_valid_i;
-    logic signed [FFT_DW-1:0] tx_fft_real_i;
-    logic signed [FFT_DW-1:0] tx_fft_imag_i;
-    logic tx_fft_last_i;
-    logic signed [7:0] tx_bfpexp_i;
-    logic tx_fft_ready_o;
-    logic [FFT_N-1:0] tx_fft_read_index_r;
-
-    logic tx_overflow_from_adapter_o;
-
-    assign tx_fifo_wdata = {fft_tx_real_o, fft_tx_imag_o, bfpexp_o};
-    assign tx_fifo_wrreq = fft_tx_valid_o && !tx_fifo_wrfull;
-    assign tx_fifo_rdreq = !tx_fifo_word_valid_r && !tx_fifo_read_inflight_r && (tx_fifo_level_r != 0);
-    assign tx_fifo_overflow_o = fft_tx_valid_o && tx_fifo_wrfull;
-
-    assign tx_fft_valid_i = tx_fifo_word_valid_r;
-    assign tx_fft_real_i  = tx_fifo_word_r[43:26];
-    assign tx_fft_imag_i  = tx_fifo_word_r[25:8];
-    assign tx_bfpexp_i    = tx_fifo_word_r[7:0];
-    assign tx_fft_last_i  = (tx_fft_read_index_r == FFT_N'(FFT_LENGTH-1));
-
-    assign tx_overflow_o  = tx_fifo_overflow_o || tx_overflow_from_adapter_o;
-
     // Mantido apenas para compatibilidade de interface externa.
     initial begin
         if (TX_BRIDGE_FIFO_DEPTH < 2)
             $error("aces: TX_BRIDGE_FIFO_DEPTH deve ser >= 2.");
-        if (FFT_DW != 18)
-            $error("aces: FFT_DW deve ser 18 para casar com fifo IP de 44 bits.");
-    end
-
-    always_ff @(posedge clk or posedge rst) begin
-        if (rst) begin
-            tx_fifo_level_r         <= '0;
-            tx_fifo_word_r          <= '0;
-            tx_fifo_word_valid_r    <= 1'b0;
-            tx_fifo_read_inflight_r <= 1'b0;
-            tx_fft_read_index_r     <= '0;
-        end else begin
-            int signed level_next;
-            logic word_valid_next;
-            logic read_inflight_next;
-            logic [FFT_N-1:0] read_index_next;
-
-            level_next = int'(tx_fifo_level_r);
-            if (tx_fifo_wrreq)
-                level_next = level_next + 1;
-            if (tx_fifo_rdreq)
-                level_next = level_next - 1;
-
-            word_valid_next    = tx_fifo_word_valid_r;
-            read_inflight_next = tx_fifo_read_inflight_r;
-            read_index_next    = tx_fft_read_index_r;
-
-            if (tx_fft_valid_i && tx_fft_ready_o) begin
-                word_valid_next = 1'b0;
-                if (tx_fft_read_index_r == FFT_N'(FFT_LENGTH-1))
-                    read_index_next = '0;
-                else
-                    read_index_next = tx_fft_read_index_r + 1'b1;
-            end
-
-            if (tx_fifo_read_inflight_r) begin
-                tx_fifo_word_r <= tx_fifo_rdata;
-                word_valid_next = 1'b1;
-                read_inflight_next = 1'b0;
-            end
-
-            if (tx_fifo_rdreq)
-                read_inflight_next = 1'b1;
-
-            tx_fifo_level_r         <= TX_FIFO_LEVEL_W'(level_next);
-            tx_fifo_word_valid_r    <= word_valid_next;
-            tx_fifo_read_inflight_r <= read_inflight_next;
-            tx_fft_read_index_r     <= read_index_next;
-        end
     end
 
     // -----------------------------
@@ -266,44 +182,34 @@ module aces #(
         .fft_bin_last_o(fft_tx_last_o)
     );
 
-    // FIFO IP de saida da FFT (44 bits = real[17:0], imag[17:0], bfpexp[7:0]).
-    fft_output_fifo u_fft_output_fifo (
-        .data(tx_fifo_wdata),
-        .rdclk(clk),
-        .rdreq(tx_fifo_rdreq),
-        .wrclk(clk),
-        .wrreq(tx_fifo_wrreq),
-        .q(tx_fifo_rdata),
-        .wrfull(tx_fifo_wrfull)
-    );
-
     // -----------------------------
-    // transmissor I2S tagged para host externo
+    // transmissor SPI tagged para host externo
     // -----------------------------
-    i2s_fft_tx_adapter #(
+    spi_fft_tx_adapter #(
         .FFT_DW(FFT_DW),
         .BFPEXP_W(8),
-        .I2S_SAMPLE_W(FFT_DW),
-        .I2S_SLOT_W(32),
-        .CLOCK_DIV(I2S_CLOCK_DIV),
-        .FIFO_DEPTH(FFT_LENGTH + 1),
-        .BFPEXP_HOLD_FRAMES(128)
-    ) u_i2s_fft_tx_adapter (
+        .PAYLOAD_W(FFT_DW),
+        .WORD_W(32),
+        .FIFO_DEPTH(TX_BRIDGE_FIFO_DEPTH),
+        .BFPEXP_HOLD_FRAMES(TX_BFPEXP_HOLD_FRAMES)
+    ) u_spi_fft_tx_adapter (
         .clk(clk),
         .rst(rst),
-        .fft_valid_i(tx_fft_valid_i),
-        .fft_real_i(tx_fft_real_i),
-        .fft_imag_i(tx_fft_imag_i),
-        .fft_last_i(tx_fft_last_i),
-        .bfpexp_i(tx_bfpexp_i),
-        .fft_ready_o(tx_fft_ready_o),
+        .fft_valid_i(fft_tx_valid_o),
+        .fft_real_i(fft_tx_real_o),
+        .fft_imag_i(fft_tx_imag_o),
+        .fft_last_i(fft_tx_last_o),
+        .bfpexp_i(bfpexp_o),
+        .fft_ready_o(),
         .fifo_full_o(),
         .fifo_empty_o(),
-        .overflow_o(tx_overflow_from_adapter_o),
+        .overflow_o(tx_overflow_o),
         .fifo_level_o(),
-        .i2s_sck_o(tx_i2s_sck_o),
-        .i2s_ws_o(tx_i2s_ws_o),
-        .i2s_sd_o(tx_i2s_sd_o)
+        .spi_sclk_i(tx_spi_sclk_i),
+        .spi_cs_n_i(tx_spi_cs_n_i),
+        .spi_miso_o(tx_spi_miso_o),
+        .window_ready_o(tx_spi_window_ready_o),
+        .spi_active_o()
     );
 
 endmodule

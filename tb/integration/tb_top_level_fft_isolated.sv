@@ -491,6 +491,8 @@ module tb_top_level_fft_isolated;
     assign gpio_0_d8  = tb_dbg_stage1_drive;
     assign gpio_0_d9  = tb_dbg_page0_drive;
     assign gpio_0_d10 = tb_dbg_page1_drive;
+    assign gpio_1_d27 = 1'b0;
+    assign gpio_1_d29 = 1'b1;
 
     always #CLK_HALF tb_clk_drive = ~tb_clk_drive;
 

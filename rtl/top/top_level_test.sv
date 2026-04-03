@@ -123,9 +123,9 @@ module top_level_test #(
     inout logic gpio_1_d24, //PIN_E15
     output logic gpio_1_d25, //PIN_E16
     inout logic gpio_1_d26, //PIN_F14
-    output logic gpio_1_d27, //PIN_F15
+    input logic gpio_1_d27, //PIN_F15
     inout logic gpio_1_d28, //PIN_F13
-    output logic gpio_1_d29, //PIN_F12
+    input logic gpio_1_d29, //PIN_F12
     output logic gpio_1_d30, //PIN_G16
     output logic gpio_1_d31, //PIN_G15
     output logic gpio_1_d32, //PIN_G13
@@ -227,15 +227,18 @@ module top_level_test #(
     logic signed [FFT_DW-1:0] fft_tx_real_o;
     logic signed [FFT_DW-1:0] fft_tx_imag_o;
     logic fft_tx_last_o;
-    logic tx_i2s_sck_o;
-    logic tx_i2s_ws_o;
-    logic tx_i2s_sd_o;
+    logic tx_spi_sclk_i;
+    logic tx_spi_cs_n_i;
+    logic tx_spi_miso_o;
+    logic tx_spi_window_ready_o;
     logic tx_overflow_o;
 	
 	 logic select_audio_source;
 	 assign select_audio_source = sw7;
     logic mic_sd_internal;
 	 assign mic_sd_internal = (select_audio_source) ? stim_sd_o: mic_sd_o;
+    assign tx_spi_sclk_i = gpio_1_d27;
+    assign tx_spi_cs_n_i = gpio_1_d29;
 	 
     // -----------------------------------------
     // multiplexação de debug
@@ -589,9 +592,10 @@ module top_level_test #(
         .fft_tx_real_o(fft_tx_real_o),
         .fft_tx_imag_o(fft_tx_imag_o),
         .fft_tx_last_o(fft_tx_last_o),
-        .tx_i2s_sck_o(tx_i2s_sck_o),
-        .tx_i2s_ws_o(tx_i2s_ws_o),
-        .tx_i2s_sd_o(tx_i2s_sd_o),
+        .tx_spi_sclk_i(tx_spi_sclk_i),
+        .tx_spi_cs_n_i(tx_spi_cs_n_i),
+        .tx_spi_miso_o(tx_spi_miso_o),
+        .tx_spi_window_ready_o(tx_spi_window_ready_o),
         .tx_overflow_o(tx_overflow_o)
     );
 
@@ -639,18 +643,14 @@ module top_level_test #(
 //    assign gpio_1_d3 = dbg_gpio_capture_r[2];
 //    assign gpio_1_d4 = dbg_gpio_capture_r[3] ^ (sw9 & unused_inputs_probe);
     
-    // Exporta o stream I2S de FFT em grupos completos de pinos para facilitar
-    // tanto o cabeamento legado quanto o remapeado durante o bring-up.
-	 assign gpio_1_d21 = tx_i2s_sck_o;
-	 assign gpio_1_d23 = tx_i2s_ws_o;
-	 assign gpio_1_d25 = tx_i2s_sd_o;
-
-	 assign gpio_1_d27 = tx_i2s_sck_o;
-	 assign gpio_1_d29 = tx_i2s_ws_o;
-	 assign gpio_1_d31 = tx_i2s_sd_o;
-
-	 assign gpio_1_d30 = tx_i2s_sck_o;
-	 assign gpio_1_d32 = tx_i2s_ws_o;
-	 assign gpio_1_d34 = tx_i2s_sd_o;
+    // Reaproveita a trilha fisica do TX antigo como SPI slave para o Raspberry Pi:
+    // D27=SCLK, D29=CS_N, D31=MISO e D25=window_ready/IRQ.
+	 assign gpio_1_d21 = tx_spi_window_ready_o;
+	 assign gpio_1_d23 = tx_overflow_o;
+	 assign gpio_1_d25 = tx_spi_window_ready_o;
+	 assign gpio_1_d30 = tx_spi_window_ready_o;
+	 assign gpio_1_d31 = tx_spi_miso_o;
+	 assign gpio_1_d32 = tx_overflow_o;
+	 assign gpio_1_d34 = tx_spi_miso_o;
 
 endmodule

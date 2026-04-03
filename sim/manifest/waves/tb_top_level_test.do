@@ -94,49 +94,48 @@ add wave -radix unsigned sim:/tb_top_level_test/dut/fft_tx_index_o
 add wave -radix decimal sim:/tb_top_level_test/dut/fft_tx_real_o
 add wave -radix decimal sim:/tb_top_level_test/dut/fft_tx_imag_o
 
-add wave -divider {TX FIFO Path}
-add wave sim:/tb_top_level_test/dut/u_aces/tx_fifo_wrreq
-add wave sim:/tb_top_level_test/dut/u_aces/tx_fifo_rdreq
-add wave sim:/tb_top_level_test/dut/u_aces/tx_fifo_wrfull
-add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/tx_fifo_level_r
-add wave sim:/tb_top_level_test/dut/u_aces/tx_fifo_word_valid_r
-add wave sim:/tb_top_level_test/dut/u_aces/tx_fifo_read_inflight_r
-add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/tx_fft_read_index_r
-add wave sim:/tb_top_level_test/dut/u_aces/tx_fft_valid_i
-add wave sim:/tb_top_level_test/dut/u_aces/tx_fft_ready_o
+add wave -divider {SPI Host Drive}
+add wave sim:/tb_top_level_test/tb_spi_sclk_drive
+add wave sim:/tb_top_level_test/tb_spi_cs_n_drive
+add wave sim:/tb_top_level_test/gpio_1_d27
+add wave sim:/tb_top_level_test/gpio_1_d29
+add wave sim:/tb_top_level_test/gpio_1_d31
+add wave sim:/tb_top_level_test/gpio_1_d25
+
+add wave -divider {SPI FFT TX Adapter}
+add wave sim:/tb_top_level_test/dut/tx_spi_sclk_i
+add wave sim:/tb_top_level_test/dut/tx_spi_cs_n_i
+add wave sim:/tb_top_level_test/dut/tx_spi_miso_o
+add wave sim:/tb_top_level_test/dut/tx_spi_window_ready_o
 add wave sim:/tb_top_level_test/dut/tx_overflow_o
-add wave sim:/tb_top_level_test/dut/u_aces/tx_overflow_from_adapter_o
-add wave sim:/tb_top_level_test/dut/u_aces/tx_fifo_overflow_o
-add wave -radix hex sim:/tb_top_level_test/dut/u_aces/tx_fifo_word_r
-add wave -radix hex sim:/tb_top_level_test/dut/u_aces/tx_fifo_rdata
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/fft_ready_o
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/fifo_full_o
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/fifo_empty_o
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/overflow_o
+add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/fifo_level_o
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/window_ready_o
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/spi_active_o
 
-add wave -divider {I2S FFT TX Adapter}
-add wave sim:/tb_top_level_test/dut/tx_i2s_sck_o
-add wave sim:/tb_top_level_test/dut/tx_i2s_ws_o
-add wave sim:/tb_top_level_test/dut/tx_i2s_sd_o
-add wave sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/active_valid_r
-add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/active_tag_r
-add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/active_left_r
-add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/active_right_r
-add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/active_hold_frames_r
-add wave sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/pending_valid_r
-add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/pending_real_r
-add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/pending_imag_r
-add wave sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/pending_last_r
-add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/pending_bfpexp_r
-add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/channel_r
-add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/slot_bit_r
-
-add wave -divider {TX Serial Decoder}
-add wave sim:/tb_top_level_test/tx_mon_slot_ws_r
-add wave -radix unsigned sim:/tb_top_level_test/tx_mon_slot_count_r
-add wave -radix hex sim:/tb_top_level_test/tx_mon_slot_shift_r
-add wave sim:/tb_top_level_test/tx_mon_prev_slot_valid_r
-add wave sim:/tb_top_level_test/tx_mon_prev_slot_ws_r
-add wave sim:/tb_top_level_test/tx_mon_have_right_r
-add wave -radix hex sim:/tb_top_level_test/tx_mon_right_word_r
-add wave -radix unsigned sim:/tb_top_level_test/tx_sck_toggle_count_r
-add wave sim:/tb_top_level_test/tx_sck_timing_armed_r
+add wave -divider {SPI TX Internals}
+add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/complete_windows_r
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/spi_transaction_active_r
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/tx_window_in_progress_r
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/wait_next_fft_pair_r
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/wait_fifo_refresh_r
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/byte_complete_pending_r
+add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/bfpexp_hold_remaining_r
+add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/active_pair_kind_r
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/active_fft_last_r
+add wave -radix hex sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/active_left_word_r
+add wave -radix hex sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/active_right_word_r
+add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/pair_byte_idx_r
+add wave -radix hex sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/current_byte_r
+add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/current_bit_idx_r
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/fifo_valid_w
+add wave sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/fifo_last_w
+add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/fifo_real_w
+add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/fifo_imag_w
+add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_spi_fft_tx_adapter/fifo_bfpexp_w
 
 wave zoom full
 update

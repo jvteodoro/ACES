@@ -8,10 +8,10 @@ module tb_top_level_test;
     localparam int N_EXAMPLES             = 8;
     localparam int I2S_CLOCK_DIV          = 4;
     localparam int BFPEXP_W               = 8;
+    localparam int WORD_W                 = 32;
     localparam int I2S_SAMPLE_W           = 18;
-    localparam int I2S_SLOT_W             = 32;
     localparam int TAG_W                  = 2;
-    localparam int BFPEXP_HOLD_FRAMES     = 128;
+    localparam int BFPEXP_HOLD_FRAMES     = 1;
     localparam int TOTAL_SAMPLES          = N_EXAMPLES * N_POINTS;
     localparam int TOTAL_BINS             = N_EXAMPLES * FFT_LENGTH;
     localparam int SERIAL_FRAMES_PER_EX   = BFPEXP_HOLD_FRAMES + FFT_LENGTH;
@@ -19,7 +19,7 @@ module tb_top_level_test;
     localparam int EXAMPLE_SEL_W          = (N_EXAMPLES <= 1) ? 1 : $clog2(N_EXAMPLES);
     localparam int FFT_N                  = $clog2(FFT_LENGTH);
     localparam time CLK_HALF              = 5ns;
-    localparam time TX_SCK_TOGGLE_PERIOD  = 2 * CLK_HALF * I2S_CLOCK_DIV;
+    localparam int SPI_HALF_CYCLES        = 4;
     localparam int MAX_SAMPLE_SLACK       = 4;
     localparam int MAX_EXAMPLE_CYCLES     = 1_000_000;
 
@@ -69,6 +69,8 @@ module tb_top_level_test;
     logic tb_dbg_stage1_drive;
     logic tb_dbg_page0_drive;
     logic tb_dbg_page1_drive;
+    logic tb_spi_sclk_drive;
+    logic tb_spi_cs_n_drive;
 
     int expected_sample24_mem [0:TOTAL_SAMPLES-1];
     int expected_sample18_mem [0:TOTAL_SAMPLES-1];
@@ -108,23 +110,6 @@ module tb_top_level_test;
     bit fft_ingest_gated_r;
     bit fft_ingest_gate_pending_r;
 
-    time tx_last_sck_toggle_time_r;
-    bit tx_sck_timing_armed_r;
-    int tx_sck_toggle_count_r;
-    int tx_sck_toggle_total_r;
-
-    logic tx_mon_slot_ws_r;
-    logic [I2S_SLOT_W-1:0] tx_mon_slot_shift_r;
-    int tx_mon_slot_count_r;
-    bit tx_mon_prev_slot_valid_r;
-    logic tx_mon_prev_slot_ws_r;
-    logic [I2S_SLOT_W-1:0] tx_mon_left_word_r;
-    logic [I2S_SLOT_W-1:0] tx_mon_right_word_r;
-    logic tx_mon_pending_ws_r;
-    bit tx_mon_have_right_r;
-    bit tx_mon_have_left_r;
-    bit tx_mon_pending_start_r;
-
     integer dump_sample24_fd_r;
     integer dump_fft_input_fd_r;
     integer dump_fft_output_fd_r;
@@ -140,15 +125,15 @@ module tb_top_level_test;
     endfunction
 
     function automatic logic [TAG_W-1:0] decode_tag(
-        input logic [I2S_SLOT_W-1:0] word_i
+        input logic [WORD_W-1:0] word_i
     );
         begin
-            decode_tag = word_i[I2S_SLOT_W-1 -: TAG_W];
+            decode_tag = word_i[WORD_W-1 -: TAG_W];
         end
     endfunction
 
     function automatic logic signed [I2S_SAMPLE_W-1:0] decode_payload(
-        input logic [I2S_SLOT_W-1:0] word_i
+        input logic [WORD_W-1:0] word_i
     );
         begin
             decode_payload = $signed(word_i[I2S_SAMPLE_W-1:0]);
@@ -332,7 +317,7 @@ module tb_top_level_test;
 
     task automatic load_expected_samples;
         string path_s;
-        string header_s;
+        reg [2047:0] header_s;
         int fd_i;
         int ex_idx;
         int sample_idx;
@@ -366,7 +351,7 @@ module tb_top_level_test;
 
     task automatic load_expected_fft;
         string path_s;
-        string header_s;
+        reg [2047:0] header_s;
         int fd_i;
         int ex_idx;
         int bin_idx;
@@ -557,8 +542,8 @@ module tb_top_level_test;
     endtask
 
     task automatic check_decoded_frame(
-        input logic [I2S_SLOT_W-1:0] left_word_i,
-        input logic [I2S_SLOT_W-1:0] right_word_i
+        input logic [WORD_W-1:0] left_word_i,
+        input logic [WORD_W-1:0] right_word_i
     );
         logic [TAG_W-1:0] left_tag;
         logic [TAG_W-1:0] right_tag;
@@ -659,6 +644,72 @@ module tb_top_level_test;
         end
     endtask
 
+    task automatic spi_wait_half_period;
+        begin
+            repeat (SPI_HALF_CYCLES) @(posedge tb_clk_drive);
+        end
+    endtask
+
+    task automatic spi_read_byte(output logic [7:0] byte_o);
+        int bit_idx;
+        begin
+            byte_o = '0;
+            for (bit_idx = 7; bit_idx >= 0; bit_idx = bit_idx - 1) begin
+                spi_wait_half_period();
+                tb_spi_sclk_drive = 1'b1;
+                spi_wait_half_period();
+                byte_o[bit_idx] = gpio_1_d31;
+                tb_spi_sclk_drive = 1'b0;
+            end
+        end
+    endtask
+
+    task automatic spi_read_word(output logic [WORD_W-1:0] word_o);
+        logic [7:0] byte0;
+        logic [7:0] byte1;
+        logic [7:0] byte2;
+        logic [7:0] byte3;
+        begin
+            spi_read_byte(byte0);
+            spi_read_byte(byte1);
+            spi_read_byte(byte2);
+            spi_read_byte(byte3);
+            word_o = {byte3, byte2, byte1, byte0};
+        end
+    endtask
+
+    task automatic spi_begin_transaction;
+        begin
+            tb_spi_sclk_drive = 1'b0;
+            tb_spi_cs_n_drive = 1'b0;
+            repeat (4) @(posedge tb_clk_drive);
+        end
+    endtask
+
+    task automatic spi_end_transaction;
+        begin
+            repeat (4) @(posedge tb_clk_drive);
+            tb_spi_sclk_drive = 1'b0;
+            tb_spi_cs_n_drive = 1'b1;
+            repeat (4) @(posedge tb_clk_drive);
+        end
+    endtask
+
+    task automatic spi_drain_expected_window;
+        int pair_idx;
+        logic [WORD_W-1:0] left_word;
+        logic [WORD_W-1:0] right_word;
+        begin
+            spi_begin_transaction();
+            for (pair_idx = 0; pair_idx < SERIAL_FRAMES_PER_EX; pair_idx = pair_idx + 1) begin
+                spi_read_word(left_word);
+                spi_read_word(right_word);
+                check_decoded_frame(left_word, right_word);
+            end
+            spi_end_transaction();
+        end
+    endtask
+
     assign clock_50   = tb_clk_drive;
     assign reset_n    = ~tb_rst_drive;
     assign gpio_1_d1  = tb_rst_drive;
@@ -670,6 +721,8 @@ module tb_top_level_test;
     assign gpio_1_d15 = tb_dbg_stage1_drive;
     assign gpio_1_d17 = tb_dbg_page0_drive;
     assign gpio_1_d19 = tb_dbg_page1_drive;
+    assign gpio_1_d27 = tb_spi_sclk_drive;
+    assign gpio_1_d29 = tb_spi_cs_n_drive;
 
     always #CLK_HALF tb_clk_drive = ~tb_clk_drive;
 
@@ -705,24 +758,17 @@ module tb_top_level_test;
         .gpio_1_d35(gpio_1_d35)
     );
 
-    always @(dut.tx_i2s_sck_o or gpio_1_d27 or tb_rst_drive) begin
+    always @(dut.tx_spi_miso_o or gpio_1_d31 or tb_rst_drive) begin
         if (!tb_rst_drive) begin
-            assert (gpio_1_d27 === dut.tx_i2s_sck_o)
-            else $fatal(1, "GPIO_1_D27 nao reflete tx_i2s_sck_o. pin=%0b dut=%0b", gpio_1_d27, dut.tx_i2s_sck_o);
+            assert (gpio_1_d31 === dut.tx_spi_miso_o)
+            else $fatal(1, "GPIO_1_D31 nao reflete tx_spi_miso_o. pin=%0b dut=%0b", gpio_1_d31, dut.tx_spi_miso_o);
         end
     end
 
-    always @(dut.tx_i2s_ws_o or gpio_1_d29 or tb_rst_drive) begin
+    always @(dut.tx_spi_window_ready_o or gpio_1_d25 or tb_rst_drive) begin
         if (!tb_rst_drive) begin
-            assert (gpio_1_d29 === dut.tx_i2s_ws_o)
-            else $fatal(1, "GPIO_1_D29 nao reflete tx_i2s_ws_o. pin=%0b dut=%0b", gpio_1_d29, dut.tx_i2s_ws_o);
-        end
-    end
-
-    always @(dut.tx_i2s_sd_o or gpio_1_d31 or tb_rst_drive) begin
-        if (!tb_rst_drive) begin
-            assert (gpio_1_d31 === dut.tx_i2s_sd_o)
-            else $fatal(1, "GPIO_1_D31 nao reflete tx_i2s_sd_o. pin=%0b dut=%0b", gpio_1_d31, dut.tx_i2s_sd_o);
+            assert (gpio_1_d25 === dut.tx_spi_window_ready_o)
+            else $fatal(1, "GPIO_1_D25 nao reflete tx_spi_window_ready_o. pin=%0b dut=%0b", gpio_1_d25, dut.tx_spi_window_ready_o);
         end
     end
 
@@ -830,15 +876,12 @@ module tb_top_level_test;
 
             if (dut.tx_overflow_o) begin
                 tx_overflow_seen_r <= 1'b1;
-                $display("[%0t] tx_overflow debug: fifo_overflow=%0b adapter_overflow=%0b fifo_level=%0d word_valid=%0b read_inflight=%0b tx_valid=%0b tx_ready=%0b serial_rd=%0d serial_wr=%0d fft_bins=%0d extra_fft=%0d",
+                $display("[%0t] tx_overflow debug: bridge_level=%0d adapter_level=%0d complete_windows=%0d spi_active=%0b serial_rd=%0d serial_wr=%0d fft_bins=%0d extra_fft=%0d",
                          $time,
-                         dut.u_aces.tx_fifo_overflow_o,
-                         dut.u_aces.tx_overflow_from_adapter_o,
-                         dut.u_aces.tx_fifo_level_r,
-                         dut.u_aces.tx_fifo_word_valid_r,
-                         dut.u_aces.tx_fifo_read_inflight_r,
-                         dut.u_aces.tx_fft_valid_i,
-                         dut.u_aces.tx_fft_ready_o,
+                         dut.u_aces.u_spi_fft_tx_adapter.fifo_level_o,
+                         dut.u_aces.u_spi_fft_tx_adapter.fifo_level_o,
+                         dut.u_aces.u_spi_fft_tx_adapter.complete_windows_r,
+                         dut.u_aces.u_spi_fft_tx_adapter.spi_active_o,
                          serial_expected_read_idx_r,
                          serial_expected_write_idx_r,
                          fft_bin_count_r,
@@ -990,117 +1033,23 @@ module tb_top_level_test;
             if (tb_rst_drive) begin
                 // Nada a fazer: o estado do scoreboard e resetado por
                 // reset_example_scoreboard/apply_reset_sequence.
-            end else if (example_in_progress_r && dut.u_aces.tx_fft_valid_i && dut.u_aces.tx_fft_ready_o) begin
+            end else if (example_in_progress_r && dut.fft_tx_valid_o && dut.u_aces.u_spi_fft_tx_adapter.fft_ready_o) begin
                 if (!serial_bfpexp_enqueued_r) begin
-                    bfpexp_payload = extend_bfpexp_payload(dut.u_aces.tx_bfpexp_i);
+                    bfpexp_payload = extend_bfpexp_payload(dut.bfpexp_o);
                     for (hold_idx = 0; hold_idx < BFPEXP_HOLD_FRAMES; hold_idx++)
                         enqueue_expected_frame(TAG_BFPEXP_C, bfpexp_payload, bfpexp_payload);
                     serial_bfpexp_enqueued_r <= 1'b1;
                 end
 
                 if (serial_expected_write_idx_r < SERIAL_FRAMES_PER_EX)
-                    enqueue_expected_frame(TAG_FFT_C, dut.u_aces.tx_fft_real_i, dut.u_aces.tx_fft_imag_i);
+                    enqueue_expected_frame(TAG_FFT_C, dut.fft_tx_real_o, dut.fft_tx_imag_o);
             end
         end
     end
 
-    always @(posedge dut.tx_i2s_sck_o or negedge dut.tx_i2s_sck_o or posedge tb_rst_drive) begin
-        if (tb_rst_drive) begin
-            tx_sck_toggle_count_r     <= 0;
-            tx_sck_timing_armed_r     <= 1'b0;
-            tx_last_sck_toggle_time_r <= 0;
-        end else begin
-            if (tx_sck_timing_armed_r) begin
-                assert (($realtime - tx_last_sck_toggle_time_r) == TX_SCK_TOGGLE_PERIOD)
-                else $fatal(1, "TX SCK mudou fora do periodo esperado: dt=%0t exp=%0t",
-                            $realtime - tx_last_sck_toggle_time_r, TX_SCK_TOGGLE_PERIOD);
-            end else begin
-                tx_sck_timing_armed_r <= 1'b1;
-            end
-
-            tx_sck_toggle_count_r     <= tx_sck_toggle_count_r + 1;
-            tx_sck_toggle_total_r     <= tx_sck_toggle_total_r + 1;
-            tx_last_sck_toggle_time_r <= $realtime;
-        end
-    end
-
-    always @(posedge dut.tx_i2s_sck_o or posedge tb_rst_drive) begin
-        logic ws_changed;
-        logic [I2S_SLOT_W-1:0] completed_word;
-        begin
-            if (tb_rst_drive) begin
-                tx_mon_slot_ws_r         <= 1'b0;
-                tx_mon_slot_shift_r      <= '0;
-                tx_mon_slot_count_r      <= 0;
-                tx_mon_prev_slot_valid_r <= 1'b0;
-                tx_mon_prev_slot_ws_r    <= 1'b0;
-                tx_mon_left_word_r       <= '0;
-                tx_mon_right_word_r      <= '0;
-                tx_mon_pending_ws_r      <= 1'b0;
-                tx_mon_have_right_r      <= 1'b0;
-                tx_mon_have_left_r       <= 1'b0;
-                tx_mon_pending_start_r   <= 1'b0;
-            end else begin
-                ws_changed = tx_mon_prev_slot_valid_r && (dut.tx_i2s_ws_o != tx_mon_prev_slot_ws_r);
-
-                if (tx_mon_pending_start_r) begin
-                    assert (!ws_changed)
-                    else $fatal(1, "TX WS alternou novamente antes do MSB esperado.");
-
-                    assert (dut.tx_i2s_ws_o == tx_mon_pending_ws_r)
-                    else $fatal(1, "TX WS nao permaneceu estavel entre a borda de alinhamento e o MSB.");
-
-                    tx_mon_slot_ws_r       <= tx_mon_pending_ws_r;
-                    tx_mon_slot_shift_r    <= {{(I2S_SLOT_W-1){1'b0}}, dut.tx_i2s_sd_o};
-                    tx_mon_slot_count_r    <= 1;
-                    tx_mon_pending_start_r <= 1'b0;
-                end else if (tx_mon_slot_count_r != 0) begin
-                    completed_word = {tx_mon_slot_shift_r[I2S_SLOT_W-2:0], dut.tx_i2s_sd_o};
-
-                    if (tx_mon_slot_count_r == I2S_SLOT_W-1) begin
-                        assert (ws_changed)
-                        else $fatal(1, "TX WS nao antecipou o ultimo bit do slot I2S.");
-
-                        tx_mon_slot_count_r <= 0;
-                        tx_mon_slot_shift_r <= '0;
-
-                        if (tx_mon_slot_ws_r) begin
-                            assert (!tx_mon_have_right_r)
-                            else $fatal(1, "Dois slots direitos consecutivos no monitor TX.");
-
-                            tx_mon_right_word_r <= completed_word;
-                            tx_mon_have_right_r <= 1'b1;
-                            tx_mon_have_left_r  <= 1'b0;
-                        end else begin
-                            if (tx_mon_have_right_r) begin
-                                check_decoded_frame(completed_word, tx_mon_right_word_r);
-                                tx_mon_have_right_r <= 1'b0;
-                            end else begin
-                                tx_mon_left_word_r <= completed_word;
-                                tx_mon_have_left_r <= 1'b1;
-                            end
-                        end
-                    end else begin
-                        assert (!ws_changed)
-                        else $fatal(1, "TX WS alternou antes do ultimo bit do slot I2S.");
-
-                        tx_mon_slot_shift_r <= completed_word;
-                        tx_mon_slot_count_r <= tx_mon_slot_count_r + 1;
-                    end
-                end
-
-                if (ws_changed) begin
-                    assert (!tx_mon_pending_start_r)
-                    else $fatal(1, "Borda de TX WS chegou enquanto um novo slot ja estava pendente.");
-
-                    tx_mon_pending_start_r <= 1'b1;
-                    tx_mon_pending_ws_r    <= dut.tx_i2s_ws_o;
-                end
-
-                tx_mon_prev_slot_valid_r <= 1'b1;
-                tx_mon_prev_slot_ws_r    <= dut.tx_i2s_ws_o;
-            end
-        end
+    always @(posedge gpio_1_d25) begin
+        if (!tb_rst_drive && example_in_progress_r)
+            spi_drain_expected_window();
     end
 
     initial begin
@@ -1147,17 +1096,8 @@ module tb_top_level_test;
         sact_prev_r                 = 1'b0;
         fft_ingest_gated_r          = 1'b0;
         fft_ingest_gate_pending_r   = 1'b0;
-        tx_sck_toggle_count_r       = 0;
-        tx_sck_toggle_total_r       = 0;
-        tx_sck_timing_armed_r       = 1'b0;
-        tx_last_sck_toggle_time_r   = 0;
-        tx_mon_slot_ws_r            = 1'b0;
-        tx_mon_slot_shift_r         = '0;
-        tx_mon_slot_count_r         = 0;
-        tx_mon_prev_slot_valid_r    = 1'b0;
-        tx_mon_prev_slot_ws_r       = 1'b0;
-        tx_mon_right_word_r         = '0;
-        tx_mon_have_right_r         = 1'b0;
+        tb_spi_sclk_drive           = 1'b0;
+        tb_spi_cs_n_drive           = 1'b1;
         dump_sample24_fd_r          = 0;
         dump_fft_input_fd_r         = 0;
         dump_fft_output_fd_r        = 0;
@@ -1190,9 +1130,6 @@ module tb_top_level_test;
             wait (dut.stim_ready_o == 1'b1);
             repeat (16) @(posedge tb_clk_drive);
         end
-
-        assert (tx_sck_toggle_total_r > 64)
-        else $fatal(1, "Poucos toggles observados em tx_i2s_sck_o ao longo do teste: %0d", tx_sck_toggle_total_r);
 
 `ifdef TB_TOP_LEVEL_REAL_FLOW
         $display("tb_top_level_test PASSED no fluxo real com exemplos [%0d:%0d] e comparacao FFT vs Python",

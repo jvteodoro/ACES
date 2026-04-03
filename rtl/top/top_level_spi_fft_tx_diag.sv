@@ -1,10 +1,7 @@
-module top_level_i2s_fft_tx_diag #(
+module top_level_spi_fft_tx_diag #(
     parameter int FFT_DW                    = 18,
-    parameter int I2S_CLOCK_DIV            = 8,
-    parameter int I2S_SAMPLE_W             = 18,
-    parameter int I2S_SLOT_W               = 32,
-    parameter int DIAG_WINDOW_BINS         = 512,
-    parameter int DIAG_BFPEXP_HOLD_FRAMES  = 1
+    parameter int DIAG_WINDOW_BINS          = 512,
+    parameter int DIAG_BFPEXP_HOLD_FRAMES   = 1
 )(
 
     // -----------------------------------------
@@ -94,7 +91,7 @@ module top_level_i2s_fft_tx_diag #(
     input logic gpio_0_d35, //PIN_T15
 
     output logic gpio_1_d0,  //PIN_H16
-    output logic gpio_1_d1,  //PIN_A12
+    input logic gpio_1_d1,  //PIN_A12
     output logic gpio_1_d2,  //PIN_H15
     output logic gpio_1_d3,  //PIN_B12
     output logic gpio_1_d4,  //PIN_A13
@@ -114,20 +111,20 @@ module top_level_i2s_fft_tx_diag #(
     input logic gpio_1_d18, //PIN_J13
     output logic gpio_1_d19, //PIN_L8
     output logic gpio_1_d20, //PIN_A14
-    input logic gpio_1_d21, //PIN_B15
+    output logic gpio_1_d21, //PIN_B15
     input logic gpio_1_d22, //PIN_C15
-    input logic gpio_1_d23, //PIN_E14
+    output logic gpio_1_d23, //PIN_E14
     input logic gpio_1_d24, //PIN_E15
-    input logic gpio_1_d25, //PIN_E16
+    output logic gpio_1_d25, //PIN_E16
     input logic gpio_1_d26, //PIN_F14
-    output logic gpio_1_d27, //PIN_F15
+    input logic gpio_1_d27, //PIN_F15
     input logic gpio_1_d28, //PIN_F13
-    output logic gpio_1_d29, //PIN_F12
-    input logic gpio_1_d30, //PIN_G16
+    input logic gpio_1_d29, //PIN_F12
+    output logic gpio_1_d30, //PIN_G16
     output logic gpio_1_d31, //PIN_G15
-    input logic gpio_1_d32, //PIN_G13
+    output logic gpio_1_d32, //PIN_G13
     input logic gpio_1_d33, //PIN_G12
-    input logic gpio_1_d34, //PIN_J17
+    output logic gpio_1_d34, //PIN_J17
     input logic gpio_1_d35  //PIN_K16
 );
 
@@ -152,9 +149,9 @@ module top_level_i2s_fft_tx_diag #(
     logic diag_overflow_o;
     logic [$clog2(DIAG_WINDOW_BINS + 2)-1:0] diag_fifo_level_o;
 
-    logic tx_i2s_sck_o;
-    logic tx_i2s_ws_o;
-    logic tx_i2s_sd_o;
+    logic tx_spi_window_ready_o;
+    logic tx_spi_miso_o;
+    logic tx_spi_active_o;
 
     logic [BIN_IDX_W-1:0] diag_bin_index_r;
     logic [15:0] diag_accept_count_r;
@@ -170,7 +167,6 @@ module top_level_i2s_fft_tx_diag #(
     logic [3:0] hex4_i;
     logic [3:0] hex5_i;
 
-    logic unused_inputs_probe;
     logic diag_accept_w;
     logic diag_window_done_w;
 
@@ -183,23 +179,23 @@ module top_level_i2s_fft_tx_diag #(
     assign diag_fft_last_i  = (diag_bin_index_r == BIN_IDX_W'(DIAG_WINDOW_BINS-1));
     assign diag_bfpexp_i    = DIAG_BFPEXP_C;
 
-    assign diag_accept_w     = diag_fft_valid_i && diag_fft_ready_o;
+    assign diag_accept_w      = diag_fft_valid_i && diag_fft_ready_o;
     assign diag_window_done_w = diag_accept_w && diag_fft_last_i;
 
     initial begin
         if (FFT_DW != 18)
-            $error("top_level_i2s_fft_tx_diag: FFT_DW deve permanecer em 18 para casar com o contrato do host.");
+            $error("top_level_spi_fft_tx_diag: FFT_DW deve permanecer em 18 para casar com o contrato do host.");
         if (DIAG_WINDOW_BINS < 1)
-            $error("top_level_i2s_fft_tx_diag: DIAG_WINDOW_BINS deve ser >= 1.");
+            $error("top_level_spi_fft_tx_diag: DIAG_WINDOW_BINS deve ser >= 1.");
     end
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
-            diag_bin_index_r         <= '0;
-            diag_accept_count_r      <= '0;
-            diag_window_count_r      <= '0;
-            diag_overflow_latched_r  <= 1'b0;
-            diag_heartbeat_r         <= 1'b0;
+            diag_bin_index_r        <= '0;
+            diag_accept_count_r     <= '0;
+            diag_window_count_r     <= '0;
+            diag_overflow_latched_r <= 1'b0;
+            diag_heartbeat_r        <= 1'b0;
         end else begin
             if (diag_overflow_o)
                 diag_overflow_latched_r <= 1'b1;
@@ -239,10 +235,10 @@ module top_level_i2s_fft_tx_diag #(
     assign ledr2 = diag_fifo_empty_o;
     assign ledr3 = diag_overflow_latched_r;
     assign ledr4 = diag_accept_w;
-    assign ledr5 = tx_i2s_sck_o;
-    assign ledr6 = tx_i2s_ws_o;
-    assign ledr7 = tx_i2s_sd_o;
-    assign ledr8 = diag_fft_last_i;
+    assign ledr5 = tx_spi_window_ready_o;
+    assign ledr6 = ~gpio_1_d29;
+    assign ledr7 = tx_spi_miso_o;
+    assign ledr8 = gpio_1_d27;
     assign ledr9 = diag_heartbeat_r;
 
     assign hex0_i = dbg_word[3:0];
@@ -259,15 +255,14 @@ module top_level_i2s_fft_tx_diag #(
     hexa7seg hex4(hex4_i, hex4_o);
     hexa7seg hex5(hex5_i, hex5_o);
 
-    i2s_fft_tx_adapter #(
+    spi_fft_tx_adapter #(
         .FFT_DW(FFT_DW),
         .BFPEXP_W(BFPEXP_W),
-        .I2S_SAMPLE_W(I2S_SAMPLE_W),
-        .I2S_SLOT_W(I2S_SLOT_W),
-        .CLOCK_DIV(I2S_CLOCK_DIV),
+        .PAYLOAD_W(FFT_DW),
+        .WORD_W(32),
         .FIFO_DEPTH(DIAG_WINDOW_BINS + 1),
         .BFPEXP_HOLD_FRAMES(DIAG_BFPEXP_HOLD_FRAMES)
-    ) u_i2s_fft_tx_adapter (
+    ) u_spi_fft_tx_adapter (
         .clk(clk),
         .rst(rst),
         .fft_valid_i(diag_fft_valid_i),
@@ -280,9 +275,11 @@ module top_level_i2s_fft_tx_diag #(
         .fifo_empty_o(diag_fifo_empty_o),
         .overflow_o(diag_overflow_o),
         .fifo_level_o(diag_fifo_level_o),
-        .i2s_sck_o(tx_i2s_sck_o),
-        .i2s_ws_o(tx_i2s_ws_o),
-        .i2s_sd_o(tx_i2s_sd_o)
+        .spi_sclk_i(gpio_1_d27),
+        .spi_cs_n_i(gpio_1_d29),
+        .spi_miso_o(tx_spi_miso_o),
+        .window_ready_o(tx_spi_window_ready_o),
+        .spi_active_o(tx_spi_active_o)
     );
 
     assign gpio_0_d3  = diag_accept_w;
@@ -292,42 +289,28 @@ module top_level_i2s_fft_tx_diag #(
     assign gpio_0_d14 = diag_overflow_latched_r;
     assign gpio_0_d17 = diag_window_done_w;
     assign gpio_0_d19 = diag_heartbeat_r;
+    assign gpio_0_d27 = tx_spi_window_ready_o;
+    assign gpio_0_d28 = tx_spi_active_o;
+    assign gpio_0_d29 = diag_overflow_latched_r;
+    assign gpio_0_d30 = tx_spi_window_ready_o;
+    assign gpio_0_d31 = tx_spi_active_o;
+    assign gpio_0_d32 = diag_overflow_latched_r;
+    assign gpio_0_d34 = tx_spi_miso_o;
 
     assign gpio_1_d0  = diag_fft_ready_o;
-    assign gpio_1_d1  = diag_fft_last_i;
     assign gpio_1_d2  = diag_accept_w;
     assign gpio_1_d3  = diag_window_done_w;
     assign gpio_1_d4  = diag_overflow_latched_r;
     assign gpio_1_d5  = diag_heartbeat_r;
-    assign gpio_1_d17 = sw9 & unused_inputs_probe;
+    assign gpio_1_d17 = 1'b0;
     assign gpio_1_d19 = 1'b0;
     assign gpio_1_d20 = 1'b0;
-
-    // Exporta o stream tagged I2S nos mesmos pinos usados pelo host no top_level_test.
-    assign gpio_0_d30 = tx_i2s_sck_o;
-    assign gpio_0_d32 = tx_i2s_ws_o;
-    assign gpio_0_d34 = tx_i2s_sd_o;
-    assign gpio_1_d27 = tx_i2s_sck_o;
-    assign gpio_1_d29 = tx_i2s_ws_o;
-    assign gpio_1_d31 = tx_i2s_sd_o;
-
-    // Mantem entradas opcionais observaveis para evitar podas agressivas e
-    // preservar o mesmo envelope fisico do top_level_test.
-//    assign unused_inputs_probe = ^{
-//        key0, key1, key2, key3, reset_n,
-//        sw2, sw3, sw4, sw5, sw6, sw7, sw8, sw9,
-//        clock_50, clock2_50, clock3_50, clock4_50,
-//        gpio_0_d2, gpio_0_d4, gpio_0_d5, gpio_0_d6, gpio_0_d7,
-//        gpio_0_d8, gpio_0_d9, gpio_0_d10, gpio_0_d15, gpio_0_d16,
-//        gpio_0_d18, gpio_0_d20, gpio_0_d21, gpio_0_d22, gpio_0_d23,
-//        gpio_0_d24, gpio_0_d25, gpio_0_d26, gpio_0_d27, gpio_0_d28,
-//        gpio_0_d29, gpio_0_d30, gpio_0_d31, gpio_0_d32, gpio_0_d33,
-//        gpio_0_d34, gpio_0_d35,
-//        gpio_1_d6, gpio_1_d7, gpio_1_d8, gpio_1_d9, gpio_1_d10,
-//        gpio_1_d11, gpio_1_d12, gpio_1_d13, gpio_1_d14, gpio_1_d15,
-//        gpio_1_d16, gpio_1_d18, gpio_1_d21, gpio_1_d22, gpio_1_d23,
-//        gpio_1_d24, gpio_1_d25, gpio_1_d26, gpio_1_d28, gpio_1_d30,
-//        gpio_1_d32, gpio_1_d33, gpio_1_d34, gpio_1_d35
-//    };
+    assign gpio_1_d21 = tx_spi_window_ready_o;
+    assign gpio_1_d23 = diag_overflow_latched_r;
+    assign gpio_1_d25 = tx_spi_window_ready_o;
+    assign gpio_1_d30 = tx_spi_window_ready_o;
+    assign gpio_1_d31 = tx_spi_miso_o;
+    assign gpio_1_d32 = diag_overflow_latched_r;
+    assign gpio_1_d34 = tx_spi_miso_o;
 
 endmodule

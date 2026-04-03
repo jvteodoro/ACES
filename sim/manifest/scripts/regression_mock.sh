@@ -10,14 +10,15 @@ TESTS=(
   fft_control
   fft_dma_reader
   fft_tx_bridge_fifo
-  i2s_fft_tx_adapter
-  fft_tx_i2s_link
+  spi_fft_tx_adapter
+  fft_tx_spi_link
   aces_audio_to_fft_pipeline
   aces
+  top_level_spi_fft_tx_diag
   top_level_test
 )
 for test_name in "${TESTS[@]}"; do
   echo "=== Running ${test_name} (mock) ==="
   "${SCRIPT_DIR}/run_questa.sh" "${test_name}" mock
   echo
- done
+done
