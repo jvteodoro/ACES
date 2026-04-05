@@ -1,3 +1,13 @@
+// -----------------------------------------------------------------------------
+// fft_tx_bridge_fifo
+// -----------------------------------------------------------------------------
+// FIFO show-ahead reutilizavel para transportar um bin FFT completo
+// (`real/imag/last/bfpexp`) entre dois blocos com ritmos diferentes.
+//
+// Este modulo existe para isolar a politica de buffering do transporte fisico:
+// o adaptador SPI o instancia internamente, e os benches tambem o exercitam de
+// forma independente para validar ordenacao, overflow e push/pop simultaneos.
+// -----------------------------------------------------------------------------
 module fft_tx_bridge_fifo #(
     parameter int FFT_DW     = 18,
     parameter int BFPEXP_W   = 8,
@@ -45,6 +55,8 @@ module fft_tx_bridge_fifo #(
         end
     endfunction
 
+    // Show-ahead: a cabeca atual fica permanentemente refletida nas saidas
+    // enquanto `level_o != 0`, sem exigir um pop previo para leitura.
     assign head_word = fifo_mem[rptr_r];
 
     assign valid_o    = (level_o != '0);
@@ -71,6 +83,8 @@ module fft_tx_bridge_fifo #(
             logic do_pop;
 
             do_pop      = pop_i && !empty_o;
+            // Push e pop no mesmo ciclo sao aceitos. Isso permite throughput 1
+            // entrada/ciclo quando um consumidor drena a FIFO continuamente.
             do_push     = push_i && (!full_o || do_pop);
             overflow_o  <= push_i && full_o && !do_pop;
 

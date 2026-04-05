@@ -4,7 +4,7 @@
 // spi_fft_tx_adapter
 // -----------------------------------------------------------------------------
 // Backend sintetizavel para exportar resultados da FFT a um host externo via
-// SPI slave, preservando o mesmo empacotamento lógico usado antes no transporte
+// SPI slave, preservando o mesmo empacotamento logico usado antes no transporte
 // tagged-I2S:
 //
 //   [2-bit tag][reserved zero bits][PAYLOAD_W signed payload bits]
@@ -17,6 +17,12 @@
 // quando `window_ready_o` sobe. Cada transacao entrega uma janela inteira:
 // - BFPEXP repetido BFPEXP_HOLD_FRAMES vezes
 // - seguido pelos bins FFT na ordem recebida
+//
+// A arquitetura interna foi separada em tres responsabilidades:
+// 1. absorver bins FFT em uma FIFO show-ahead;
+// 2. contar quantas janelas completas ja estao prontas para leitura;
+// 3. transformar a cabeca da FIFO em palavras tagged de 32 bits e serializa-las
+//    em MISO no formato esperado pelo host.
 //
 // Premissas de uso:
 // - SPI mode 0 (CPOL=0, CPHA=0)
@@ -68,6 +74,8 @@ module spi_fft_tx_adapter #(
         PAIR_FFT
     } pair_kind_t;
 
+    // FIFO interna que desacopla a producao bursty de bins FFT da drenagem
+    // serial SPI, que eh dirigida pelo host e pode ser muito mais lenta.
     logic fifo_push_w;
     logic fifo_pop_r;
     logic fifo_valid_w;
@@ -77,8 +85,13 @@ module spi_fft_tx_adapter #(
     logic signed [BFPEXP_W-1:0] fifo_bfpexp_w;
     logic fifo_overflow_w;
 
+    // Conta quantas janelas completas ja entraram na FIFO. Isso eh separado do
+    // nivel total da FIFO porque uma janela so pode ser anunciada ao host depois
+    // que o bin marcado com `fft_last_i` for realmente aceito.
     logic [WINDOW_CNT_W-1:0] complete_windows_r;
 
+    // Sinais SPI chegam assincronos ao dominio `clk`, entao eles passam por um
+    // sincronizador simples antes da deteccao de borda.
     logic spi_sclk_meta_r;
     logic spi_sclk_sync_r;
     logic spi_sclk_prev_r;
@@ -91,6 +104,7 @@ module spi_fft_tx_adapter #(
     logic spi_cs_fall_w;
     logic spi_cs_rise_w;
 
+    // Estado da transacao e do serializer byte/bit a byte.
     logic spi_transaction_active_r;
     logic tx_window_in_progress_r;
     logic wait_next_fft_pair_r;
@@ -133,6 +147,9 @@ module spi_fft_tx_adapter #(
         end
     endfunction
 
+    // O fio SPI transmite cada palavra de 32 bits em ordem little-endian por
+    // byte: primeiro os 8 bits menos significativos da palavra esquerda, depois
+    // o restante da palavra esquerda, e so entao a palavra direita.
     function automatic logic [7:0] pair_byte(
         input logic [WORD_W-1:0] left_i,
         input logic [WORD_W-1:0] right_i,
@@ -152,6 +169,8 @@ module spi_fft_tx_adapter #(
         end
     endfunction
 
+    // Centraliza a troca do "par logico" atualmente em transmissao, reiniciando
+    // tambem o serializer para o primeiro byte e o primeiro bit desse par.
     task automatic load_pair_words(
         input pair_kind_t kind_i,
         input logic [WORD_W-1:0] left_i,
@@ -191,10 +210,13 @@ module spi_fft_tx_adapter #(
             $error("spi_fft_tx_adapter: BFPEXP_HOLD_FRAMES deve ser >= 1.");
     end
 
-    assign fft_ready_o   = !fifo_full_o;
-    assign fifo_push_w   = fft_valid_i && fft_ready_o;
+    assign fft_ready_o    = !fifo_full_o;
+    assign fifo_push_w    = fft_valid_i && fft_ready_o;
+    // `window_ready_o` so sobe quando existe ao menos uma janela completa e nao
+    // ha transacao ativa, evitando que o host veja "janela pronta" no meio de um
+    // burst que ainda esta sendo drenado.
     assign window_ready_o = (complete_windows_r != '0) && !spi_transaction_active_r;
-    assign spi_active_o  = spi_transaction_active_r;
+    assign spi_active_o   = spi_transaction_active_r;
 
     fft_tx_bridge_fifo #(
         .FFT_DW(FFT_DW),
@@ -258,6 +280,8 @@ module spi_fft_tx_adapter #(
             logic [WORD_W-1:0] fft_left_word_w;
             logic [WORD_W-1:0] fft_right_word_w;
 
+            // Traz `spi_sclk_i` e `spi_cs_n_i` com seguranca para o dominio
+            // `clk` antes de detectar bordas.
             spi_sclk_meta_r <= spi_sclk_i;
             spi_sclk_sync_r <= spi_sclk_meta_r;
             spi_sclk_prev_r <= spi_sclk_sync_r;
@@ -267,15 +291,21 @@ module spi_fft_tx_adapter #(
 
             fifo_pop_r <= 1'b0;
 
+            // O contador de janelas prontas avanca quando o ultimo bin de uma
+            // janela eh aceito na FIFO, e recua apenas quando o ultimo bin dessa
+            // janela eh totalmente serializado para fora.
             complete_windows_next = complete_windows_r;
             if (fifo_push_w && fft_last_i)
                 complete_windows_next = complete_windows_next + 1'b1;
 
+            // Empacota a cabeca atual da FIFO no contrato de 32 bits do host.
             bfpexp_payload_w = extend_bfpexp(fifo_bfpexp_w);
             bfpexp_word_w    = pack_word(TAG_BFPEXP_C, bfpexp_payload_w);
             fft_left_word_w  = pack_word(TAG_FFT_C, extend_fft_sample(fifo_real_w));
             fft_right_word_w = pack_word(TAG_FFT_C, extend_fft_sample(fifo_imag_w));
 
+            // Encerrar CS aborta qualquer transmissao parcial e zera o estado
+            // local da transacao. O conteudo da FIFO permanece intocado.
             if (spi_cs_rise_w) begin
                 spi_transaction_active_r <= 1'b0;
                 tx_window_in_progress_r  <= 1'b0;
@@ -292,6 +322,9 @@ module spi_fft_tx_adapter #(
                 current_bit_idx_r        <= 3'd7;
                 spi_miso_o               <= 1'b0;
             end else begin
+                // O inicio de uma transacao sempre carrega imediatamente o
+                // primeiro par a ser transmitido: BFPEXP se ja existe uma janela
+                // completa, ou um par IDLE se o host sondar cedo demais.
                 if (spi_cs_fall_w) begin
                     spi_transaction_active_r <= 1'b1;
                     byte_complete_pending_r  <= 1'b0;
@@ -335,6 +368,9 @@ module spi_fft_tx_adapter #(
                     end
                 end
 
+                // Depois de enviar um par FFT e gerar `fifo_pop_r`, a FIFO
+                // show-ahead precisa de um ciclo para expor a nova cabeca. O par
+                // seguinte so eh carregado depois dessa pequena espera.
                 if (wait_next_fft_pair_r && spi_transaction_active_r && !spi_cs_sync_r) begin
                     if (wait_fifo_refresh_r) begin
                         wait_fifo_refresh_r <= 1'b0;
@@ -357,6 +393,10 @@ module spi_fft_tx_adapter #(
                     end
                 end
 
+                // Em SPI mode 0 o mestre amostra em borda de subida. Quando o
+                // ultimo bit do byte atual eh amostrado, adiamos a troca para a
+                // borda de descida seguinte, quando o proximo bit pode ser
+                // apresentado com folga temporal.
                 if (spi_transaction_active_r && !spi_cs_sync_r && spi_sclk_rise_w) begin
                     if (current_bit_idx_r == 3'd0)
                         byte_complete_pending_r <= 1'b1;
@@ -366,9 +406,13 @@ module spi_fft_tx_adapter #(
                     if (byte_complete_pending_r) begin
                         byte_complete_pending_r <= 1'b0;
 
+                        // O oitavo byte fecha o par inteiro de 64 bits. A partir
+                        // daqui decidimos qual par entra em seguida.
                         if (pair_byte_idx_r == 3'd7) begin
                             unique case (active_pair_kind_r)
                                 PAIR_BFPEXP: begin
+                                    // Repetimos o BFPEXP quantas vezes o host
+                                    // espera antes de iniciar os bins FFT.
                                     if (bfpexp_hold_remaining_r > 1) begin
                                         bfpexp_hold_remaining_r <= bfpexp_hold_remaining_r - 1'b1;
                                         load_pair_words(
@@ -387,6 +431,9 @@ module spi_fft_tx_adapter #(
                                         );
                                     end else begin
                                         bfpexp_hold_remaining_r <= '0;
+                                        // Depois da ultima copia do BFPEXP, a
+                                        // cabeca atual da FIFO ja contem o
+                                        // primeiro bin FFT da janela.
                                         load_pair_words(
                                             PAIR_FFT,
                                             fft_left_word_w,
@@ -405,11 +452,15 @@ module spi_fft_tx_adapter #(
                                 end
 
                                 PAIR_FFT: begin
+                                    // So removemos um bin da FIFO depois que os
+                                    // 64 bits que o representam foram enviados.
                                     fifo_pop_r <= 1'b1;
                                     if (active_fft_last_r && (complete_windows_r != '0))
                                         complete_windows_next = complete_windows_next - 1'b1;
 
                                     if (active_fft_last_r) begin
+                                        // A janela terminou. Mantemos o barramento
+                                        // em IDLE ate o host encerrar CS.
                                         tx_window_in_progress_r <= 1'b0;
                                         load_pair_words(
                                             PAIR_IDLE,
@@ -426,12 +477,17 @@ module spi_fft_tx_adapter #(
                                             spi_miso_o
                                         );
                                     end else begin
+                                        // A proxima amostra vira da nova cabeca
+                                        // da FIFO depois do refresh show-ahead.
                                         wait_next_fft_pair_r <= 1'b1;
                                         wait_fifo_refresh_r  <= 1'b1;
                                     end
                                 end
 
                                 default: begin
+                                    // Enquanto o host mantiver CS baixo sem uma
+                                    // janela ativa, o adapter continua devolvendo
+                                    // zeros tagged como IDLE.
                                     load_pair_words(
                                         PAIR_IDLE,
                                         '0,
@@ -449,6 +505,8 @@ module spi_fft_tx_adapter #(
                                 end
                             endcase
                         end else begin
+                            // Ainda estamos no mesmo par de palavras: avanca
+                            // para o proximo byte.
                             logic [2:0] next_byte_idx_w;
                             logic [7:0] next_byte_w;
 
@@ -461,6 +519,8 @@ module spi_fft_tx_adapter #(
                             spi_miso_o        <= next_byte_w[7];
                         end
                     end else begin
+                        // Ainda no mesmo byte: desloca para o proximo bit, MSB
+                        // first dentro do byte.
                         logic [2:0] next_bit_idx_w;
                         next_bit_idx_w = current_bit_idx_r - 1'b1;
                         current_bit_idx_r <= next_bit_idx_w;
