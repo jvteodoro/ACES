@@ -137,7 +137,13 @@ module tb_aces;
         .tx_spi_cs_n_i(1'b1),
         .tx_spi_miso_o(),
         .tx_spi_window_ready_o(),
-        .tx_overflow_o()
+        .tx_overflow_o(),
+        .tx_spi_master_sclk_o(),
+        .tx_spi_master_cs_n_o(),
+        .tx_spi_master_mosi_o(),
+        .tx_spi_master_frame_pending_o(),
+        .tx_spi_master_active_o(),
+        .tx_master_overflow_o()
     );
 
     always @(posedge sample_valid_mic_o) begin

@@ -11,7 +11,9 @@ TESTS=(
   fft_dma_reader
   fft_tx_bridge_fifo
   spi_fft_tx_adapter
+  spi_fft_frame_master
   fft_tx_spi_link
+  fft_frame_spi_master_link
   aces_audio_to_fft_pipeline
   aces
   top_level_spi_fft_tx_diag

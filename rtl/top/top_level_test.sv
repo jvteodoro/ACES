@@ -232,6 +232,12 @@ module top_level_test #(
     logic tx_spi_miso_o;
     logic tx_spi_window_ready_o;
     logic tx_overflow_o;
+    logic tx_spi_master_sclk_o;
+    logic tx_spi_master_cs_n_o;
+    logic tx_spi_master_mosi_o;
+    logic tx_spi_master_frame_pending_o;
+    logic tx_spi_master_active_o;
+    logic tx_master_overflow_o;
 	
 	 logic select_audio_source;
 	 assign select_audio_source = sw7;
@@ -596,7 +602,13 @@ module top_level_test #(
         .tx_spi_cs_n_i(tx_spi_cs_n_i),
         .tx_spi_miso_o(tx_spi_miso_o),
         .tx_spi_window_ready_o(tx_spi_window_ready_o),
-        .tx_overflow_o(tx_overflow_o)
+        .tx_overflow_o(tx_overflow_o),
+        .tx_spi_master_sclk_o(tx_spi_master_sclk_o),
+        .tx_spi_master_cs_n_o(tx_spi_master_cs_n_o),
+        .tx_spi_master_mosi_o(tx_spi_master_mosi_o),
+        .tx_spi_master_frame_pending_o(tx_spi_master_frame_pending_o),
+        .tx_spi_master_active_o(tx_spi_master_active_o),
+        .tx_master_overflow_o(tx_master_overflow_o)
     );
 
     // -----------------------------------------
@@ -643,14 +655,17 @@ module top_level_test #(
 //    assign gpio_1_d3 = dbg_gpio_capture_r[2];
 //    assign gpio_1_d4 = dbg_gpio_capture_r[3] ^ (sw9 & unused_inputs_probe);
     
-    // Reaproveita a trilha fisica do TX antigo como SPI slave para o Raspberry Pi:
-    // D27=SCLK, D29=CS_N, D31=MISO e D25=window_ready/IRQ.
-	 assign gpio_1_d21 = tx_spi_window_ready_o;
-	 assign gpio_1_d23 = tx_overflow_o;
+    // Mantem o caminho SPI slave legado para compatibilidade de bancada:
+    // D27=SCLK in, D29=CS_N in, D31=MISO out, D25=window_ready.
+    //
+    // Exporta o caminho novo para o Analog Discovery como slave/passive receiver:
+    // D30=SCLK, D32=CS_N, D34=MOSI, D21=frame_pending, D23=overflow.
+	 assign gpio_1_d21 = tx_spi_master_frame_pending_o;
+	 assign gpio_1_d23 = tx_master_overflow_o | tx_overflow_o;
 	 assign gpio_1_d25 = tx_spi_window_ready_o;
-	 assign gpio_1_d30 = tx_spi_window_ready_o;
+	 assign gpio_1_d30 = tx_spi_master_sclk_o;
 	 assign gpio_1_d31 = tx_spi_miso_o;
-	 assign gpio_1_d32 = tx_overflow_o;
-	 assign gpio_1_d34 = tx_spi_miso_o;
+	 assign gpio_1_d32 = tx_spi_master_cs_n_o;
+	 assign gpio_1_d34 = tx_spi_master_mosi_o;
 
 endmodule

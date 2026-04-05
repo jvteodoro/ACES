@@ -5,7 +5,9 @@
 The active FFT export benches after the SPI refactor are:
 
 - `tb_spi_fft_tx_adapter`
+- `tb_spi_fft_frame_master`
 - `tb_fft_tx_spi_link`
+- `tb_fft_frame_spi_master_link`
 - `tb_top_level_spi_fft_tx_diag`
 - `tb_top_level_test`
 
@@ -23,6 +25,18 @@ Checks:
 - multi-window sequencing
 - no unexpected overflow on a nominal path
 
+### `tb_spi_fft_frame_master`
+
+Unit bench for `rtl/frontend/spi_fft_frame_master.sv`.
+
+Checks:
+
+- FPGA-driven SPI mode-0 timing
+- no `CS_N` activity before a complete FFT frame exists
+- clean idle behavior with no garbage clocks/data
+- correct `SOF`, `SEQ`, `COUNT`, `EXP`, and payload packing
+- signed 18-bit payload encoding for positive and negative values
+
 ### `tb_fft_tx_spi_link`
 
 Integration bench for:
@@ -37,6 +51,21 @@ Checks:
 - valid/ready to SPI drain behavior
 - multi-window handoff
 - no overflow in a nominal burst
+
+### `tb_fft_frame_spi_master_link`
+
+Integration bench for:
+
+```text
+fft_dma_reader -> spi_fft_frame_master
+```
+
+Checks:
+
+- sequential `BIN_ID` propagation from DMA readout
+- one SPI transaction per FFT frame
+- header/payload compatibility with the production parser contract
+- no transmission while the DMA reader has not yet completed a frame
 
 ### `tb_top_level_spi_fft_tx_diag`
 
@@ -72,7 +101,9 @@ Checks:
 The current SPI-related manifest filelists are:
 
 - `sim/manifest/filelists/mock_unit_spi_fft_tx_adapter.f`
+- `sim/manifest/filelists/mock_unit_spi_fft_frame_master.f`
 - `sim/manifest/filelists/mock_integration_fft_tx_spi_link.f`
+- `sim/manifest/filelists/mock_integration_fft_frame_spi_master_link.f`
 - `sim/manifest/filelists/mock_integration_top_level_spi_fft_tx_diag.f`
 - `sim/manifest/filelists/mock_integration_top_level_test.f`
 
@@ -80,7 +111,9 @@ The current SPI-related manifest filelists are:
 
 ```bash
 sim/manifest/scripts/run_questa.sh spi_fft_tx_adapter
+sim/manifest/scripts/run_questa.sh spi_fft_frame_master
 sim/manifest/scripts/run_questa.sh fft_tx_spi_link
+sim/manifest/scripts/run_questa.sh fft_frame_spi_master_link
 sim/manifest/scripts/run_questa.sh top_level_spi_fft_tx_diag
 sim/manifest/scripts/run_questa.sh top_level_test mock
 ```

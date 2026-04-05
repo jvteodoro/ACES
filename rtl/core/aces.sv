@@ -3,7 +3,10 @@ module aces #(
     parameter int FFT_DW       = 18,
     parameter int I2S_CLOCK_DIV = 16,
     parameter int TX_BRIDGE_FIFO_DEPTH = 2048,
-    parameter int TX_BFPEXP_HOLD_FRAMES = 1
+    parameter int TX_BFPEXP_HOLD_FRAMES = 1,
+    parameter int TX_SPI_MASTER_FIFO_DEPTH = 2048,
+    parameter int TX_SPI_MASTER_FRAME_FIFO_DEPTH = 8,
+    parameter int TX_SPI_MASTER_CLK_DIV = 4
 )(
     input  logic clk,
     input  logic rst,
@@ -58,21 +61,37 @@ module aces #(
     input  logic tx_spi_cs_n_i,
     output logic tx_spi_miso_o,
     output logic tx_spi_window_ready_o,
-    output logic tx_overflow_o
+    output logic tx_overflow_o,
+
+    // -----------------------------
+    // novo exportador SPI master para Analog Discovery slave
+    // -----------------------------
+    output logic tx_spi_master_sclk_o,
+    output logic tx_spi_master_cs_n_o,
+    output logic tx_spi_master_mosi_o,
+    output logic tx_spi_master_frame_pending_o,
+    output logic tx_spi_master_active_o,
+    output logic tx_master_overflow_o
 );
 
     localparam int FFT_N = $clog2(FFT_LENGTH);
+    localparam int SPI_BIN_ID_W = 9;
 
     logic dmaact_i;
     logic [FFT_N-1:0] dmaa_i;
     logic signed [FFT_DW-1:0] dmadr_real_o;
     logic signed [FFT_DW-1:0] dmadr_imag_o;
+    logic [SPI_BIN_ID_W-1:0] fft_tx_index_ext_w;
 
     // Mantido apenas para compatibilidade de interface externa.
     initial begin
         if (TX_BRIDGE_FIFO_DEPTH < 2)
             $error("aces: TX_BRIDGE_FIFO_DEPTH deve ser >= 2.");
+        if (FFT_LENGTH > 512)
+            $error("aces: o protocolo SPI atual suporta BIN_ID de 9 bits (0..511).");
     end
+
+    assign fft_tx_index_ext_w = fft_tx_index_o;
 
     // -----------------------------
     // controle físico do microfone
@@ -210,6 +229,40 @@ module aces #(
         .spi_miso_o(tx_spi_miso_o),
         .window_ready_o(tx_spi_window_ready_o),
         .spi_active_o()
+    );
+
+    // -----------------------------
+    // transmissor SPI master com frame formal
+    // -----------------------------
+    spi_fft_frame_master #(
+        .FFT_DW(FFT_DW),
+        .BFPEXP_W(8),
+        .BIN_ID_W(SPI_BIN_ID_W),
+        .WORD_W(32),
+        .FIFO_DEPTH(TX_SPI_MASTER_FIFO_DEPTH),
+        .FRAME_FIFO_DEPTH(TX_SPI_MASTER_FRAME_FIFO_DEPTH),
+        .SPI_CLK_DIV(TX_SPI_MASTER_CLK_DIV),
+        .DEFAULT_FLAGS(16'h0000)
+    ) u_spi_fft_frame_master (
+        .clk(clk),
+        .rst(rst),
+        .fft_valid_i(fft_tx_valid_o),
+        .fft_bin_index_i(fft_tx_index_ext_w),
+        .fft_real_i(fft_tx_real_o),
+        .fft_imag_i(fft_tx_imag_o),
+        .fft_last_i(fft_tx_last_o),
+        .bfpexp_i(bfpexp_o),
+        .fft_ready_o(),
+        .bin_fifo_full_o(),
+        .frame_fifo_full_o(),
+        .overflow_o(tx_master_overflow_o),
+        .bin_fifo_level_o(),
+        .frame_fifo_level_o(),
+        .frame_pending_o(tx_spi_master_frame_pending_o),
+        .spi_sclk_o(tx_spi_master_sclk_o),
+        .spi_cs_n_o(tx_spi_master_cs_n_o),
+        .spi_mosi_o(tx_spi_master_mosi_o),
+        .spi_active_o(tx_spi_master_active_o)
     );
 
 endmodule

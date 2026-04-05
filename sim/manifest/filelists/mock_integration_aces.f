@@ -3,6 +3,7 @@ tb/mocks/r2fft_tribuf_impl_mock.sv
 rtl/frontend/i2s_master_clock_gen.sv
 rtl/frontend/i2s_rx_adapter_24.sv
 rtl/frontend/spi_fft_tx_adapter.sv
+rtl/frontend/spi_fft_frame_master.sv
 rtl/common/sample_width_adapter_24_to_18.sv
 rtl/common/fft_control.sv
 rtl/common/fft_dma_reader.sv

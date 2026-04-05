@@ -772,6 +772,56 @@ module tb_top_level_test;
         end
     end
 
+    always @(dut.tx_spi_master_frame_pending_o or gpio_1_d21 or tb_rst_drive) begin
+        if (!tb_rst_drive) begin
+            assert (gpio_1_d21 === dut.tx_spi_master_frame_pending_o)
+            else $fatal(1,
+                        "GPIO_1_D21 nao reflete tx_spi_master_frame_pending_o. pin=%0b dut=%0b",
+                        gpio_1_d21,
+                        dut.tx_spi_master_frame_pending_o);
+        end
+    end
+
+    always @(dut.tx_master_overflow_o or dut.tx_overflow_o or gpio_1_d23 or tb_rst_drive) begin
+        if (!tb_rst_drive) begin
+            assert (gpio_1_d23 === (dut.tx_master_overflow_o | dut.tx_overflow_o))
+            else $fatal(1,
+                        "GPIO_1_D23 nao reflete o OR dos overflows SPI. pin=%0b dut=%0b",
+                        gpio_1_d23,
+                        (dut.tx_master_overflow_o | dut.tx_overflow_o));
+        end
+    end
+
+    always @(dut.tx_spi_master_sclk_o or gpio_1_d30 or tb_rst_drive) begin
+        if (!tb_rst_drive) begin
+            assert (gpio_1_d30 === dut.tx_spi_master_sclk_o)
+            else $fatal(1,
+                        "GPIO_1_D30 nao reflete tx_spi_master_sclk_o. pin=%0b dut=%0b",
+                        gpio_1_d30,
+                        dut.tx_spi_master_sclk_o);
+        end
+    end
+
+    always @(dut.tx_spi_master_cs_n_o or gpio_1_d32 or tb_rst_drive) begin
+        if (!tb_rst_drive) begin
+            assert (gpio_1_d32 === dut.tx_spi_master_cs_n_o)
+            else $fatal(1,
+                        "GPIO_1_D32 nao reflete tx_spi_master_cs_n_o. pin=%0b dut=%0b",
+                        gpio_1_d32,
+                        dut.tx_spi_master_cs_n_o);
+        end
+    end
+
+    always @(dut.tx_spi_master_mosi_o or gpio_1_d34 or tb_rst_drive) begin
+        if (!tb_rst_drive) begin
+            assert (gpio_1_d34 === dut.tx_spi_master_mosi_o)
+            else $fatal(1,
+                        "GPIO_1_D34 nao reflete tx_spi_master_mosi_o. pin=%0b dut=%0b",
+                        gpio_1_d34,
+                        dut.tx_spi_master_mosi_o);
+        end
+    end
+
     always @(posedge dut.u_aces.u_audio_to_fft_pipeline.sample_valid_24 or posedge tb_rst_drive) begin
         if (tb_rst_drive) begin
             sample24_count_r       <= 0;
