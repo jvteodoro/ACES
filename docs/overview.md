@@ -57,3 +57,4 @@ The microphone/frontend side remains I2S.
 - [testbenches.md](testbenches.md)
 - [spi_fft_tx_adapter.md](spi_fft_tx_adapter.md)
 - [top_level_spi_fft_tx_diag.md](top_level_spi_fft_tx_diag.md)
+- [interface_and_pin_guide.md](interface_and_pin_guide.md)

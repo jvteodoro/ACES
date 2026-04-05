@@ -4,6 +4,10 @@ ACES is an FPGA audio/FFT workspace with reproducible RTL simulation, board-orie
 
 The current branch exports FFT windows to the Raspberry Pi through SPI slave TX on the FPGA side while keeping the microphone/frontend path in I2S.
 
+Both interface possibilities (SPI and I2S host-capture flow) are documented in:
+
+- `docs/interface_and_pin_guide.md`
+
 ## Current Data Path
 
 ```text
@@ -47,6 +51,10 @@ The Raspberry Pi SPI host package lives under `submodules/ACES-RPi-interface/rpi
 - `analyzer_from_fpga_fft.py`
 - `fft_spi_logger.py`
 - `setup_rpi_spi_fft.sh`
+
+For the I2S-based Raspberry Pi tooling currently present in this repository, see:
+
+- `submodules/ACES-RPi-interface/rpi3b_i2s_fft/`
 
 ## Simulation
 
