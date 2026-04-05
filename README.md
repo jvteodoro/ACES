@@ -101,6 +101,7 @@ ls -l /dev/spidev*
 ## Docs
 
 - `docs/overview.md`
+- `docs/spi_transport_walkthrough.md`
 - `docs/architecture.md`
 - `docs/simulation.md`
 - `docs/testbenches.md`

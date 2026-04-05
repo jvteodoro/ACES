@@ -101,7 +101,8 @@ Check:
 Recommended order:
 
 1. [overview.md](overview.md)
-2. [repository_structure.md](repository_structure.md)
-3. [simulation.md](simulation.md)
-4. [testbenches.md](testbenches.md)
-5. [development_guide.md](development_guide.md)
+2. [spi_transport_walkthrough.md](spi_transport_walkthrough.md)
+3. [repository_structure.md](repository_structure.md)
+4. [simulation.md](simulation.md)
+5. [testbenches.md](testbenches.md)
+6. [development_guide.md](development_guide.md)

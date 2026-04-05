@@ -1,3 +1,15 @@
+// -----------------------------------------------------------------------------
+// top_level_spi_fft_tx_diag
+// -----------------------------------------------------------------------------
+// Top-level de laboratorio para validar exclusivamente o caminho de exportacao
+// SPI da FFT. Em vez de depender do microfone, pipeline de ingestao e nucleo
+// FFT, este modulo injeta um padrao fixo e repetitivo diretamente no adapter.
+//
+// Isso facilita tres tipos de verificacao:
+// 1. confirmar o cabeamento FPGA <-> Raspberry Pi;
+// 2. confirmar o framing SPI e a decodificacao do host;
+// 3. depurar problemas de board bring-up sem a complexidade do datapath real.
+// -----------------------------------------------------------------------------
 module top_level_spi_fft_tx_diag #(
     parameter int FFT_DW                    = 18,
     parameter int DIAG_WINDOW_BINS          = 512,
@@ -130,6 +142,8 @@ module top_level_spi_fft_tx_diag #(
 
     localparam int BFPEXP_W = 8;
     localparam int BIN_IDX_W = (DIAG_WINDOW_BINS <= 1) ? 1 : $clog2(DIAG_WINDOW_BINS);
+    // Padrao fixo escolhido para ter assinatura visual facil em dump/waveform:
+    // real e imag diferentes entre si, ambos nao triviais, e BFPEXP constante.
     localparam logic signed [FFT_DW-1:0] DIAG_FFT_REAL_C = 18'sh15555;
     localparam logic signed [FFT_DW-1:0] DIAG_FFT_IMAG_C = 18'sh0AAAB;
     localparam logic signed [BFPEXP_W-1:0] DIAG_BFPEXP_C = 8'sh12;
@@ -171,8 +185,13 @@ module top_level_spi_fft_tx_diag #(
     logic diag_window_done_w;
 
     assign clk = clock_50;
+    // Reset bruto exposto em GPIO para simplificar bench e bring-up em placa.
     assign rst = gpio_1_d1;
 
+    // O gerador diagnostico opera em "always valid": sempre que o adapter
+    // aceitar um bin, entregamos o proximo imediatamente. Assim o teste usa o
+    // maior ritmo sustentavel pelo proprio caminho SPI, mas continua totalmente
+    // deterministico.
     assign diag_fft_valid_i = diag_fft_ready_o;
     assign diag_fft_real_i  = DIAG_FFT_REAL_C;
     assign diag_fft_imag_i  = DIAG_FFT_IMAG_C;
@@ -204,6 +223,9 @@ module top_level_spi_fft_tx_diag #(
                 diag_accept_count_r <= diag_accept_count_r + 1'b1;
                 diag_heartbeat_r    <= ~diag_heartbeat_r;
 
+                // `diag_bin_index_r` modela uma janela FFT sintetica. Ao atingir
+                // o ultimo bin, ele volta para zero e registra mais uma janela
+                // produzida para o adapter.
                 if (diag_fft_last_i) begin
                     diag_bin_index_r    <= '0;
                     diag_window_count_r <= diag_window_count_r + 1'b1;
@@ -217,6 +239,8 @@ module top_level_spi_fft_tx_diag #(
     always_comb begin
         dbg_word = '0;
 
+        // As duas chaves mais baixas selecionam que informacao vai para HEX:
+        // BFPEXP constante, parte real, parte imaginaria ou pagina de status.
         unique case ({sw1, sw0})
             2'b00: dbg_word = {{16{DIAG_BFPEXP_C[BFPEXP_W-1]}}, DIAG_BFPEXP_C};
             2'b01: dbg_word = {{(24-FFT_DW){DIAG_FFT_REAL_C[FFT_DW-1]}}, DIAG_FFT_REAL_C};
@@ -230,6 +254,8 @@ module top_level_spi_fft_tx_diag #(
         endcase
     end
 
+    // LEDs entregam um resumo rapido para bancada:
+    // pronto para receber, estado da FIFO, overflow, atividade SPI e heartbeat.
     assign ledr0 = diag_fft_ready_o;
     assign ledr1 = diag_fifo_full_o;
     assign ledr2 = diag_fifo_empty_o;
@@ -255,6 +281,9 @@ module top_level_spi_fft_tx_diag #(
     hexa7seg hex4(hex4_i, hex4_o);
     hexa7seg hex5(hex5_i, hex5_o);
 
+    // O modulo em teste real eh o adapter SPI. Todo o restante deste top serve
+    // apenas para alimenta-lo com um fluxo deterministico e para espelhar sinais
+    // uteis de depuracao para LEDs, HEX e GPIOs.
     spi_fft_tx_adapter #(
         .FFT_DW(FFT_DW),
         .BFPEXP_W(BFPEXP_W),
@@ -282,6 +311,8 @@ module top_level_spi_fft_tx_diag #(
         .spi_active_o(tx_spi_active_o)
     );
 
+    // Espelha sinais em varios pinos para facilitar captura por analisador
+    // logico ou osciloscopio, mesmo quando alguns headers ja estiverem ocupados.
     assign gpio_0_d3  = diag_accept_w;
     assign gpio_0_d11 = diag_fft_ready_o;
     assign gpio_0_d12 = diag_fifo_full_o;

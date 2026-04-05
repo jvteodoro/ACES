@@ -53,6 +53,10 @@ module aces #(
 
     // -----------------------------
     // transmissao SPI FFT tagged
+    // Esta e a fronteira externa do transporte atual. O caminho de captura e
+    // processamento continua interno ao ACES; o host enxerga apenas a janela
+    // FFT pronta atraves de `window_ready` e a serializacao MISO controlada por
+    // `tx_spi_sclk_i/tx_spi_cs_n_i`.
     // -----------------------------
     input  logic tx_spi_sclk_i,
     input  logic tx_spi_cs_n_i,
@@ -184,6 +188,8 @@ module aces #(
 
     // -----------------------------
     // transmissor SPI tagged para host externo
+    // O adaptador encapsula a FIFO de ponte e preserva o contrato de palavra
+    // de 32 bits ja esperado pelo software do Raspberry Pi.
     // -----------------------------
     spi_fft_tx_adapter #(
         .FFT_DW(FFT_DW),
