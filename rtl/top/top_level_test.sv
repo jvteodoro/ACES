@@ -96,41 +96,41 @@ module top_level_test #(
     inout logic gpio_0_d34, //PIN_T17
     input logic gpio_0_d35, //PIN_T15
 
-    output logic gpio_1_d0,  //PIN_H16
-    inout logic gpio_1_d1,  //PIN_A12
-    output logic gpio_1_d2,  //PIN_H15
+    output logic gpio_1_d0,  //PIN_H16 I2S_MIC_LR
+    input logic gpio_1_d1,  //PIN_A12 reset (DIO:0)
+    output logic gpio_1_d2,  //PIN_H15 I2S_MIC_WS
     inout logic gpio_1_d3,  //PIN_B12
-    output logic gpio_1_d4,  //PIN_A13
-    inout logic gpio_1_d5,  //PIN_B13
-    input logic gpio_1_d6,  //PIN_C13
-    inout logic gpio_1_d7,  //PIN_D13
+    output logic gpio_1_d4,  //PIN_A13 I2S_MIC_SCK
+    input logic gpio_1_d5,  //PIN_B13 dbg_capture_leds (DIO:1)
+    input logic gpio_1_d6,  //PIN_C13 I2S_MIC_SD
+    input logic gpio_1_d7,  //PIN_D13 dbg_capture_hex (DIO:2)
     inout logic gpio_1_d8,  //PIN_G18
-    inout logic gpio_1_d9,  //PIN_G17
+    input logic gpio_1_d9,  //PIN_G17 dbg_capture_gpio (DIO:3)
     inout logic gpio_1_d10, //PIN_H18
-    inout logic gpio_1_d11, //PIN_J18
+    input logic gpio_1_d11, //PIN_J18 dbg_capture_clear (DIO:4)
     inout logic gpio_1_d12, //PIN_J19
-    inout logic gpio_1_d13, //PIN_G11
+    input logic gpio_1_d13, //PIN_G11 stage_1 (DIO:5)
     inout logic gpio_1_d14, //PIN_H10
-    inout logic gpio_1_d15, //PIN_J11
+    input logic gpio_1_d15, //PIN_J11 stage_0 (DIO:6)
     inout logic gpio_1_d16, //PIN_H14
-    inout logic gpio_1_d17, //PIN_A15
+    input logic gpio_1_d17, //PIN_A15 page_1 (DIO:7)
     inout logic gpio_1_d18, //PIN_J13
-    inout logic gpio_1_d19, //PIN_L8
+    input logic gpio_1_d19, //PIN_L8 page_0 (DIO:8)
     inout logic gpio_1_d20, //PIN_A14
-    output logic gpio_1_d21, //PIN_B15
+    output logic gpio_1_d21, //PIN_B15 SPI_window_ready_mirror (DIO:9)
     inout logic gpio_1_d22, //PIN_C15
-    output logic gpio_1_d23, //PIN_E14
+    output logic gpio_1_d23, //PIN_E14 SPI_overflow (DIO:10)
     inout logic gpio_1_d24, //PIN_E15
-    output logic gpio_1_d25, //PIN_E16
+    output logic gpio_1_d25, //PIN_E16 SPI_window_ready (RPi: GPIO23)
     inout logic gpio_1_d26, //PIN_F14
-    input logic gpio_1_d27, //PIN_F15
+    input logic gpio_1_d27, //PIN_F15 SPI_SCLK (RPi: GPIO11)
     inout logic gpio_1_d28, //PIN_F13
-    input logic gpio_1_d29, //PIN_F12
-    output logic gpio_1_d30, //PIN_G16
-    output logic gpio_1_d31, //PIN_G15
-    output logic gpio_1_d32, //PIN_G13
+    input logic gpio_1_d29, //PIN_F12 SPI_CS_N (RPi: GPIO8)
+    output logic gpio_1_d30, //PIN_G16 SPI_window_ready_mirror
+    output logic gpio_1_d31, //PIN_G15 SPI_MISO (RPi: GPIO9)
+    output logic gpio_1_d32, //PIN_G13 SPI_overflow_mirror
     inout logic gpio_1_d33, //PIN_G12
-    output logic gpio_1_d34, //PIN_J17
+    output logic gpio_1_d34, //PIN_J17 SPI_MISO_mirror (DIO:11)
     inout logic gpio_1_d35  //PIN_K16
 
 
@@ -655,17 +655,15 @@ module top_level_test #(
 //    assign gpio_1_d3 = dbg_gpio_capture_r[2];
 //    assign gpio_1_d4 = dbg_gpio_capture_r[3] ^ (sw9 & unused_inputs_probe);
     
-    // Mantem o caminho SPI slave legado para compatibilidade de bancada:
-    // D27=SCLK in, D29=CS_N in, D31=MISO out, D25=window_ready.
-    //
-    // Exporta o caminho novo para o Analog Discovery como slave/passive receiver:
-    // D30=SCLK, D32=CS_N, D34=MOSI, D21=frame_pending, D23=overflow.
-	 assign gpio_1_d21 = tx_spi_master_frame_pending_o;
-	 assign gpio_1_d23 = tx_master_overflow_o | tx_overflow_o;
+    // JP2 segue o pinout da bancada atual:
+    // D27/D29 entram com SCLK/CS_N do host, D31 leva MISO ao host
+    // e D21/D23/D30/D32/D34 espelham sinais de status/retorno em DIO.
+	 assign gpio_1_d21 = tx_spi_window_ready_o;
+	 assign gpio_1_d23 = tx_overflow_o;
 	 assign gpio_1_d25 = tx_spi_window_ready_o;
-	 assign gpio_1_d30 = tx_spi_master_sclk_o;
+	 assign gpio_1_d30 = tx_spi_window_ready_o;
 	 assign gpio_1_d31 = tx_spi_miso_o;
-	 assign gpio_1_d32 = tx_spi_master_cs_n_o;
-	 assign gpio_1_d34 = tx_spi_master_mosi_o;
+	 assign gpio_1_d32 = tx_overflow_o;
+	 assign gpio_1_d34 = tx_spi_miso_o;
 
 endmodule

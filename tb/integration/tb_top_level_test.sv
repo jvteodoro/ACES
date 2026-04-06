@@ -717,10 +717,10 @@ module tb_top_level_test;
     assign gpio_1_d7  = tb_capture_hex_drive;
     assign gpio_1_d9  = tb_capture_gpio_drive;
     assign gpio_1_d11 = tb_capture_clear_drive;
-    assign gpio_1_d13 = tb_dbg_stage0_drive;
-    assign gpio_1_d15 = tb_dbg_stage1_drive;
-    assign gpio_1_d17 = tb_dbg_page0_drive;
-    assign gpio_1_d19 = tb_dbg_page1_drive;
+    assign gpio_1_d13 = tb_dbg_stage1_drive;
+    assign gpio_1_d15 = tb_dbg_stage0_drive;
+    assign gpio_1_d17 = tb_dbg_page1_drive;
+    assign gpio_1_d19 = tb_dbg_page0_drive;
     assign gpio_1_d27 = tb_spi_sclk_drive;
     assign gpio_1_d29 = tb_spi_cs_n_drive;
 
@@ -772,53 +772,53 @@ module tb_top_level_test;
         end
     end
 
-    always @(dut.tx_spi_master_frame_pending_o or gpio_1_d21 or tb_rst_drive) begin
+    always @(dut.tx_spi_window_ready_o or gpio_1_d21 or tb_rst_drive) begin
         if (!tb_rst_drive) begin
-            assert (gpio_1_d21 === dut.tx_spi_master_frame_pending_o)
+            assert (gpio_1_d21 === dut.tx_spi_window_ready_o)
             else $fatal(1,
-                        "GPIO_1_D21 nao reflete tx_spi_master_frame_pending_o. pin=%0b dut=%0b",
+                        "GPIO_1_D21 nao reflete tx_spi_window_ready_o. pin=%0b dut=%0b",
                         gpio_1_d21,
-                        dut.tx_spi_master_frame_pending_o);
+                        dut.tx_spi_window_ready_o);
         end
     end
 
-    always @(dut.tx_master_overflow_o or dut.tx_overflow_o or gpio_1_d23 or tb_rst_drive) begin
+    always @(dut.tx_overflow_o or gpio_1_d23 or tb_rst_drive) begin
         if (!tb_rst_drive) begin
-            assert (gpio_1_d23 === (dut.tx_master_overflow_o | dut.tx_overflow_o))
+            assert (gpio_1_d23 === dut.tx_overflow_o)
             else $fatal(1,
-                        "GPIO_1_D23 nao reflete o OR dos overflows SPI. pin=%0b dut=%0b",
+                        "GPIO_1_D23 nao reflete tx_overflow_o. pin=%0b dut=%0b",
                         gpio_1_d23,
-                        (dut.tx_master_overflow_o | dut.tx_overflow_o));
+                        dut.tx_overflow_o);
         end
     end
 
-    always @(dut.tx_spi_master_sclk_o or gpio_1_d30 or tb_rst_drive) begin
+    always @(dut.tx_spi_window_ready_o or gpio_1_d30 or tb_rst_drive) begin
         if (!tb_rst_drive) begin
-            assert (gpio_1_d30 === dut.tx_spi_master_sclk_o)
+            assert (gpio_1_d30 === dut.tx_spi_window_ready_o)
             else $fatal(1,
-                        "GPIO_1_D30 nao reflete tx_spi_master_sclk_o. pin=%0b dut=%0b",
+                        "GPIO_1_D30 nao reflete tx_spi_window_ready_o. pin=%0b dut=%0b",
                         gpio_1_d30,
-                        dut.tx_spi_master_sclk_o);
+                        dut.tx_spi_window_ready_o);
         end
     end
 
-    always @(dut.tx_spi_master_cs_n_o or gpio_1_d32 or tb_rst_drive) begin
+    always @(dut.tx_overflow_o or gpio_1_d32 or tb_rst_drive) begin
         if (!tb_rst_drive) begin
-            assert (gpio_1_d32 === dut.tx_spi_master_cs_n_o)
+            assert (gpio_1_d32 === dut.tx_overflow_o)
             else $fatal(1,
-                        "GPIO_1_D32 nao reflete tx_spi_master_cs_n_o. pin=%0b dut=%0b",
+                        "GPIO_1_D32 nao reflete tx_overflow_o. pin=%0b dut=%0b",
                         gpio_1_d32,
-                        dut.tx_spi_master_cs_n_o);
+                        dut.tx_overflow_o);
         end
     end
 
-    always @(dut.tx_spi_master_mosi_o or gpio_1_d34 or tb_rst_drive) begin
+    always @(dut.tx_spi_miso_o or gpio_1_d34 or tb_rst_drive) begin
         if (!tb_rst_drive) begin
-            assert (gpio_1_d34 === dut.tx_spi_master_mosi_o)
+            assert (gpio_1_d34 === dut.tx_spi_miso_o)
             else $fatal(1,
-                        "GPIO_1_D34 nao reflete tx_spi_master_mosi_o. pin=%0b dut=%0b",
+                        "GPIO_1_D34 nao reflete tx_spi_miso_o. pin=%0b dut=%0b",
                         gpio_1_d34,
-                        dut.tx_spi_master_mosi_o);
+                        dut.tx_spi_miso_o);
         end
     end
 

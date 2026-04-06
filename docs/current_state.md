@@ -27,18 +27,17 @@ The workspace currently carries two SPI export paths in parallel.
 
 ## Pin Mapping
 
-- Legacy slave path:
+- Host SPI path on JP2:
   - `GPIO_1_D27`: SPI `SCLK` input
   - `GPIO_1_D29`: SPI `CS_N` input
   - `GPIO_1_D31`: SPI `MISO` output
   - `GPIO_1_D25`: `window_ready`
-- New master path:
-  - `GPIO_1_D30`: SPI `SCLK` output
-  - `GPIO_1_D32`: SPI `CS_N` output
-  - `GPIO_1_D34`: SPI `MOSI` output
-  - `GPIO_1_D21`: `frame_pending`
-- Shared debug:
-  - `GPIO_1_D23`: OR de overflow do SPI slave e do SPI master
+- Mirrored observability pins on JP2:
+  - `GPIO_1_D21`: `window_ready` mirror
+  - `GPIO_1_D23`: SPI overflow
+  - `GPIO_1_D30`: `window_ready` mirror
+  - `GPIO_1_D32`: SPI overflow mirror
+  - `GPIO_1_D34`: SPI `MISO` mirror
 
 ## Simulation Targets
 

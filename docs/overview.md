@@ -52,11 +52,13 @@ The microphone/frontend side remains I2S.
 
 ## Analog Discovery Wiring
 
-- `GPIO_1_D30`: SPI master `SCLK` output from FPGA
-- `GPIO_1_D32`: SPI master `CS_N` output from FPGA
-- `GPIO_1_D34`: SPI master `MOSI` output from FPGA
-- `GPIO_1_D21`: `frame_pending` debug/output
-- `GPIO_1_D23`: overflow debug output for either SPI path
+- `GPIO_1_D27`: SPI `SCLK` input from the host
+- `GPIO_1_D29`: SPI `CS_N` input from the host
+- `GPIO_1_D31`: SPI `MISO` output back to the host
+- `GPIO_1_D25`: `window_ready` output to the host
+- `GPIO_1_D21` and `GPIO_1_D30`: mirrored `window_ready`
+- `GPIO_1_D23` and `GPIO_1_D32`: SPI overflow monitors
+- `GPIO_1_D34`: mirrored SPI `MISO`
 
 ## Supported Simulation Targets
 

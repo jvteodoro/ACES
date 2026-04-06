@@ -55,7 +55,7 @@ That keeps the bridge dumb and stable: WaveForms-specific logic stays in Windows
 
 ## FPGA Side Expectations
 
-The production decoder assumes the FPGA is the SPI master and the Analog Discovery only observes the bus:
+The production decoder assumes the external host drives `SCLK`/`CS_N`, the FPGA returns `MISO`, and the Analog Discovery only observes the bus:
 
 - one `CS` low pulse corresponds to one FFT frame
 - the frame layout is `header0, header1, header2, payload...`
@@ -63,15 +63,15 @@ The production decoder assumes the FPGA is the SPI master and the Analog Discove
 - SPI timing is mode 0 by default
 - idle bus must remain quiescent between FFT frames
 
-The matching RTL transport is documented in `docs/spi_fft_frame_master_protocol.md`.
+The matching RTL transport is the external-host SPI path exported by `rtl/top/top_level_test.sv`.
 
 In `rtl/top/top_level_test.sv`, the intended board wiring for that path is:
 
-- `GPIO_1_D30` -> Analog Discovery digital input used as `SCLK`
-- `GPIO_1_D32` -> Analog Discovery digital input used as `CS`
-- `GPIO_1_D34` -> Analog Discovery digital input used as `MOSI`
-- `GPIO_1_D21` -> optional `frame_pending` monitor
-- `GPIO_1_D23` -> optional overflow monitor
+- `GPIO_1_D27` -> host-driven `SCLK` line (can be tapped passively by Analog Discovery)
+- `GPIO_1_D29` -> host-driven `CS_N` line (can be tapped passively by Analog Discovery)
+- `GPIO_1_D31` or `GPIO_1_D34` -> FPGA `MISO`
+- `GPIO_1_D25`, `GPIO_1_D21` or `GPIO_1_D30` -> `window_ready`
+- `GPIO_1_D23` or `GPIO_1_D32` -> overflow monitor
 
 ## Execution
 
