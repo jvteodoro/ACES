@@ -1,6 +1,6 @@
 # Quartus source manifest for the active board-oriented top-level.
 # Load this project from quartus/top_level_test.qpf and Quartus will import
-# all RTL/IP files required to elaborate the `top_level_test` entity.
+# all RTL/IP files required to elaborate the `top_level_mic_passthrough` entity.
 
 set project_dir [file dirname [info script]]
 set repo_root [file normalize [file join $project_dir ..]]
@@ -20,10 +20,8 @@ foreach relpath {
     rtl/common/sample_width_adapter_24_to_18.sv
     rtl/common/fft_control.sv
     rtl/common/fft_dma_reader.sv
-    rtl/common/fft_tx_bridge_fifo.sv
     rtl/frontend/i2s_master_clock_gen.sv
     rtl/frontend/i2s_rx_adapter_24.sv
-    rtl/frontend/i2s_fft_tx_adapter.sv
     rtl/core/aces_audio_to_fft_pipeline.sv
     rtl/core/aces.sv
     rtl/stimulus/i2s_stimulus_manager_rom.sv
@@ -46,7 +44,7 @@ foreach relpath {
     submodules/R2FFT/hdl/writeBusMux_tribuf.sv
     submodules/R2FFT/quartus/r2fft_impl.sv
     submodules/R2FFT/quartus/r2fft_tribuf_impl.sv
-    rtl/top/top_level_test.sv
+    rtl/top/top_level_mic_passthrough.sv
 } {
     add_repo_file $repo_root $relpath SYSTEMVERILOG_FILE
 }
@@ -56,7 +54,6 @@ foreach relpath {
 # depend on duplicate twrom/dpram definitions inside the restored snapshot.
 foreach relpath {
     rtl/ip/rom/signals_rom_ip.qip
-    rtl/ip/output_fifo/fft_output_fifo.qip
     rtl/ip/fft/dpram.qip
     rtl/ip/fft/twrom.qip
 } {
