@@ -175,7 +175,7 @@ module top_level_i2s_fft_tx_diag #(
     logic diag_window_done_w;
 
     assign clk = clock_50;
-    assign rst = gpio_1_d1;
+    assign rst = gpio_0_d1;
 
     assign diag_fft_valid_i = diag_fft_ready_o;
     assign diag_fft_real_i  = DIAG_FFT_REAL_C;
@@ -191,6 +191,8 @@ module top_level_i2s_fft_tx_diag #(
             $error("top_level_i2s_fft_tx_diag: FFT_DW deve permanecer em 18 para casar com o contrato do host.");
         if (DIAG_WINDOW_BINS < 1)
             $error("top_level_i2s_fft_tx_diag: DIAG_WINDOW_BINS deve ser >= 1.");
+        if (DIAG_WINDOW_BINS > 512)
+            $error("top_level_i2s_fft_tx_diag: DIAG_WINDOW_BINS deve caber na faixa 512..1023 do protocolo I2S.");
     end
 
     always_ff @(posedge clk or posedge rst) begin
@@ -261,6 +263,7 @@ module top_level_i2s_fft_tx_diag #(
 
     i2s_fft_tx_adapter #(
         .FFT_DW(FFT_DW),
+        .FFT_INDEX_W(BIN_IDX_W),
         .BFPEXP_W(BFPEXP_W),
         .I2S_SAMPLE_W(I2S_SAMPLE_W),
         .I2S_SLOT_W(I2S_SLOT_W),
@@ -271,6 +274,7 @@ module top_level_i2s_fft_tx_diag #(
         .clk(clk),
         .rst(rst),
         .fft_valid_i(diag_fft_valid_i),
+        .fft_index_i(diag_bin_index_r),
         .fft_real_i(diag_fft_real_i),
         .fft_imag_i(diag_fft_imag_i),
         .fft_last_i(diag_fft_last_i),

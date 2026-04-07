@@ -282,6 +282,7 @@ module aces #(
     // -----------------------------
     i2s_fft_tx_adapter #(
         .FFT_DW(FFT_DW),
+        .FFT_INDEX_W(FFT_N),
         .BFPEXP_W(8),
         .I2S_SAMPLE_W(FFT_DW),
         .I2S_SLOT_W(32),
@@ -292,6 +293,7 @@ module aces #(
         .clk(clk),
         .rst(rst),
         .fft_valid_i(tx_fft_valid_i),
+        .fft_index_i(tx_fft_read_index_r),
         .fft_real_i(tx_fft_real_i),
         .fft_imag_i(tx_fft_imag_i),
         .fft_last_i(tx_fft_last_i),

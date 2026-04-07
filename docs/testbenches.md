@@ -27,8 +27,8 @@ Characteristics:
 
 Current examples in this repository:
 
-- `tb_fft_tx_bridge_fifo` verifies aligned FIFO semantics for `(real, imag, last, bfpexp)`.
-- `tb_i2s_fft_tx_adapter` verifies tagged I2S framing, hold frames, and serializer timing.
+- `tb_fft_tx_bridge_fifo` verifies aligned FIFO semantics for `(fft_index, real, imag, last, bfpexp)`.
+- `tb_i2s_fft_tx_adapter` verifies tagged I2S framing, packet-index sequencing, hold frames, and serializer timing.
 
 ## Integration Testbenches
 
@@ -44,8 +44,9 @@ These tests validate contracts between modules rather than just local combinatio
 Current examples in this repository:
 
 - `tb_aces_audio_to_fft_pipeline` verifies receive-side frontend composition.
-- `tb_fft_tx_i2s_link` verifies burst-to-serial behavior across `fft_tx_bridge_fifo` and `i2s_fft_tx_adapter`.
-- `tb_top_level_i2s_fft_tx_diag` verifies the board-facing tagged-I2S diagnostic top-level with a deterministic fixed-pattern source.
+- `tb_fft_tx_i2s_link` verifies burst-to-serial behavior across `fft_tx_bridge_fifo` and `i2s_fft_tx_adapter`, including indexed BFPEXP and indexed FFT bins.
+- `tb_top_level_i2s_fft_tx_diag` verifies the board-facing tagged-I2S diagnostic top-level with a deterministic fixed-pattern source and asserts the expected packet-index values on the wire.
+- `tb_top_level_test` verifies the real ACES end-to-end transmit path with the same indexed transport contract after the FFT pipeline produces output.
 - `tb_top_level_fft_isolated` verifies the real FFT control/readout path inside the top-level wrapper while isolating it from the rest of the end-to-end bench.
 
 ## Mock vs Real-IP Testbenches
@@ -120,6 +121,7 @@ Good wave files reduce rework during collaborative debug because everyone starts
 - Use readable localparams for widths, depths, and timing constants.
 - Assert structural contracts, not just final outputs.
 - When checking serialized interfaces, verify both data and framing behavior.
+- For packetized transports, assert metadata consistency as well as payload, such as left/right tag equality, packet-index equality, and reserved-bit cleanliness.
 - Prefer deterministic ROM-backed or local-array-backed stimulus over opaque random behavior.
 - Make failure messages specific enough that a headless run is still useful.
 - Prefer fail-fast checks for manifest-supported regression benches so `run_questa.sh` can stop immediately on a real mismatch.

@@ -1,5 +1,6 @@
 module fft_tx_bridge_fifo #(
     parameter int FFT_DW     = 18,
+    parameter int FFT_INDEX_W = 9,
     parameter int BFPEXP_W   = 8,
     parameter int FIFO_DEPTH = 2048
 )(
@@ -7,6 +8,7 @@ module fft_tx_bridge_fifo #(
     input  logic rst,
 
     input  logic push_i,
+    input  logic [FFT_INDEX_W-1:0] fft_index_i,
     input  logic signed [FFT_DW-1:0] fft_real_i,
     input  logic signed [FFT_DW-1:0] fft_imag_i,
     input  logic fft_last_i,
@@ -15,6 +17,7 @@ module fft_tx_bridge_fifo #(
     input  logic pop_i,
 
     output logic valid_o,
+    output logic [FFT_INDEX_W-1:0] fft_index_o,
     output logic signed [FFT_DW-1:0] fft_real_o,
     output logic signed [FFT_DW-1:0] fft_imag_o,
     output logic fft_last_o,
@@ -26,8 +29,13 @@ module fft_tx_bridge_fifo #(
     output logic [$clog2(FIFO_DEPTH+1)-1:0] level_o
 );
 
-    localparam int ENTRY_W = (2 * FFT_DW) + BFPEXP_W + 1;
-    localparam int PTR_W   = (FIFO_DEPTH <= 1) ? 1 : $clog2(FIFO_DEPTH);
+    localparam int ENTRY_W    = FFT_INDEX_W + (2 * FFT_DW) + BFPEXP_W + 1;
+    localparam int PTR_W      = (FIFO_DEPTH <= 1) ? 1 : $clog2(FIFO_DEPTH);
+    localparam int BFPEXP_LSB = 0;
+    localparam int LAST_LSB   = BFPEXP_W;
+    localparam int IMAG_LSB   = BFPEXP_W + 1;
+    localparam int REAL_LSB   = BFPEXP_W + 1 + FFT_DW;
+    localparam int INDEX_LSB  = BFPEXP_W + 1 + (2 * FFT_DW);
 
     logic [ENTRY_W-1:0] fifo_mem [0:FIFO_DEPTH-1];
     logic [PTR_W-1:0] wptr_r;
@@ -50,10 +58,11 @@ module fft_tx_bridge_fifo #(
     assign valid_o    = (level_o != '0);
     assign empty_o    = (level_o == '0);
     assign full_o     = (level_o == FIFO_DEPTH);
-    assign fft_real_o = empty_o ? '0 : head_word[ENTRY_W-1 -: FFT_DW];
-    assign fft_imag_o = empty_o ? '0 : head_word[BFPEXP_W+1 +: FFT_DW];
-    assign fft_last_o = empty_o ? 1'b0 : head_word[BFPEXP_W];
-    assign bfpexp_o   = empty_o ? '0 : head_word[BFPEXP_W-1:0];
+    assign fft_index_o = empty_o ? '0 : head_word[INDEX_LSB +: FFT_INDEX_W];
+    assign fft_real_o  = empty_o ? '0 : head_word[REAL_LSB +: FFT_DW];
+    assign fft_imag_o  = empty_o ? '0 : head_word[IMAG_LSB +: FFT_DW];
+    assign fft_last_o  = empty_o ? 1'b0 : head_word[LAST_LSB];
+    assign bfpexp_o    = empty_o ? '0 : head_word[BFPEXP_LSB +: BFPEXP_W];
 
     initial begin
         if (FIFO_DEPTH < 1)
@@ -75,7 +84,7 @@ module fft_tx_bridge_fifo #(
             overflow_o  <= push_i && full_o && !do_pop;
 
             if (do_push) begin
-                fifo_mem[wptr_r] <= {fft_real_i, fft_imag_i, fft_last_i, bfpexp_i};
+                fifo_mem[wptr_r] <= {fft_index_i, fft_real_i, fft_imag_i, fft_last_i, bfpexp_i};
                 wptr_r <= fifo_inc_ptr(wptr_r);
             end
 

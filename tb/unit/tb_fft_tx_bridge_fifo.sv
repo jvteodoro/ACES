@@ -3,6 +3,7 @@
 module tb_fft_tx_bridge_fifo;
 
     localparam int FFT_DW     = 18;
+    localparam int FFT_INDEX_W = 3;
     localparam int BFPEXP_W   = 8;
     localparam int FIFO_DEPTH = 4;
     localparam time CLK_HALF  = 5ns;
@@ -11,6 +12,7 @@ module tb_fft_tx_bridge_fifo;
     logic rst;
 
     logic push_i;
+    logic [FFT_INDEX_W-1:0] fft_index_i;
     logic signed [FFT_DW-1:0] fft_real_i;
     logic signed [FFT_DW-1:0] fft_imag_i;
     logic fft_last_i;
@@ -19,6 +21,7 @@ module tb_fft_tx_bridge_fifo;
     logic pop_i;
 
     logic valid_o;
+    logic [FFT_INDEX_W-1:0] fft_index_o;
     logic signed [FFT_DW-1:0] fft_real_o;
     logic signed [FFT_DW-1:0] fft_imag_o;
     logic fft_last_o;
@@ -32,18 +35,21 @@ module tb_fft_tx_bridge_fifo;
 
     fft_tx_bridge_fifo #(
         .FFT_DW(FFT_DW),
+        .FFT_INDEX_W(FFT_INDEX_W),
         .BFPEXP_W(BFPEXP_W),
         .FIFO_DEPTH(FIFO_DEPTH)
     ) dut (
         .clk(clk),
         .rst(rst),
         .push_i(push_i),
+        .fft_index_i(fft_index_i),
         .fft_real_i(fft_real_i),
         .fft_imag_i(fft_imag_i),
         .fft_last_i(fft_last_i),
         .bfpexp_i(bfpexp_i),
         .pop_i(pop_i),
         .valid_o(valid_o),
+        .fft_index_o(fft_index_o),
         .fft_real_o(fft_real_o),
         .fft_imag_o(fft_imag_o),
         .fft_last_o(fft_last_o),
@@ -76,6 +82,7 @@ module tb_fft_tx_bridge_fifo;
     endtask
 
     task automatic push_one(
+        input logic [FFT_INDEX_W-1:0] index_i,
         input logic signed [FFT_DW-1:0] real_i,
         input logic signed [FFT_DW-1:0] imag_i,
         input logic last_i,
@@ -84,6 +91,7 @@ module tb_fft_tx_bridge_fifo;
         begin
             @(negedge clk);
             push_i      = 1'b1;
+            fft_index_i = index_i;
             fft_real_i  = real_i;
             fft_imag_i  = imag_i;
             fft_last_i  = last_i;
@@ -96,6 +104,7 @@ module tb_fft_tx_bridge_fifo;
     endtask
 
     task automatic pop_expect(
+        input logic [FFT_INDEX_W-1:0] index_e,
         input logic signed [FFT_DW-1:0] real_e,
         input logic signed [FFT_DW-1:0] imag_e,
         input logic last_e,
@@ -104,6 +113,9 @@ module tb_fft_tx_bridge_fifo;
         begin
             assert (valid_o)
             else $fatal(1, "FIFO deveria estar valida antes do pop.");
+
+            assert (fft_index_o === index_e)
+            else $fatal(1, "index mismatch: exp=%0d got=%0d", index_e, fft_index_o);
 
             assert (fft_real_o === real_e)
             else $fatal(1, "real mismatch: exp=%0d got=%0d", real_e, fft_real_o);
@@ -126,6 +138,7 @@ module tb_fft_tx_bridge_fifo;
     endtask
 
     task automatic push_pop_same_cycle(
+        input logic [FFT_INDEX_W-1:0] push_index_i,
         input logic signed [FFT_DW-1:0] push_real_i,
         input logic signed [FFT_DW-1:0] push_imag_i,
         input logic push_last_i,
@@ -135,6 +148,7 @@ module tb_fft_tx_bridge_fifo;
             @(negedge clk);
             push_i      = 1'b1;
             pop_i       = 1'b1;
+            fft_index_i = push_index_i;
             fft_real_i  = push_real_i;
             fft_imag_i  = push_imag_i;
             fft_last_i  = push_last_i;
@@ -168,6 +182,7 @@ module tb_fft_tx_bridge_fifo;
         rst        = 1'b1;
         push_i     = 1'b0;
         pop_i      = 1'b0;
+        fft_index_i = '0;
         fft_real_i = '0;
         fft_imag_i = '0;
         fft_last_i = 1'b0;
@@ -180,47 +195,47 @@ module tb_fft_tx_bridge_fifo;
         assert (overflow_o == 1'b0)
         else $fatal(1, "overflow_o deveria iniciar em 0.");
 
-        push_one(18'sd10, -18'sd10, 1'b0, 8'sd3);
+        push_one(3'd0, 18'sd10, -18'sd10, 1'b0, 8'sd3);
         expect_status(1, 1'b0, 1'b0);
-        assert (fft_real_o === 18'sd10 && fft_imag_o === -18'sd10)
+        assert ((fft_index_o === 3'd0) && (fft_real_o === 18'sd10) && (fft_imag_o === -18'sd10))
         else $fatal(1, "Cabeca da FIFO nao refletiu o primeiro push.");
 
-        push_one(18'sd20, -18'sd20, 1'b0, 8'sd4);
+        push_one(3'd1, 18'sd20, -18'sd20, 1'b0, 8'sd4);
         expect_status(2, 1'b0, 1'b0);
-        assert (fft_real_o === 18'sd10)
+        assert ((fft_index_o === 3'd0) && (fft_real_o === 18'sd10))
         else $fatal(1, "FIFO deveria preservar a ordenacao na cabeca.");
 
-        pop_expect(18'sd10, -18'sd10, 1'b0, 8'sd3);
+        pop_expect(3'd0, 18'sd10, -18'sd10, 1'b0, 8'sd3);
         expect_status(1, 1'b0, 1'b0);
-        pop_expect(18'sd20, -18'sd20, 1'b0, 8'sd4);
+        pop_expect(3'd1, 18'sd20, -18'sd20, 1'b0, 8'sd4);
         expect_status(0, 1'b1, 1'b0);
 
-        push_one(18'sd1, -18'sd1, 1'b0, 8'sd1);
-        push_one(18'sd2, -18'sd2, 1'b0, 8'sd2);
-        push_one(18'sd3, -18'sd3, 1'b0, 8'sd3);
-        push_one(18'sd4, -18'sd4, 1'b1, 8'sd4);
+        push_one(3'd0, 18'sd1, -18'sd1, 1'b0, 8'sd1);
+        push_one(3'd1, 18'sd2, -18'sd2, 1'b0, 8'sd2);
+        push_one(3'd2, 18'sd3, -18'sd3, 1'b0, 8'sd3);
+        push_one(3'd3, 18'sd4, -18'sd4, 1'b1, 8'sd4);
         expect_status(FIFO_DEPTH, 1'b0, 1'b1);
-        assert (fft_real_o === 18'sd1)
+        assert ((fft_index_o === 3'd0) && (fft_real_o === 18'sd1))
         else $fatal(1, "Cabeca deveria permanecer no primeiro elemento apos enchimento.");
 
-        push_one(18'sd99, -18'sd99, 1'b0, 8'sd7);
+        push_one(3'd7, 18'sd99, -18'sd99, 1'b0, 8'sd7);
         #1;
         assert (overflow_o)
         else $fatal(1, "overflow_o deveria pulsar apos push em FIFO cheia.");
         expect_status(FIFO_DEPTH, 1'b0, 1'b1);
-        assert (fft_real_o === 18'sd1 && fft_imag_o === -18'sd1)
+        assert ((fft_index_o === 3'd0) && (fft_real_o === 18'sd1) && (fft_imag_o === -18'sd1))
         else $fatal(1, "Push com overflow nao deve corromper a cabeca da FIFO.");
 
-        push_pop_same_cycle(18'sd55, -18'sd55, 1'b1, -8'sd5);
+        push_pop_same_cycle(3'd4, 18'sd55, -18'sd55, 1'b1, -8'sd5);
         #1;
         assert (overflow_o == 1'b0)
         else $fatal(1, "Push+pop simultaneo nao deveria gerar overflow.");
         expect_status(FIFO_DEPTH, 1'b0, 1'b1);
 
-        pop_expect(18'sd2, -18'sd2, 1'b0, 8'sd2);
-        pop_expect(18'sd3, -18'sd3, 1'b0, 8'sd3);
-        pop_expect(18'sd4, -18'sd4, 1'b1, 8'sd4);
-        pop_expect(18'sd55, -18'sd55, 1'b1, -8'sd5);
+        pop_expect(3'd1, 18'sd2, -18'sd2, 1'b0, 8'sd2);
+        pop_expect(3'd2, 18'sd3, -18'sd3, 1'b0, 8'sd3);
+        pop_expect(3'd3, 18'sd4, -18'sd4, 1'b1, 8'sd4);
+        pop_expect(3'd4, 18'sd55, -18'sd55, 1'b1, -8'sd5);
         expect_status(0, 1'b1, 1'b0);
 
         $display("tb_fft_tx_bridge_fifo PASSED");

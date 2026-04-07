@@ -7,6 +7,7 @@
 //
 // Contrato de entrada:
 // - A FFT entrega pares (real, imag) com um pulso em fft_valid_i.
+// - fft_index_i carrega o numero do bin dentro da janela atual.
 // - fft_last_i identifica o ultimo bin de uma janela.
 // - bfpexp_i deve permanecer valido junto do primeiro bin da janela.
 //
@@ -19,7 +20,10 @@
 //     right = parte imaginaria
 //
 // Formato do slot I2S:
-// - 2 bits de tag em-band nos bits mais altos do slot:
+// - 10 bits de indice de transporte nos bits mais altos do slot:
+//     0 .. BFPEXP_HOLD_FRAMES-1 = repeticoes do bfpexp
+//     512 .. 512+FFT_LENGTH-1   = bins FFT indexados
+// - 2 bits de tag em-band logo abaixo do indice:
 //     2'd0 = IDLE, 2'd1 = BFPEXP, 2'd2 = FFT
 // - I2S_SAMPLE_W bits de payload signed nos bits menos significativos.
 // - bits intermediarios reservados em zero ate completar I2S_SLOT_W bits.
@@ -35,6 +39,7 @@
 // -----------------------------------------------------------------------------
 module i2s_fft_tx_adapter #(
     parameter int FFT_DW              = 18,
+    parameter int FFT_INDEX_W         = 9,
     parameter int BFPEXP_W            = 8,
     parameter int I2S_SAMPLE_W        = 18,
     parameter int I2S_SLOT_W          = 32,
@@ -46,6 +51,7 @@ module i2s_fft_tx_adapter #(
     input  logic rst,
 
     input  logic fft_valid_i,
+    input  logic [FFT_INDEX_W-1:0] fft_index_i,
     input  logic signed [FFT_DW-1:0] fft_real_i,
     input  logic signed [FFT_DW-1:0] fft_imag_i,
     input  logic fft_last_i,
@@ -62,10 +68,11 @@ module i2s_fft_tx_adapter #(
     output logic i2s_sd_o
 );
 
-    localparam int SLOT_BIT_W    = (I2S_SLOT_W <= 1) ? 1 : $clog2(I2S_SLOT_W);
-    localparam int HOLD_CNT_W    = $clog2(BFPEXP_HOLD_FRAMES + 1);
-    localparam int TAG_W         = 2;
-    localparam int RESERVED_W    = I2S_SLOT_W - I2S_SAMPLE_W - TAG_W;
+    localparam int SLOT_BIT_W     = (I2S_SLOT_W <= 1) ? 1 : $clog2(I2S_SLOT_W);
+    localparam int HOLD_CNT_W     = $clog2(BFPEXP_HOLD_FRAMES + 1);
+    localparam int PACKET_INDEX_W = 10;
+    localparam int TAG_W          = 2;
+    localparam int RESERVED_W     = I2S_SLOT_W - I2S_SAMPLE_W - TAG_W - PACKET_INDEX_W;
     localparam int DIV_CNT_W     = (CLOCK_DIV <= 1) ? 1 : $clog2(CLOCK_DIV);
     localparam int FIFO_LEVEL_W  = $clog2(FIFO_DEPTH + 1);
     localparam logic [DIV_CNT_W-1:0] WS_PREP_DIV_C =
@@ -73,6 +80,8 @@ module i2s_fft_tx_adapter #(
     localparam logic [HOLD_CNT_W-1:0] BFPEXP_HOLD_FRAMES_C = HOLD_CNT_W'(BFPEXP_HOLD_FRAMES);
     localparam logic [HOLD_CNT_W-1:0] ONE_HOLD_FRAME_C     = {{(HOLD_CNT_W-1){1'b0}}, 1'b1};
     localparam logic [FIFO_LEVEL_W-1:0] ONE_FIFO_LEVEL_C   = {{(FIFO_LEVEL_W-1){1'b0}}, 1'b1};
+    localparam logic [PACKET_INDEX_W-1:0] FFT_PACKET_INDEX_BASE_C =
+        PACKET_INDEX_W'(1 << (PACKET_INDEX_W-1));
     localparam logic [TAG_W-1:0] TAG_IDLE_C   = 2'd0;
     localparam logic [TAG_W-1:0] TAG_BFPEXP_C = 2'd1;
     localparam logic [TAG_W-1:0] TAG_FFT_C    = 2'd2;
@@ -84,18 +93,21 @@ module i2s_fft_tx_adapter #(
     logic [SLOT_BIT_W-1:0] slot_bit_r;
 
     logic active_valid_r;
+    logic [PACKET_INDEX_W-1:0] active_packet_index_r;
     logic [TAG_W-1:0] active_tag_r;
     logic signed [I2S_SAMPLE_W-1:0] active_left_r;
     logic signed [I2S_SAMPLE_W-1:0] active_right_r;
     logic [HOLD_CNT_W-1:0] active_hold_frames_r;
 
     logic pending_valid_r;
+    logic [FFT_INDEX_W-1:0] pending_index_r;
     logic signed [FFT_DW-1:0] pending_real_r;
     logic signed [FFT_DW-1:0] pending_imag_r;
     logic pending_last_r;
     logic signed [BFPEXP_W-1:0] pending_bfpexp_r;
 
     logic stalled_input_valid_r;
+    logic [FFT_INDEX_W-1:0] stalled_index_r;
     logic signed [FFT_DW-1:0] stalled_real_r;
     logic signed [FFT_DW-1:0] stalled_imag_r;
     logic stalled_last_r;
@@ -118,13 +130,14 @@ module i2s_fft_tx_adapter #(
     endfunction
 
     function automatic logic i2s_slot_bit(
+        input logic [PACKET_INDEX_W-1:0] packet_index_i,
         input logic [TAG_W-1:0] tag_i,
         input logic signed [I2S_SAMPLE_W-1:0] sample_i,
         input logic [SLOT_BIT_W-1:0] bit_idx_i
     );
         logic [I2S_SLOT_W-1:0] slot_word;
         begin
-            slot_word = {tag_i, {RESERVED_W{1'b0}}, sample_i};
+            slot_word = {packet_index_i, tag_i, {RESERVED_W{1'b0}}, sample_i};
             i2s_slot_bit = slot_word[I2S_SLOT_W-1-bit_idx_i];
         end
     endfunction
@@ -135,14 +148,18 @@ module i2s_fft_tx_adapter #(
     assign fifo_level_o  = pending_valid_r ? ONE_FIFO_LEVEL_C : '0;
 
     initial begin
-        if (I2S_SAMPLE_W > (I2S_SLOT_W - TAG_W))
-            $error("i2s_fft_tx_adapter: I2S_SAMPLE_W deve caber no slot junto com os bits de tag.");
+        if (I2S_SAMPLE_W > (I2S_SLOT_W - TAG_W - PACKET_INDEX_W))
+            $error("i2s_fft_tx_adapter: I2S_SAMPLE_W deve caber no slot junto com tag e indice.");
         if (I2S_SAMPLE_W < FFT_DW)
             $error("i2s_fft_tx_adapter: I2S_SAMPLE_W deve ser >= FFT_DW.");
         if (I2S_SAMPLE_W < BFPEXP_W)
             $error("i2s_fft_tx_adapter: I2S_SAMPLE_W deve ser >= BFPEXP_W.");
+        if (FFT_INDEX_W > (PACKET_INDEX_W-1))
+            $error("i2s_fft_tx_adapter: FFT_INDEX_W deve caber abaixo da faixa 512..1023.");
         if (BFPEXP_HOLD_FRAMES < 1)
             $error("i2s_fft_tx_adapter: BFPEXP_HOLD_FRAMES deve ser >= 1.");
+        if (BFPEXP_HOLD_FRAMES > FFT_PACKET_INDEX_BASE_C)
+            $error("i2s_fft_tx_adapter: BFPEXP_HOLD_FRAMES deve caber na faixa 0..511.");
         if (CLOCK_DIV < 2)
             $error("i2s_fft_tx_adapter: CLOCK_DIV deve ser >= 2 para garantir setup do WS.");
     end
@@ -159,18 +176,21 @@ module i2s_fft_tx_adapter #(
             slot_bit_r                  <= '0;
 
             active_valid_r              <= 1'b0;
+            active_packet_index_r       <= '0;
             active_tag_r                <= TAG_IDLE_C;
             active_left_r               <= '0;
             active_right_r              <= '0;
             active_hold_frames_r        <= '0;
 
             pending_valid_r             <= 1'b0;
+            pending_index_r             <= '0;
             pending_real_r              <= '0;
             pending_imag_r              <= '0;
             pending_last_r              <= 1'b0;
             pending_bfpexp_r            <= '0;
 
             stalled_input_valid_r       <= 1'b0;
+            stalled_index_r             <= '0;
             stalled_real_r              <= '0;
             stalled_imag_r              <= '0;
             stalled_last_r              <= 1'b0;
@@ -181,6 +201,7 @@ module i2s_fft_tx_adapter #(
             logic next_channel;
             logic [SLOT_BIT_W-1:0] next_slot_bit;
             logic next_active_valid;
+            logic [PACKET_INDEX_W-1:0] next_active_packet_index;
             logic [TAG_W-1:0] next_active_tag;
             logic signed [I2S_SAMPLE_W-1:0] next_active_left;
             logic signed [I2S_SAMPLE_W-1:0] next_active_right;
@@ -194,11 +215,13 @@ module i2s_fft_tx_adapter #(
             if (pending_valid_r && fft_valid_i) begin
                 if (!stalled_input_valid_r) begin
                     stalled_input_valid_r <= 1'b1;
+                    stalled_index_r       <= fft_index_i;
                     stalled_real_r        <= fft_real_i;
                     stalled_imag_r        <= fft_imag_i;
                     stalled_last_r        <= fft_last_i;
                     stalled_bfpexp_r      <= bfpexp_i;
-                end else if ((fft_real_i  !== stalled_real_r)   ||
+                end else if ((fft_index_i !== stalled_index_r)  ||
+                             (fft_real_i  !== stalled_real_r)   ||
                              (fft_imag_i  !== stalled_imag_r)   ||
                              (fft_last_i  !== stalled_last_r)   ||
                              (bfpexp_i    !== stalled_bfpexp_r)) begin
@@ -210,6 +233,7 @@ module i2s_fft_tx_adapter #(
 
             if (!pending_valid_r && fft_valid_i) begin
                 pending_valid_r  <= 1'b1;
+                pending_index_r  <= fft_index_i;
                 pending_real_r   <= fft_real_i;
                 pending_imag_r   <= fft_imag_i;
                 pending_last_r   <= fft_last_i;
@@ -230,6 +254,7 @@ module i2s_fft_tx_adapter #(
                     i2s_sck_o <= 1'b0;
 
                     next_active_valid              = active_valid_r;
+                    next_active_packet_index       = active_packet_index_r;
                     next_active_tag                = active_tag_r;
                     next_active_left               = active_left_r;
                     next_active_right              = active_right_r;
@@ -250,16 +275,20 @@ module i2s_fft_tx_adapter #(
 
                     if (frame_boundary) begin
                         if (active_valid_r && (active_tag_r == TAG_BFPEXP_C) && (active_hold_frames_r > 1)) begin
+                            next_active_packet_index = active_packet_index_r + 1'b1;
                             next_active_hold_frames = active_hold_frames_r - 1'b1;
+                            active_packet_index_r <= active_packet_index_r + 1'b1;
                             active_hold_frames_r <= active_hold_frames_r - 1'b1;
                         end else begin
                             if (!input_window_in_progress_r && pending_valid_r) begin
                                 next_active_valid              = 1'b1;
+                                next_active_packet_index       = '0;
                                 next_active_tag                = TAG_BFPEXP_C;
                                 next_active_left               = extend_bfpexp(pending_bfpexp_r);
                                 next_active_right              = extend_bfpexp(pending_bfpexp_r);
                                 next_active_hold_frames        = BFPEXP_HOLD_FRAMES_C;
                                 active_valid_r        <= 1'b1;
+                                active_packet_index_r <= '0;
                                 active_tag_r          <= TAG_BFPEXP_C;
                                 active_left_r         <= extend_bfpexp(pending_bfpexp_r);
                                 active_right_r        <= extend_bfpexp(pending_bfpexp_r);
@@ -267,11 +296,13 @@ module i2s_fft_tx_adapter #(
                                 input_window_in_progress_r <= 1'b1;
                             end else if (input_window_in_progress_r && pending_valid_r) begin
                                 next_active_valid              = 1'b1;
+                                next_active_packet_index       = FFT_PACKET_INDEX_BASE_C + PACKET_INDEX_W'(pending_index_r);
                                 next_active_tag                = TAG_FFT_C;
                                 next_active_left               = extend_fft_sample(pending_real_r);
                                 next_active_right              = extend_fft_sample(pending_imag_r);
                                 next_active_hold_frames        = ONE_HOLD_FRAME_C;
                                 active_valid_r        <= 1'b1;
+                                active_packet_index_r <= FFT_PACKET_INDEX_BASE_C + PACKET_INDEX_W'(pending_index_r);
                                 active_tag_r          <= TAG_FFT_C;
                                 active_left_r         <= extend_fft_sample(pending_real_r);
                                 active_right_r        <= extend_fft_sample(pending_imag_r);
@@ -282,11 +313,13 @@ module i2s_fft_tx_adapter #(
                                     input_window_in_progress_r <= 1'b0;
                             end else begin
                                 next_active_valid              = 1'b0;
+                                next_active_packet_index       = '0;
                                 next_active_tag                = TAG_IDLE_C;
                                 next_active_left               = '0;
                                 next_active_right              = '0;
                                 next_active_hold_frames        = '0;
                                 active_valid_r       <= 1'b0;
+                                active_packet_index_r <= '0;
                                 active_tag_r         <= TAG_IDLE_C;
                                 active_left_r        <= '0;
                                 active_right_r       <= '0;
@@ -302,6 +335,7 @@ module i2s_fft_tx_adapter #(
                     // receptor bcm2835 em slave mode.
                     i2s_sd_o <= next_active_valid
                                 ? i2s_slot_bit(
+                                      next_active_packet_index,
                                       next_active_tag,
                                       next_channel ? next_active_right : next_active_left,
                                       next_slot_bit

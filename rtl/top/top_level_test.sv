@@ -152,10 +152,10 @@ module top_level_test #(
     logic clk;
     logic rst;
 
-    assign clk = clock_50;
+    assign clk = gpio_0_d0;
     // With the onboard 50 MHz clock selected, keep reset on a stable onboard source
     // instead of an external GPIO that may now be left floating.
-    assign rst = gpio_1_d1;
+    assign rst = gpio_0_d1;
 
     logic dbg_capture_leds_i;
     logic dbg_capture_hex_i;

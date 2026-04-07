@@ -9,19 +9,30 @@ module tb_top_level_i2s_fft_tx_diag;
     localparam int DIAG_BFPEXP_HOLD_FRAMES   = 1;
     localparam int CAPTURE_DEPTH             = 128;
     localparam int EXPECTED_COUNT            = 10;
+    localparam int PACKET_INDEX_W            = 10;
     localparam int TAG_W                     = 2;
+    localparam int RESERVED_W                = I2S_SLOT_W - FFT_DW - TAG_W - PACKET_INDEX_W;
+    localparam int TAG_LSB                   = FFT_DW + RESERVED_W;
+    localparam int PACKET_INDEX_LSB          = TAG_LSB + TAG_W;
     localparam time CLK_HALF                 = 5ns;
 
     localparam logic [TAG_W-1:0] TAG_BFPEXP_C = 2'd1;
     localparam logic [TAG_W-1:0] TAG_FFT_C    = 2'd2;
+    localparam logic [PACKET_INDEX_W-1:0] FFT_PACKET_INDEX_BASE_C = PACKET_INDEX_W'(1 << (PACKET_INDEX_W-1));
 
     localparam logic signed [FFT_DW-1:0] DIAG_FFT_REAL_C = 18'sh15555;
     localparam logic signed [FFT_DW-1:0] DIAG_FFT_IMAG_C = 18'sh0AAAB;
     localparam logic signed [FFT_DW-1:0] DIAG_BFPEXP_EXT_C = 18'sd18;
 
-    localparam logic [I2S_SLOT_W-1:0] BFPEXP_WORD_C = {TAG_BFPEXP_C, 12'd0, DIAG_BFPEXP_EXT_C};
-    localparam logic [I2S_SLOT_W-1:0] FFT_LEFT_WORD_C = {TAG_FFT_C, 12'd0, DIAG_FFT_REAL_C};
-    localparam logic [I2S_SLOT_W-1:0] FFT_RIGHT_WORD_C = {TAG_FFT_C, 12'd0, DIAG_FFT_IMAG_C};
+    function automatic logic [I2S_SLOT_W-1:0] pack_slot_word(
+        input logic [PACKET_INDEX_W-1:0] packet_index_i,
+        input logic [TAG_W-1:0] tag_i,
+        input logic signed [FFT_DW-1:0] payload_i
+    );
+        begin
+            pack_slot_word = {packet_index_i, tag_i, {RESERVED_W{1'b0}}, payload_i};
+        end
+    endfunction
 
     logic gpio_0_d0;
     logic gpio_0_d1;
@@ -56,7 +67,15 @@ module tb_top_level_i2s_fft_tx_diag;
         input logic [I2S_SLOT_W-1:0] word_i
     );
         begin
-            decode_tag = word_i[I2S_SLOT_W-1 -: TAG_W];
+            decode_tag = word_i[TAG_LSB +: TAG_W];
+        end
+    endfunction
+
+    function automatic logic [PACKET_INDEX_W-1:0] decode_packet_index(
+        input logic [I2S_SLOT_W-1:0] word_i
+    );
+        begin
+            decode_packet_index = word_i[PACKET_INDEX_LSB +: PACKET_INDEX_W];
         end
     endfunction
 
@@ -82,6 +101,7 @@ module tb_top_level_i2s_fft_tx_diag;
     task automatic wait_for_first_expected_frame;
         bit found;
         int timeout_cycles;
+        int dump_idx;
         begin
             found = 1'b0;
             timeout_cycles = 0;
@@ -102,8 +122,20 @@ module tb_top_level_i2s_fft_tx_diag;
                 end
             end
 
-            if (!found)
+            if (!found) begin
+                $display("Captured frames before timeout: %0d", captured_write_idx);
+                for (dump_idx = 0; dump_idx < captured_write_idx && dump_idx < 8; dump_idx++) begin
+                    $display("captured[%0d] left=%08x right=%08x pkt=%0d tag=%0d payload_l=%0d payload_r=%0d",
+                             dump_idx,
+                             captured_left_word_mem[dump_idx],
+                             captured_right_word_mem[dump_idx],
+                             decode_packet_index(captured_left_word_mem[dump_idx]),
+                             decode_tag(captured_left_word_mem[dump_idx]),
+                             decode_payload(captured_left_word_mem[dump_idx]),
+                             decode_payload(captured_right_word_mem[dump_idx]));
+                end
                 $fatal(1, "Nao foi encontrado o primeiro frame BFPEXP esperado.");
+            end
         end
     endtask
 
@@ -124,10 +156,12 @@ module tb_top_level_i2s_fft_tx_diag;
                 assert (captured_left_word_mem[captured_read_idx] === expected_left_word_mem[idx])
                 else $fatal(
                     1,
-                    "LEFT word mismatch idx=%0d exp=%h got=%h exp_tag=%0d got_tag=%0d exp_payload=%0d got_payload=%0d",
+                    "LEFT word mismatch idx=%0d exp=%h got=%h exp_pkt=%0d got_pkt=%0d exp_tag=%0d got_tag=%0d exp_payload=%0d got_payload=%0d",
                     idx,
                     expected_left_word_mem[idx],
                     captured_left_word_mem[captured_read_idx],
+                    decode_packet_index(expected_left_word_mem[idx]),
+                    decode_packet_index(captured_left_word_mem[captured_read_idx]),
                     decode_tag(expected_left_word_mem[idx]),
                     decode_tag(captured_left_word_mem[captured_read_idx]),
                     decode_payload(expected_left_word_mem[idx]),
@@ -137,10 +171,12 @@ module tb_top_level_i2s_fft_tx_diag;
                 assert (captured_right_word_mem[captured_read_idx] === expected_right_word_mem[idx])
                 else $fatal(
                     1,
-                    "RIGHT word mismatch idx=%0d exp=%h got=%h exp_tag=%0d got_tag=%0d exp_payload=%0d got_payload=%0d",
+                    "RIGHT word mismatch idx=%0d exp=%h got=%h exp_pkt=%0d got_pkt=%0d exp_tag=%0d got_tag=%0d exp_payload=%0d got_payload=%0d",
                     idx,
                     expected_right_word_mem[idx],
                     captured_right_word_mem[captured_read_idx],
+                    decode_packet_index(expected_right_word_mem[idx]),
+                    decode_packet_index(captured_right_word_mem[captured_read_idx]),
                     decode_tag(expected_right_word_mem[idx]),
                     decode_tag(captured_right_word_mem[captured_read_idx]),
                     decode_payload(expected_right_word_mem[idx]),
@@ -175,7 +211,7 @@ module tb_top_level_i2s_fft_tx_diag;
         .sw7(1'b0),
         .sw8(1'b0),
         .sw9(1'b0),
-        .clock_50(1'b0),
+        .clock_50(gpio_0_d0),
         .clock2_50(1'b0),
         .clock3_50(1'b0),
         .clock4_50(1'b0),
@@ -225,11 +261,11 @@ module tb_top_level_i2s_fft_tx_diag;
         .gpio_0_d27(),
         .gpio_0_d28(),
         .gpio_0_d29(),
-        .gpio_0_d30(1'b0),
+        .gpio_0_d30(),
         .gpio_0_d31(),
-        .gpio_0_d32(1'b0),
+        .gpio_0_d32(),
         .gpio_0_d33(1'b0),
-        .gpio_0_d34(1'b0),
+        .gpio_0_d34(),
         .gpio_0_d35(1'b0),
         .gpio_1_d0(),
         .gpio_1_d1(),
@@ -352,6 +388,12 @@ module tb_top_level_i2s_fft_tx_diag;
                         mon_have_left_r  <= 1'b0;
                     end else begin
                         if (mon_have_right_r) begin
+                            assert (decode_tag(completed_word) == decode_tag(mon_right_word_r))
+                            else $fatal(1, "Tags diferentes entre canais no frame idx=%0d", captured_write_idx);
+
+                            assert (decode_packet_index(completed_word) == decode_packet_index(mon_right_word_r))
+                            else $fatal(1, "Packet index diferente entre canais no frame idx=%0d", captured_write_idx);
+
                             if (captured_write_idx >= CAPTURE_DEPTH) begin
                                 $fatal(1, "CAPTURE_DEPTH insuficiente no monitor I2S.");
                             end else begin
@@ -392,16 +434,36 @@ module tb_top_level_i2s_fft_tx_diag;
         gpio_0_d1        = 1'b1;
         captured_read_idx = 0;
 
-        set_expected_frame(0, BFPEXP_WORD_C, BFPEXP_WORD_C);
-        set_expected_frame(1, FFT_LEFT_WORD_C, FFT_RIGHT_WORD_C);
-        set_expected_frame(2, FFT_LEFT_WORD_C, FFT_RIGHT_WORD_C);
-        set_expected_frame(3, FFT_LEFT_WORD_C, FFT_RIGHT_WORD_C);
-        set_expected_frame(4, FFT_LEFT_WORD_C, FFT_RIGHT_WORD_C);
-        set_expected_frame(5, BFPEXP_WORD_C, BFPEXP_WORD_C);
-        set_expected_frame(6, FFT_LEFT_WORD_C, FFT_RIGHT_WORD_C);
-        set_expected_frame(7, FFT_LEFT_WORD_C, FFT_RIGHT_WORD_C);
-        set_expected_frame(8, FFT_LEFT_WORD_C, FFT_RIGHT_WORD_C);
-        set_expected_frame(9, FFT_LEFT_WORD_C, FFT_RIGHT_WORD_C);
+        set_expected_frame(0,
+                           pack_slot_word(10'd0, TAG_BFPEXP_C, DIAG_BFPEXP_EXT_C),
+                           pack_slot_word(10'd0, TAG_BFPEXP_C, DIAG_BFPEXP_EXT_C));
+        set_expected_frame(1,
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd0, TAG_FFT_C, DIAG_FFT_REAL_C),
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd0, TAG_FFT_C, DIAG_FFT_IMAG_C));
+        set_expected_frame(2,
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd1, TAG_FFT_C, DIAG_FFT_REAL_C),
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd1, TAG_FFT_C, DIAG_FFT_IMAG_C));
+        set_expected_frame(3,
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd2, TAG_FFT_C, DIAG_FFT_REAL_C),
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd2, TAG_FFT_C, DIAG_FFT_IMAG_C));
+        set_expected_frame(4,
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd3, TAG_FFT_C, DIAG_FFT_REAL_C),
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd3, TAG_FFT_C, DIAG_FFT_IMAG_C));
+        set_expected_frame(5,
+                           pack_slot_word(10'd0, TAG_BFPEXP_C, DIAG_BFPEXP_EXT_C),
+                           pack_slot_word(10'd0, TAG_BFPEXP_C, DIAG_BFPEXP_EXT_C));
+        set_expected_frame(6,
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd0, TAG_FFT_C, DIAG_FFT_REAL_C),
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd0, TAG_FFT_C, DIAG_FFT_IMAG_C));
+        set_expected_frame(7,
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd1, TAG_FFT_C, DIAG_FFT_REAL_C),
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd1, TAG_FFT_C, DIAG_FFT_IMAG_C));
+        set_expected_frame(8,
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd2, TAG_FFT_C, DIAG_FFT_REAL_C),
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd2, TAG_FFT_C, DIAG_FFT_IMAG_C));
+        set_expected_frame(9,
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd3, TAG_FFT_C, DIAG_FFT_REAL_C),
+                           pack_slot_word(FFT_PACKET_INDEX_BASE_C + 10'd3, TAG_FFT_C, DIAG_FFT_IMAG_C));
 
         repeat (4) @(posedge gpio_0_d0);
         gpio_0_d1 = 1'b0;

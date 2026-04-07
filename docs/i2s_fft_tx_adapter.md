@@ -9,10 +9,13 @@ The block is intentionally lightweight. It does not try to absorb an FFT burst b
 ## Relevant files
 
 - `rtl/frontend/i2s_fft_tx_adapter.sv`
+- `rtl/common/fft_tx_bridge_fifo.sv`
 - `rtl/core/aces.sv`
 - `rtl/common/fft_dma_reader.sv`
 - `tb/unit/tb_i2s_fft_tx_adapter.sv`
+- `tb/unit/tb_fft_tx_bridge_fifo.sv`
 - `tb/integration/tb_fft_tx_i2s_link.sv`
+- `tb/integration/tb_top_level_i2s_fft_tx_diag.sv`
 - `tb/integration/tb_top_level_test.sv`
 
 ## Position in the top-level path
@@ -38,6 +41,7 @@ In `aces`, the adapter input valid is `tx_fft_valid_i = tx_fifo_word_valid_r`, s
 
 For each accepted FFT bin, the adapter samples:
 
+- `fft_index_i`
 - `fft_real_i`
 - `fft_imag_i`
 - `fft_last_i`
@@ -48,8 +52,9 @@ Acceptance happens only when `fft_valid_i && fft_ready_o`.
 The intended window-level contract is:
 
 1. The first accepted bin of a window carries the `bfpexp_i` that should be announced to software.
-2. Bins remain ordered.
-3. `fft_last_i` marks the last accepted bin of the current FFT window.
+2. `fft_index_i` identifies the bin position inside the FFT window.
+3. Bins remain ordered and their index must remain stable during backpressure.
+4. `fft_last_i` marks the last accepted bin of the current FFT window.
 
 ## Internal model
 
@@ -91,18 +96,29 @@ That means having data in `pending_*` is not enough by itself to toggle `i2s_sd_
 At the start of each FFT window, the adapter emits a special `BFPEXP` frame before any FFT bins of that window.
 
 That metadata frame is repeated for `BFPEXP_HOLD_FRAMES` complete I2S frames so the software reader has multiple chances to lock onto the exponent.
+Those `BFPEXP` frames use packet indices `0 .. BFPEXP_HOLD_FRAMES-1`.
 
 After that, each accepted FFT bin is serialized as one I2S frame:
 
 - left channel: real part
 - right channel: imaginary part
+- packet index: `512 + fft_index_i`
 
 ## I2S slot format
 
 Each slot has `I2S_SLOT_W` bits and carries:
 
 ```text
-[2-bit tag][reserved zero bits][I2S_SAMPLE_W signed payload bits]
+[10-bit packet index][2-bit tag][2-bit reserved][I2S_SAMPLE_W signed payload bits]
+```
+
+For the default 32-bit slot used in this project, the layout is:
+
+```text
+[31:22] packet index
+[21:20] tag
+[19:18] reserved zero
+[17:0]  signed payload
 ```
 
 Tag values:
@@ -110,6 +126,12 @@ Tag values:
 - `0 = idle`
 - `1 = bfpexp`
 - `2 = fft`
+
+Packet-index meaning:
+
+- `0 .. 511`: BFPEXP namespace
+- `512 .. 1023`: FFT bin namespace
+- both channels of the same I2S frame must carry the same packet index
 
 The payload is sent MSB-first.
 
@@ -141,11 +163,13 @@ Operationally, the adapter behaves like this:
    - `input_window_in_progress_r` becomes `1`
 
 4. **BFPEXP hold**
-   - the same BFPEXP frame is repeated for `BFPEXP_HOLD_FRAMES`
+   - the same BFPEXP payload is repeated for `BFPEXP_HOLD_FRAMES`
+   - the packet index increments as `0, 1, 2, ...`
 
 5. **FFT payload frames**
    - once the hold count expires, each frame boundary consumes one pending FFT bin
    - `active_tag_r` becomes `TAG_FFT_C`
+   - `active_packet_index_r` becomes `10'd512 + pending_index_r`
    - `active_left_r` gets the real part
    - `active_right_r` gets the imaginary part
 
@@ -266,7 +290,9 @@ The unit testbench validates:
 - `WS` advancing exactly one bit before the next 32-bit word
 - alternating slot/channel structure
 - insertion and repetition of `BFPEXP` frames
+- packet-index sequencing for `BFPEXP` and `FFT`
 - correct tagged payload sequence across two FFT windows
+- left/right packet-index equality on each I2S frame
 - consistency between `fft_ready_o` and the adapter's one-entry pending buffer
 
 ### Integration verification: `tb_fft_tx_i2s_link`
@@ -281,5 +307,13 @@ and validates:
 
 - burst writes into the FIFO while the serializer drains slowly
 - preservation of bin order through the FIFO/adapter boundary
+- preservation of the FFT bin index through the FIFO/adapter boundary
 - absence of bridge overflow and adapter backpressure violations
 - correct serialized I2S sequence at the subsystem output
+
+### Top-level verification
+
+The board-facing and full-pipeline benches extend those checks:
+
+- `tb_top_level_i2s_fft_tx_diag` asserts the deterministic diagnostic stream with `BFPEXP` index `0` and FFT indices `512 .. 1023`
+- `tb_top_level_test` asserts the same indexed transport contract on the real ACES pipeline after the FFT path becomes active

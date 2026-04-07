@@ -74,8 +74,12 @@ add wave sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/sample_valid_
 add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/sample_24
 add wave sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/sample_valid_18
 add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/sample_18
-add wave sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/valid_reg
-add wave sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/valid_d
+add wave sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/sample_toggle_mic
+add wave sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/toggle_sync_1
+add wave sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/toggle_sync_2
+add wave sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/toggle_seen_clk
+add wave sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/new_sample_clk
+add wave sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/sample_pulse_clk
 add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_audio_to_fft_pipeline/sample_reg
 
 add wave -divider {FFT Control And DMA}

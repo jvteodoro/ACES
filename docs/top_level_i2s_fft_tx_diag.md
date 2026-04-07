@@ -75,36 +75,40 @@ Constantes transmitidas:
 
 Cada janela emitida pelo topo e:
 
-1. um frame `BFPEXP`
-2. `512` frames `FFT`
+1. um frame `BFPEXP` com packet index `0`
+2. `512` frames `FFT` com packet indices `512 .. 1023`
 3. reinicio imediato na proxima janela
 
 Como `DIAG_BFPEXP_HOLD_FRAMES = 1`, nao existe hold prolongado. O stream fica:
 
 ```text
-BFPEXP, FFT x512, BFPEXP, FFT x512, BFPEXP, FFT x512, ...
+BFPEXP[0], FFT[512], FFT[513], ..., FFT[1023], BFPEXP[0], ...
 ```
 
 ## Palavras de 32 bits esperadas
 
 O packing do RTL segue o contrato do host:
 
-- bits `[31:30]`: tag
-- bits `[29:18]`: reserved, sempre `0`
+- bits `[31:22]`: packet index
+- bits `[21:20]`: tag
+- bits `[19:18]`: reserved, sempre `0`
 - bits `[17:0]`: payload signed em complemento de dois
 
 Palavras esperadas:
 
-| Tipo | Canal esquerdo | Canal direito | Tag | Payload decodificado |
-| --- | --- | --- | --- | --- |
-| BFPEXP | `0x4003FFEE` | `0x4003FFEE` | `1` | `-18` em ambos |
-| FFT | `0x80015555` | `0x80035555` | `2` | `87381` no left, `-43691` no right |
+| Tipo | Packet index | Canal esquerdo | Canal direito | Tag | Payload decodificado |
+| --- | --- | --- | --- | --- | --- |
+| BFPEXP | `0` | `0x0013FFEE` | `0x0013FFEE` | `1` | `-18` em ambos |
+| FFT bin 0 | `512` | `0x80215555` | `0x80235555` | `2` | `87381` no left, `-43691` no right |
+| FFT bin 1 | `513` | `0x80615555` | `0x80635555` | `2` | `87381` no left, `-43691` no right |
 
 Observacoes:
 
 - o frame `BFPEXP` usa o mesmo valor nos dois canais;
 - o frame `FFT` usa left/right diferentes de proposito para facilitar detectar troca de canais;
-- todos os bits reservados devem permanecer em zero.
+- o mesmo packet index deve aparecer nos dois canais de cada frame;
+- cada incremento de bin soma `0x00400000` na palavra hexadecimal, o que facilita enxergar o numero do bin em debug bruto;
+- os bits reservados `[19:18]` devem permanecer em zero.
 
 ## Comportamento esperado no software
 
@@ -121,7 +125,9 @@ Captura tagged minima para validar o contrato deste topo:
 ```bash
 .venv/bin/python analyzer_from_fpga_fft.py -r 48000 \
     --frame-bins 512 --useful-bins 256 \
-    --use-i2s-tags --tag-shift 30 --tag-mask 0x3 --payload-bits 18 \
+    --use-i2s-tags --bfpexp-hold-pairs 1 \
+    --packet-index-shift 22 --packet-index-bits 10 --fft-packet-index-base 512 \
+    --tag-shift 20 --tag-mask 0x3 --payload-bits 18 \
     --tag-idle 0 --tag-bfpexp 1 --tag-fft 2
 ```
 
@@ -131,7 +137,9 @@ inicio da captura, rode a variante relaxada:
 ```bash
 .venv/bin/python analyzer_from_fpga_fft.py -r 48000 \
     --frame-bins 512 --useful-bins 256 \
-    --use-i2s-tags --tag-shift 30 --tag-mask 0x3 --payload-bits 18 \
+    --use-i2s-tags --bfpexp-hold-pairs 1 \
+    --packet-index-shift 22 --packet-index-bits 10 --fft-packet-index-base 512 \
+    --tag-shift 20 --tag-mask 0x3 --payload-bits 18 \
     --tag-idle 0 --tag-bfpexp 1 --tag-fft 2 \
     --allow-fft-without-bfpexp
 ```
@@ -143,8 +151,10 @@ nas secoes abaixo:
 ./run_channel_debug_matrix.sh \
     --seconds 8 \
     --frame-bins 512 --useful-bins 256 \
-    --tag-shift 30 --tag-mask 0x3 --payload-bits 18 \
-    --extra-tag-shifts 29
+    --bfpexp-hold-pairs 1 \
+    --packet-index-shift 22 --packet-index-bits 10 --fft-packet-index-base 512 \
+    --tag-shift 20 --tag-mask 0x3 --payload-bits 18 \
+    --extra-tag-shifts 21
 ```
 
 Se houver uma GPIO de apoio para marcar `BFPEXP`, acrescente por exemplo:
@@ -153,9 +163,11 @@ Se houver uma GPIO de apoio para marcar `BFPEXP`, acrescente por exemplo:
 ./run_channel_debug_matrix.sh \
     --seconds 8 \
     --frame-bins 512 --useful-bins 256 \
-    --tag-shift 30 --tag-mask 0x3 --payload-bits 18 \
+    --bfpexp-hold-pairs 1 \
+    --packet-index-shift 22 --packet-index-bits 10 --fft-packet-index-base 512 \
+    --tag-shift 20 --tag-mask 0x3 --payload-bits 18 \
     --bfpexp-flag-line 23 \
-    --extra-tag-shifts 29
+    --extra-tag-shifts 21
 ```
 
 ### 1. Nivel bruto de palavra
@@ -185,15 +197,15 @@ de audio/FFT original.
 
 O script `run_channel_debug_matrix.sh` gera tres cenarios por default:
 
-1. `strict_tags_shift30`
-2. `relaxed_tags_shift30`
-3. `relaxed_tags_shift29`
+1. `strict_tags_shift20`
+2. `relaxed_tags_shift20`
+3. `relaxed_tags_shift21`
 
 Para este topo de diagnostico, o esperado e:
 
-- `strict_tags_shift30`: deve ser o cenario bom
-- `relaxed_tags_shift30`: pode ficar parecido com o strict, mas nao deve ser melhor
-- `relaxed_tags_shift29`: deve piorar claramente
+- `strict_tags_shift20`: deve ser o cenario bom
+- `relaxed_tags_shift20`: pode ficar parecido com o strict, mas nao deve ser melhor
+- `relaxed_tags_shift21`: deve piorar claramente
 
 Leitura dos campos mais importantes:
 
@@ -203,12 +215,13 @@ Esperado: `0`.
 
 Interpretacao:
 
-- `0`: padding e alinhamento de bit estao consistentes com o contrato `{tag, 12'd0, payload}`
-- `> 0`: algum bit que deveria estar em `[29:18] = 0` esta sendo visto como nao zero
+- `0`: padding e alinhamento de bit estao consistentes com o contrato `{packet_index, tag, 2'd0, payload}`
+- `> 0`: algum bit que deveria estar em `[19:18] = 0` esta sendo visto como nao zero
 
 Se esse contador cresce de forma persistente, suspeite primeiro de:
 
 - `tag_shift` errado,
+- `packet_index_shift` errado,
 - erro de alinhamento de bit,
 - erro de temporizacao `WS`/`SCK`,
 - captura fora do formato Philips I2S esperado.
@@ -229,6 +242,22 @@ Suspeitas principais:
 - perda de alinhamento entre left/right,
 - um canal sendo montado com deslocamento diferente do outro.
 
+### `packet_index_mismatch`
+
+Esperado: `0`.
+
+Interpretacao:
+
+- left e right chegaram com o mesmo `tag`, mas com packet indices diferentes;
+- ou o `tag` esta em desacordo com a faixa do packet index, por exemplo `BFPEXP >= 512` ou `FFT < 512`.
+
+Suspeitas principais:
+
+- perda de um word em apenas um dos canais,
+- erro de alinhamento entre left/right,
+- `packet_index_shift` incorreto,
+- corrupcao dos bits mais altos do word.
+
 ### `other`
 
 Esperado: `0` ou apenas alguns eventos de captura parcial no comeco/fim.
@@ -240,6 +269,7 @@ Interpretacao:
 Suspeitas principais:
 
 - `tag_shift` errado,
+- `packet_index_shift` errado,
 - `tag_mask` errado,
 - bits altos corrompidos.
 
@@ -275,30 +305,32 @@ Se as runs dominantes ficarem muito menores que `512`, suspeite:
 - `BFPEXP` extra no meio da janela,
 - perda de frames `FFT`,
 - erro no `fft_last_i`,
-- ou decodificacao do host quebrando a run por falso `idle`/`other`/`tag_mismatch`.
+- ou decodificacao do host quebrando a run por falso `idle`, `other`, `tag_mismatch` ou `packet_index_mismatch`.
 
 ## Como interpretar o `preview` dos arquivos `.jsonl`
 
 Nos `preview` por chunk, procure estes pares:
 
 ```json
-{"kind":"bfpexp", "left":{"hex":"0x4003FFEE", ...}, "right":{"hex":"0x4003FFEE", ...}}
-{"kind":"fft",    "left":{"hex":"0x80015555", ...}, "right":{"hex":"0x80035555", ...}}
+{"kind":"bfpexp", "left":{"hex":"0x0013FFEE", "packet_index":0, ...}, "right":{"hex":"0x0013FFEE", "packet_index":0, ...}}
+{"kind":"fft",    "left":{"hex":"0x80215555", "packet_index":512, ...}, "right":{"hex":"0x80235555", "packet_index":512, ...}}
 ```
 
 Se o topo estiver correto:
 
 - `kind` deve alternar entre `bfpexp` e longas sequencias de `fft`,
 - `left.hex` e `right.hex` devem bater com a tabela acima,
+- `left.packet_index` e `right.packet_index` devem ser iguais,
 - `reserved_nonzero` deve ser `false` nos dois canais.
 
 ## Diagnostico rapido por sintoma
 
 | Sintoma | Hipotese mais forte |
 | --- | --- |
-| `strict_tags_shift30` ruim e `shift29` melhor | deslocamento de tag/alinhamento de bit |
+| `strict_tags_shift20` ruim e `shift21` melhor | deslocamento de tag/alinhamento de bit |
 | `reserved_nonzero_words` alto | padding ou alinhamento bruto do frame I2S |
 | `tag_mismatch` alto | left/right desalinhados, erro de `WS` |
+| `packet_index_mismatch` alto | perda de pacote em um canal ou leitura errada dos bits altos |
 | tags corretas mas payload errado | problema no dado bruto, ordem de bits, sinal, ou troca left/right |
 | runs `FFT` curtas demais | a janela logica esta sendo quebrada no transporte |
 | `idle` dominante | fonte nao esta transmitindo continuamente ou captura iniciou fora do regime |
@@ -310,7 +342,8 @@ sim/manifest/scripts/run_questa.sh top_level_i2s_fft_tx_diag mock
 ```
 
 O testbench verifica o packing bruto esperado e garante que o stream gerado
-bate com o contrato documentado aqui.
+bate com o contrato documentado aqui, incluindo packet index, tags, bits
+reservados e igualdade left/right por frame.
 
 ## Compilacao no Quartus
 
