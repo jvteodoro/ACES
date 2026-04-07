@@ -77,13 +77,8 @@ proc write_absolute_filelist {root local_dir source_path output_path} {
 
     set staged_signals_rom [normalize_for_hdl [stage_runtime_asset         [file join $root tools signals_rom.mif]         [file join $local_dir signals_rom.mif]]]
     set staged_signals_hex [normalize_for_hdl [stage_runtime_asset         [file join $root tools signals_rom_mirror.hex]         [file join $local_dir signals_rom_mirror.hex]]]
-    set staged_twrom_mif [normalize_for_hdl [stage_runtime_asset         [file join $root submodules R2FFT quartus twrom.mif]         [file join $local_dir twrom.mif]]]
-    set staged_twrom_512x18_mif [normalize_for_hdl [stage_runtime_asset         [file join $root tb data twrom_512x18.mif]         [file join $local_dir twrom_512x18.mif]]]
 
     set staged_signals_rom_ip [normalize_for_hdl [stage_ip_wrapper         [file join $root rtl ip rom signals_rom_ip.v]         [file join $local_dir staged_ip signals_rom_ip.v]         [list "../../../tools/signals_rom.mif" $staged_signals_rom]]]
-
-    set staged_twrom_v [normalize_for_hdl [stage_ip_wrapper         [file join $root submodules R2FFT quartus twrom.v]         [file join $local_dir staged_ip twrom.v]         [list "twrom.mif" $staged_twrom_mif]]]
-    set staged_twrom_512x18_v [normalize_for_hdl [stage_ip_wrapper         [file join $root tb real_ip r2fft_twrom_altsyncram.sv]         [file join $local_dir staged_ip r2fft_twrom_altsyncram.sv]         [list "__TWROM_512X18_INIT_FILE__" $staged_twrom_512x18_mif]]]
 
     try {
         while {[gets $in line] >= 0} {
@@ -92,10 +87,6 @@ proc write_absolute_filelist {root local_dir source_path output_path} {
                 puts $out $line
             } elseif {$trimmed eq "rtl/ip/rom/signals_rom_ip.v"} {
                 puts $out $staged_signals_rom_ip
-            } elseif {$trimmed eq "tb/real_ip/r2fft_twrom_altsyncram.sv"} {
-                puts $out $staged_twrom_512x18_v
-            } elseif {$trimmed eq "rtl/ip/fft/twrom.v" || $trimmed eq "submodules/R2FFT/quartus/twrom.v"} {
-                puts $out $staged_twrom_v
             } elseif {[string match {+*} $trimmed] || [string match {-*} $trimmed]} {
                 puts $out $trimmed
             } elseif {[file pathtype $trimmed] eq "relative"} {
@@ -124,37 +115,19 @@ set sim_plusargs [expr {[info exists ::env(ACES_VSIM_PLUSARGS)] ? [split $::env(
 array set filelists {
     hexa7seg                       mock_unit_hexa7seg.f
     i2s_rx_adapter_24              mock_unit_i2s_rx_adapter_24.f
-    spi_fft_tx_adapter             mock_unit_spi_fft_tx_adapter.f
     sample_width_adapter_24_to_18  mock_unit_sample_width_adapter_24_to_18.f
     i2s_master_clock_gen           mock_unit_i2s_master_clock_gen.f
     i2s_stimulus_manager_rom       mock_unit_i2s_stimulus_manager_rom.f
-    fft_control                    mock_unit_fft_control.f
-    fft_dma_reader                 mock_unit_fft_dma_reader.f
-    fft_tx_bridge_fifo             mock_unit_fft_tx_bridge_fifo.f
-    fft_tx_spi_link                mock_integration_fft_tx_spi_link.f
     aces_audio_to_fft_pipeline     mock_integration_aces_audio_to_fft_pipeline.f
-    aces                           mock_integration_aces.f
-    top_level_test mock_integration_top_level_test.f
-    top_level_spi_fft_tx_diag mock_integration_top_level_spi_fft_tx_diag.f
-    top_level_fft_isolated real_ip_top_level_fft_isolated.f
 }
 
 array set tops {
     hexa7seg                       tb_hexa7seg
     i2s_rx_adapter_24              tb_i2s_rx_adapter_24
-    spi_fft_tx_adapter             tb_spi_fft_tx_adapter
     sample_width_adapter_24_to_18  tb_sample_width_adapter_24_to_18
     i2s_master_clock_gen           tb_i2s_master_clock_gen
     i2s_stimulus_manager_rom       tb_i2s_stimulus_manager_rom
-    fft_control                    tb_fft_control
-    fft_dma_reader                 tb_fft_dma_reader
-    fft_tx_bridge_fifo             tb_fft_tx_bridge_fifo
-    fft_tx_spi_link                tb_fft_tx_spi_link
     aces_audio_to_fft_pipeline     tb_aces_audio_to_fft_pipeline
-    aces                           tb_aces
-    top_level_test tb_top_level_test
-    top_level_spi_fft_tx_diag tb_top_level_spi_fft_tx_diag
-    top_level_fft_isolated tb_top_level_fft_isolated
 }
 
 array set wave_dos {
@@ -162,17 +135,7 @@ array set wave_dos {
 }
 
 if {$flow eq "real"} {
-    if {$test_name ni [list top_level_test top_level_fft_isolated]} {
-        fail "Real flow is currently defined only for top_level_test and top_level_fft_isolated."
-    }
-    if {![file exists [file join $repo_root submodules R2FFT quartus r2fft_tribuf_impl.sv]]} {
-        fail "Real flow requires initialized submodules/R2FFT sources. Run 'git submodule update --init --recursive' before launching the real top-level test."
-    }
-    if {$test_name eq "top_level_test"} {
-        set filelist_name real_ip_top_level_test.f
-    } else {
-        set filelist_name $filelists($test_name)
-    }
+    fail "Real flow was removed together with the legacy FPGA FFT path. Use the maintained mock-flow tests."
 } elseif {[info exists filelists($test_name)]} {
     set filelist_name $filelists($test_name)
 } else {

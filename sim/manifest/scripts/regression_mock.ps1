@@ -6,15 +6,7 @@ $tests = @(
     'sample_width_adapter_24_to_18',
     'i2s_master_clock_gen',
     'i2s_stimulus_manager_rom',
-    'fft_control',
-    'fft_dma_reader',
-    'fft_tx_bridge_fifo',
-    'spi_fft_tx_adapter',
-    'fft_tx_spi_link',
-    'aces_audio_to_fft_pipeline',
-    'aces',
-    'top_level_spi_fft_tx_diag',
-    'top_level_test'
+    'aces_audio_to_fft_pipeline'
 )
 
 foreach ($testName in $tests) {
