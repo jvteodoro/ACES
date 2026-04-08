@@ -1,0 +1,358 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+import numpy as np
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+RTL_INCLUDE_PATH = REPO_ROOT / "rtl" / "top" / "top_level_i2s_fft_tx_sine_1k_lut.svh"
+RPI_REFERENCE_PATH = (
+    REPO_ROOT
+    / "submodules"
+    / "ACES-RPi-interface"
+    / "rpi3b_i2s_fft"
+    / "sine_1k_reference.py"
+)
+
+EXAMPLE_INDEX = 0
+FRAME_BINS = 512
+USEFUL_BINS = 256
+FFT_DW = 18
+BFPEXP_W = 8
+FFT_PACKET_INDEX_BASE = 1 << 9
+TAG_BFPEXP = 1
+TAG_FFT = 2
+PACKET_INDEX_SHIFT = 22
+TAG_SHIFT = 20
+PAYLOAD_BITS = 18
+FULL_SCALE_MAX = (1 << (FFT_DW - 1)) - 1
+TARGET_COMPONENT_PEAK = int(FULL_SCALE_MAX * 0.95)
+BFPEXP_VALUE = 0
+
+
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from export_top_level_test_expectations import simulate_i2s_loopback_example, trunc_24_to_18
+from signal_rom_generator import build_default_signal_rom_generator
+
+
+def _u32(word: int) -> int:
+    return int(np.asarray([np.uint32(word)], dtype=np.uint32)[0])
+
+
+def _payload_to_u32(payload: int) -> int:
+    mask = (1 << PAYLOAD_BITS) - 1
+    return int(payload) & mask
+
+
+def _pack_tagged_word(tag: int, payload: int, packet_index: int) -> int:
+    return _u32(
+        ((int(packet_index) & ((1 << 10) - 1)) << PACKET_INDEX_SHIFT)
+        | ((int(tag) & 0x3) << TAG_SHIFT)
+        | _payload_to_u32(payload)
+    )
+
+
+def _format_sv_int(value: int, bits: int) -> str:
+    value = int(value)
+    if value < 0:
+        return f"-{bits}'sd{abs(value)}"
+    return f"{bits}'sd{value}"
+
+
+def _format_python_list(values: np.ndarray, *, values_per_line: int = 8) -> str:
+    entries = [str(int(value)) for value in np.asarray(values, dtype=np.int64).tolist()]
+    lines = []
+    for start in range(0, len(entries), values_per_line):
+        chunk = ", ".join(entries[start : start + values_per_line])
+        lines.append(f"    {chunk},")
+    return "\n".join(lines)
+
+
+def _format_sv_list(values: np.ndarray, *, bits: int, values_per_line: int = 8) -> str:
+    entries = [_format_sv_int(int(value), bits) for value in np.asarray(values, dtype=np.int64).tolist()]
+    lines = []
+    for start in range(0, len(entries), values_per_line):
+        chunk = ", ".join(entries[start : start + values_per_line])
+        lines.append(f"    {chunk},")
+    return "\n".join(lines)
+
+
+def _format_sv_case(values: np.ndarray, *, bits: int) -> str:
+    index_width = max(1, (FRAME_BINS - 1).bit_length())
+    lines = []
+    for idx, value in enumerate(np.asarray(values, dtype=np.int64).tolist()):
+        lines.append(f"            {index_width}'d{idx}: lut_value_o = {_format_sv_int(int(value), bits)};")
+    return "\n".join(lines)
+
+
+def _build_project_aligned_fft() -> tuple[np.ndarray, int, float]:
+    generator = build_default_signal_rom_generator(
+        output_dir=REPO_ROOT / "tools",
+        verbose=False,
+        save_plots=False,
+    )
+    rom_matrix_24 = generator.build_int_matrix()
+    captured_24 = simulate_i2s_loopback_example(rom_matrix_24[EXAMPLE_INDEX])
+    captured_18 = trunc_24_to_18(captured_24).astype(np.float64)
+    fft_values = np.fft.fft(captured_18)
+    sample_rate_hz = int(generator.config.sample_rate_hz)
+    example_name = generator.examples[EXAMPLE_INDEX].name
+    return fft_values, sample_rate_hz, example_name
+
+
+def _quantize_fft(fft_values: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
+    component_peak = float(
+        np.max(
+            np.concatenate(
+                [
+                    np.abs(np.real(fft_values)),
+                    np.abs(np.imag(fft_values)),
+                ]
+            )
+        )
+    )
+    if component_peak <= 0.0:
+        scale = 1.0
+    else:
+        scale = float(TARGET_COMPONENT_PEAK) / component_peak
+
+    real = np.rint(np.real(fft_values) * scale).astype(np.int64)
+    imag = np.rint(np.imag(fft_values) * scale).astype(np.int64)
+    real = np.clip(real, -FULL_SCALE_MAX - 1, FULL_SCALE_MAX)
+    imag = np.clip(imag, -FULL_SCALE_MAX - 1, FULL_SCALE_MAX)
+    return real.astype(np.int32), imag.astype(np.int32), scale
+
+
+def _build_fft_words(real: np.ndarray, imag: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    left = np.empty(FRAME_BINS, dtype=np.uint32)
+    right = np.empty(FRAME_BINS, dtype=np.uint32)
+    for idx in range(FRAME_BINS):
+        packet_index = FFT_PACKET_INDEX_BASE + idx
+        left[idx] = _pack_tagged_word(TAG_FFT, int(real[idx]), packet_index)
+        right[idx] = _pack_tagged_word(TAG_FFT, int(imag[idx]), packet_index)
+    return left, right
+
+
+def _render_sv_include(
+    *,
+    real: np.ndarray,
+    imag: np.ndarray,
+    sample_rate_hz: int,
+    peak_bin: int,
+    peak_hz: float,
+    scale: float,
+    example_name: str,
+) -> str:
+    real_case = _format_sv_case(real, bits=FFT_DW)
+    imag_case = _format_sv_case(imag, bits=FFT_DW)
+    return (
+        "// Auto-generated by utils/generate_sine_1k_transport_assets.py\n"
+        f"// Source example: {example_name}\n"
+        f"// Sample rate: {sample_rate_hz} Hz | Frame bins: {FRAME_BINS} | Useful bins: {USEFUL_BINS}\n"
+        f"// Quantized peak bin: {peak_bin} ({peak_hz:.6f} Hz) | Component scale: {scale:.12f}\n\n"
+        f"localparam int SINE_1K_FRAME_BINS = {FRAME_BINS};\n"
+        f"localparam int SINE_1K_USEFUL_BINS = {USEFUL_BINS};\n"
+        f"localparam logic signed [BFPEXP_W-1:0] SINE_1K_BFPEXP_C = {_format_sv_int(BFPEXP_VALUE, BFPEXP_W)};\n"
+        "\n"
+        "function automatic logic signed [FFT_DW-1:0] sine_1k_fft_real_lut(\n"
+        "    input logic [BIN_IDX_W-1:0] bin_idx_i\n"
+        ");\n"
+        "    logic signed [FFT_DW-1:0] lut_value_o;\n"
+        "    begin\n"
+        "        unique case (bin_idx_i)\n"
+        f"{real_case}\n"
+        "            default: lut_value_o = '0;\n"
+        "        endcase\n"
+        "        sine_1k_fft_real_lut = lut_value_o;\n"
+        "    end\n"
+        "endfunction\n"
+        "\n"
+        "function automatic logic signed [FFT_DW-1:0] sine_1k_fft_imag_lut(\n"
+        "    input logic [BIN_IDX_W-1:0] bin_idx_i\n"
+        ");\n"
+        "    logic signed [FFT_DW-1:0] lut_value_o;\n"
+        "    begin\n"
+        "        unique case (bin_idx_i)\n"
+        f"{imag_case}\n"
+        "            default: lut_value_o = '0;\n"
+        "        endcase\n"
+        "        sine_1k_fft_imag_lut = lut_value_o;\n"
+        "    end\n"
+        "endfunction\n"
+    )
+
+
+def _render_rpi_reference(
+    *,
+    real: np.ndarray,
+    imag: np.ndarray,
+    words_left: np.ndarray,
+    words_right: np.ndarray,
+    sample_rate_hz: int,
+    peak_bin: int,
+    peak_hz: float,
+    scale: float,
+    example_name: str,
+) -> str:
+    real_entries = _format_python_list(real)
+    imag_entries = _format_python_list(imag)
+    left_entries = _format_python_list(words_left.astype(np.uint32))
+    right_entries = _format_python_list(words_right.astype(np.uint32))
+    return f'''from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+import numpy as np
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+DEFAULT_OUTPUT_PATH = SCRIPT_DIR / "fft.npy"
+SAMPLE_RATE_HZ = {sample_rate_hz}
+FRAME_BINS = {FRAME_BINS}
+USEFUL_BINS = {USEFUL_BINS}
+BFPEXP = {BFPEXP_VALUE}
+EXAMPLE_NAME = "{example_name}"
+EXPECTED_PEAK_BIN = {peak_bin}
+EXPECTED_PEAK_HZ = {peak_hz:.12f}
+COMPONENT_SCALE = {scale:.15f}
+
+FFT_REAL = np.asarray(
+[
+{real_entries}
+],
+    dtype=np.int32,
+)
+FFT_IMAG = np.asarray(
+[
+{imag_entries}
+],
+    dtype=np.int32,
+)
+TRANSPORT_LEFT_WORDS = np.asarray(
+[
+{left_entries}
+],
+    dtype=np.uint32,
+)
+TRANSPORT_RIGHT_WORDS = np.asarray(
+[
+{right_entries}
+],
+    dtype=np.uint32,
+)
+
+
+def build_complex_bins() -> np.ndarray:
+    return FFT_REAL.astype(np.float32) + 1j * FFT_IMAG.astype(np.float32)
+
+
+def build_magnitude_frame() -> np.ndarray:
+    magnitude = np.sqrt(FFT_REAL.astype(np.float32) ** 2 + FFT_IMAG.astype(np.float32) ** 2)
+    return magnitude[:USEFUL_BINS]
+
+
+def build_fft_history(frame_count: int = 64) -> np.ndarray:
+    frame_count = max(1, int(frame_count))
+    frame = build_magnitude_frame()
+    return np.repeat(frame[np.newaxis, :], frame_count, axis=0).astype(np.float32, copy=False)
+
+
+def write_fft_npy(output_path: str | Path = DEFAULT_OUTPUT_PATH, *, frame_count: int = 64) -> Path:
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(path, build_fft_history(frame_count))
+    return path
+
+
+def build_transport_words() -> tuple[np.ndarray, np.ndarray]:
+    return TRANSPORT_LEFT_WORDS.copy(), TRANSPORT_RIGHT_WORDS.copy()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Write a deterministic sine_1k fft.npy for offline spectrogram validation."
+    )
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
+    parser.add_argument("--frame-count", type=int, default=64)
+    args = parser.parse_args()
+
+    out_path = write_fft_npy(args.output, frame_count=args.frame_count)
+    print(out_path)
+    print(f"peak_bin={{EXPECTED_PEAK_BIN}}")
+    print(f"peak_hz={{EXPECTED_PEAK_HZ:.6f}}")
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def generate_assets() -> dict[str, object]:
+    fft_values, sample_rate_hz, example_name = _build_project_aligned_fft()
+    real, imag, scale = _quantize_fft(fft_values)
+    magnitudes = np.sqrt(real.astype(np.float64) ** 2 + imag.astype(np.float64) ** 2)
+    peak_bin = int(np.argmax(magnitudes[:USEFUL_BINS]))
+    peak_hz = float(sample_rate_hz) * peak_bin / FRAME_BINS
+    words_left, words_right = _build_fft_words(real, imag)
+
+    sv_text = _render_sv_include(
+        real=real,
+        imag=imag,
+        sample_rate_hz=sample_rate_hz,
+        peak_bin=peak_bin,
+        peak_hz=peak_hz,
+        scale=scale,
+        example_name=example_name,
+    )
+    py_text = _render_rpi_reference(
+        real=real,
+        imag=imag,
+        words_left=words_left,
+        words_right=words_right,
+        sample_rate_hz=sample_rate_hz,
+        peak_bin=peak_bin,
+        peak_hz=peak_hz,
+        scale=scale,
+        example_name=example_name,
+    )
+
+    RTL_INCLUDE_PATH.write_text(sv_text, encoding="utf-8")
+    RPI_REFERENCE_PATH.write_text(py_text, encoding="utf-8")
+
+    return {
+        "sv_include": RTL_INCLUDE_PATH,
+        "python_reference": RPI_REFERENCE_PATH,
+        "sample_rate_hz": sample_rate_hz,
+        "peak_bin": peak_bin,
+        "peak_hz": peak_hz,
+        "scale": scale,
+        "example_name": example_name,
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Generate shared FPGA/Raspberry Pi assets for the tagged-I2S sine_1k transport test."
+    )
+    parser.parse_args()
+
+    result = generate_assets()
+    print(result["sv_include"])
+    print(result["python_reference"])
+    print(f"example_name={result['example_name']}")
+    print(f"sample_rate_hz={result['sample_rate_hz']}")
+    print(f"peak_bin={result['peak_bin']}")
+    print(f"peak_hz={result['peak_hz']:.6f}")
+    print(f"component_scale={result['scale']:.15f}")
+
+
+if __name__ == "__main__":
+    main()

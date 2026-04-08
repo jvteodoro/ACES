@@ -206,6 +206,7 @@ module tb_i2s_stimulus_manager_rom;
     integer expected_base_addr;
     bit saw_quiet_on_inactive;
     bit repeat_selected_example;
+    bit check_samples_enabled;
 
     task automatic check_expected_sample(input int addr);
         begin
@@ -221,15 +222,17 @@ module tb_i2s_stimulus_manager_rom;
     endtask
 
     always @(posedge rx_valid) begin
-        if (repeat_selected_example)
-            check_expected_sample(expected_base_addr + (rx_count % N_POINTS));
-        else
-            check_expected_sample(expected_addr);
+        if (check_samples_enabled) begin
+            if (repeat_selected_example)
+                check_expected_sample(expected_base_addr + (rx_count % N_POINTS));
+            else
+                check_expected_sample(expected_addr);
 
-        rx_count = rx_count + 1;
+            rx_count = rx_count + 1;
 
-        if (!repeat_selected_example)
-            expected_addr = expected_addr + 1;
+            if (!repeat_selected_example)
+                expected_addr = expected_addr + 1;
+        end
     end
 
     always @(negedge sck_i) begin
@@ -256,6 +259,7 @@ module tb_i2s_stimulus_manager_rom;
         expected_base_addr = 0;
         saw_quiet_on_inactive = 1'b0;
         repeat_selected_example = 1'b0;
+        check_samples_enabled = 1'b1;
 
         repeat (4) @(posedge clk);
         rst = 1'b0;
@@ -312,6 +316,53 @@ module tb_i2s_stimulus_manager_rom;
         wait (rx_count >= N_POINTS + 2);
 
         $display("Cenario 2 OK");
+
+        // ======================================================
+        // cenário 3: start emitido enquanto busy deve ficar pendente
+        // ======================================================
+        rst           = 1'b1;
+        start_i       = 1'b0;
+        chipen_i      = 1'b0;
+        repeat (4) @(posedge clk);
+        rst           = 1'b0;
+        chipen_i      = 1'b1;
+        wait (ready_o == 1'b1);
+
+        rx_count      = 0;
+        expected_addr = 0;
+        expected_base_addr = 0;
+        repeat_selected_example = 1'b0;
+        check_samples_enabled = 1'b0;
+
+        example_sel_i = 0;
+        loop_mode_i   = 2'b01;
+
+        start_i = 1'b1;
+        @(posedge clk);
+        start_i = 1'b0;
+
+        wait (busy_o == 1'b1);
+        wait (current_point_o >= 2);
+
+        // Pede parada da sessão atual e, antes de chegar ao IDLE, já emite um
+        // novo start. O DUT deve enfileirar esse pedido e reiniciar assim que a
+        // janela corrente terminar.
+        loop_mode_i = 2'b00;
+        @(posedge clk);
+        start_i = 1'b1;
+        @(posedge clk);
+        start_i = 1'b0;
+
+        wait (done_o == 1'b1);
+        loop_mode_i = 2'b01;
+
+        wait (busy_o == 1'b1);
+        wait (current_point_o >= 1);
+
+        assert (busy_o)
+        else $fatal(1, "Start pendente emitido durante busy foi perdido.");
+
+        $display("Cenario 3 OK");
         $display("tb_i2s_stimulus_manager_rom PASSED");
         $finish;
     end

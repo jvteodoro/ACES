@@ -271,7 +271,7 @@ The displayed outputs are not purely live wires anymore. They are captured into 
 
 | GPIO input | Function |
 | --- | --- |
-| `GPIO_0_D0` | system clock input used by the top-level test wrapper. |
+| `clock_50` | onboard system clock used by the active top-level wrappers. |
 | `GPIO_0_D1` | reset input used by the top-level test wrapper. |
 | `GPIO_0_D2` | capture-enable for the LED snapshot register. |
 | `GPIO_0_D4` | capture-enable for the HEX snapshot register. |

@@ -60,6 +60,7 @@ module i2s_stimulus_manager_rom #(
     state_t state;
 
     logic start_d, start_pulse;
+    logic start_pending_r;
 
     logic sck_prev, ws_prev, chipen_prev;
     logic sck_rise, sck_fall;
@@ -125,10 +126,21 @@ module i2s_stimulus_manager_rom #(
     // Detecção de start por pulso
     //------------------------------------------------------------
     always_ff @(posedge clk or posedge rst) begin
-        if (rst)
+        if (rst) begin
             start_d <= 1'b0;
-        else
+            start_pending_r <= 1'b0;
+        end else begin
             start_d <= start_i;
+
+            // Preserve a manual restart request that arrives while the current
+            // playback session is still busy. Without this, a short SW0 pulse
+            // outside ST_IDLE is silently lost and the top-level can appear
+            // frozen until another reset/start cycle.
+            if (start_pulse && ((state != ST_IDLE) || !chipen_i))
+                start_pending_r <= 1'b1;
+            else if ((state == ST_IDLE) && start_pending_r && chipen_i)
+                start_pending_r <= 1'b0;
+        end
     end
 
     assign start_pulse = start_i & ~start_d;
@@ -218,7 +230,7 @@ module i2s_stimulus_manager_rom #(
                     current_point <= '0;
                     bit_index     <= 6'd0;
 
-                    if (start_pulse && chipen_i) begin
+                    if ((start_pulse || start_pending_r) && chipen_i) begin
                         current_example <= example_sel_i;
                         current_point   <= '0;
 

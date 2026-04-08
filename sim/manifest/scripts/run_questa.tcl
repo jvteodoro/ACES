@@ -135,6 +135,8 @@ array set filelists {
     aces_audio_to_fft_pipeline     mock_integration_aces_audio_to_fft_pipeline.f
     aces                           mock_integration_aces.f
     top_level_test mock_integration_top_level_test.f
+    top_level_test_onboard_clock mock_integration_top_level_test_onboard_clock.f
+    top_level_test_ex_0 real_ip_top_level_test_ex_0.f
     top_level_i2s_fft_tx_diag mock_integration_top_level_i2s_fft_tx_diag.f
     top_level_fft_isolated real_ip_top_level_fft_isolated.f
 }
@@ -153,6 +155,8 @@ array set tops {
     aces_audio_to_fft_pipeline     tb_aces_audio_to_fft_pipeline
     aces                           tb_aces
     top_level_test tb_top_level_test
+    top_level_test_onboard_clock tb_top_level_test_onboard_clock
+    top_level_test_ex_0 tb_top_level_test_ex_0
     top_level_i2s_fft_tx_diag tb_top_level_i2s_fft_tx_diag
     top_level_fft_isolated tb_top_level_fft_isolated
 }
@@ -162,17 +166,21 @@ array set wave_dos {
 }
 
 if {$flow eq "real"} {
-    if {$test_name ni [list top_level_test top_level_fft_isolated]} {
-        fail "Real flow is currently defined only for top_level_test and top_level_fft_isolated."
+    if {$test_name ni [list top_level_test top_level_test_ex_0 top_level_fft_isolated]} {
+        fail "Real flow is currently defined only for top_level_test, top_level_test_ex_0, and top_level_fft_isolated."
     }
     if {![file exists [file join $repo_root submodules R2FFT quartus r2fft_tribuf_impl.sv]]} {
         fail "Real flow requires initialized submodules/R2FFT sources. Run 'git submodule update --init --recursive' before launching the real top-level test."
     }
     if {$test_name eq "top_level_test"} {
         set filelist_name real_ip_top_level_test.f
+    } elseif {$test_name eq "top_level_test_ex_0"} {
+        set filelist_name real_ip_top_level_test_ex_0.f
     } else {
         set filelist_name $filelists($test_name)
     }
+} elseif {$test_name eq "top_level_test_ex_0"} {
+    fail "top_level_test_ex_0 is defined only for the real flow."
 } elseif {[info exists filelists($test_name)]} {
     set filelist_name $filelists($test_name)
 } else {

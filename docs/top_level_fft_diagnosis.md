@@ -25,6 +25,26 @@ The first symptoms observed during the real-IP-oriented top-level bring-up were:
 
 ## Root causes that were identified
 
+### 0. `top_level_test` was not using the same system clock as the working diagnostic top-levels
+
+The hardware-validated `top_level_i2s_fft_tx_sine_1k` and `top_level_i2s_fft_tx_diag`
+wrappers both run from the onboard `clock_50`. `top_level_test`, however, was still
+wired to use `GPIO_0_D0` as its system clock:
+
+- `top_level_i2s_fft_tx_sine_1k`: `assign clk = clock_50;`
+- `top_level_test` (before the fix): `assign clk = gpio_0_d0;`
+
+That difference matters on hardware because the Quartus project was deriving timing from
+`clock_50`, while the real integrated FFT flow was being driven by an unrelated external
+GPIO clock. In practice this meant the full `I2S RX -> frontend -> FFT -> DMA -> TX`
+pipeline could violate timing or depend on an absent/noisy external source even though
+the tagged-I2S transport path looked correct in the transport-only diagnostic top-level.
+
+What changed:
+
+- `rtl/top/top_level_test.sv` now uses `clock_50` as the system clock, matching the
+  working transport-only top-levels and the clock that Quartus already promotes/derives.
+
 ### 1. `fft_control` assumed a continuous stream-valid level
 
 The ACES receive pipeline does **not** hold `sact_istream_o` high for an entire FFT frame. It emits a one-cycle pulse per accepted sample.

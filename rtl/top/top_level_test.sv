@@ -152,9 +152,11 @@ module top_level_test #(
     logic clk;
     logic rst;
 
-    assign clk = gpio_0_d0;
-    // With the onboard 50 MHz clock selected, keep reset on a stable onboard source
-    // instead of an external GPIO that may now be left floating.
+    // Keep the integrated FFT path on the same constrained onboard clock used by
+    // the transport-only diagnostic top-levels. Using gpio_0_d0 here made the
+    // full flow depend on an unrelated external GPIO clock and could leave the
+    // serializer idle after reset when that source was absent or unstable.
+    assign clk = clock_50;
     assign rst = gpio_0_d1;
 
     logic dbg_capture_leds_i;

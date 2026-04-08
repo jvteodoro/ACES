@@ -1,0 +1,6 @@
+`define TB_TOP_LEVEL_TEST_MODULE_NAME tb_top_level_test_ex_0
+`define TB_TOP_LEVEL_TEST_BENCH_LABEL "tb_top_level_test_ex_0"
+`define TB_TOP_LEVEL_TEST_DUMP_PREFIX "top_level_test_ex_0"
+`define TB_TOP_LEVEL_TEST_FORCE_SELECTED_EXAMPLE 0
+`define TB_TOP_LEVEL_TEST_ENABLE_EXPORT_CSVS
+`include "tb_top_level_test.sv"

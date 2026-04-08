@@ -481,6 +481,7 @@ module tb_top_level_fft_isolated;
     assert property (p_fft_status_done_matches_done)
     else $fatal(1, "fft_done_o ativo com fft_status_o diferente de DONE.");
 
+    assign clock_50   = tb_clk_drive;
     assign gpio_0_d0  = tb_clk_drive;
     assign gpio_0_d1  = tb_rst_drive;
     assign gpio_0_d2  = tb_capture_leds_drive;
@@ -641,7 +642,7 @@ module tb_top_level_fft_isolated;
 
         key0 = 1'b1; key1 = 1'b1; key2 = 1'b1; key3 = 1'b1; reset_n = 1'b1;
         sw0 = 1'b0; sw1 = 1'b0; sw2 = 1'b0; sw3 = 1'b0; sw4 = 1'b0; sw5 = 1'b0; sw6 = 1'b0; sw7 = 1'b1; sw8 = 1'b0; sw9 = 1'b0;
-        clock_50 = 1'b0; clock2_50 = 1'b0; clock3_50 = 1'b0; clock4_50 = 1'b0;
+        clock2_50 = 1'b0; clock3_50 = 1'b0; clock4_50 = 1'b0;
 
         tb_clk_drive           = 1'b0;
         tb_rst_drive           = 1'b1;
