@@ -106,6 +106,9 @@ add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/tx_fifo_level_r
 add wave sim:/tb_top_level_test/dut/u_aces/tx_fifo_word_valid_r
 add wave sim:/tb_top_level_test/dut/u_aces/tx_fifo_read_inflight_r
 add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/tx_fft_read_index_r
+add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/tx_fft_real_i
+add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/tx_fft_imag_i
+add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/tx_bfpexp_i
 add wave sim:/tb_top_level_test/dut/u_aces/tx_fft_valid_i
 add wave sim:/tb_top_level_test/dut/u_aces/tx_fft_ready_o
 add wave sim:/tb_top_level_test/dut/tx_overflow_o
@@ -119,11 +122,13 @@ add wave sim:/tb_top_level_test/dut/tx_i2s_sck_o
 add wave sim:/tb_top_level_test/dut/tx_i2s_ws_o
 add wave sim:/tb_top_level_test/dut/tx_i2s_sd_o
 add wave sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/active_valid_r
+add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/active_packet_index_r
 add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/active_tag_r
 add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/active_left_r
 add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/active_right_r
 add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/active_hold_frames_r
 add wave sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/pending_valid_r
+add wave -radix unsigned sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/pending_index_r
 add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/pending_real_r
 add wave -radix decimal sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/pending_imag_r
 add wave sim:/tb_top_level_test/dut/u_aces/u_i2s_fft_tx_adapter/pending_last_r
@@ -141,6 +146,31 @@ add wave sim:/tb_top_level_test/tx_mon_have_right_r
 add wave -radix hex sim:/tb_top_level_test/tx_mon_right_word_r
 add wave -radix unsigned sim:/tb_top_level_test/tx_sck_toggle_count_r
 add wave sim:/tb_top_level_test/tx_sck_timing_armed_r
+
+add wave -divider {TX Frame Correlation}
+add wave sim:/tb_top_level_test/tx_enqueue_fire_r
+add wave -radix unsigned sim:/tb_top_level_test/tx_enqueue_fft_index_r
+add wave -radix unsigned sim:/tb_top_level_test/tx_enqueue_packet_index_r
+add wave -radix decimal sim:/tb_top_level_test/tx_enqueue_real_r
+add wave -radix decimal sim:/tb_top_level_test/tx_enqueue_imag_r
+add wave -radix decimal sim:/tb_top_level_test/tx_enqueue_bfpexp_r
+add wave sim:/tb_top_level_test/tx_enqueue_last_r
+add wave sim:/tb_top_level_test/tx_dec_frame_valid_r
+add wave -radix unsigned sim:/tb_top_level_test/tx_dec_frame_seq_r
+add wave -radix hex sim:/tb_top_level_test/tx_dec_left_word_r
+add wave -radix hex sim:/tb_top_level_test/tx_dec_right_word_r
+add wave -radix unsigned sim:/tb_top_level_test/tx_dec_packet_index_r
+add wave -radix unsigned sim:/tb_top_level_test/tx_dec_tag_r
+add wave -radix decimal sim:/tb_top_level_test/tx_dec_fft_bin_index_r
+add wave -radix decimal sim:/tb_top_level_test/tx_dec_left_payload_r
+add wave -radix decimal sim:/tb_top_level_test/tx_dec_right_payload_r
+add wave -radix decimal sim:/tb_top_level_test/tx_dec_expected_idx_r
+add wave -radix unsigned sim:/tb_top_level_test/tx_dec_expected_packet_index_r
+add wave -radix unsigned sim:/tb_top_level_test/tx_dec_expected_tag_r
+add wave -radix decimal sim:/tb_top_level_test/tx_dec_expected_fft_bin_index_r
+add wave -radix decimal sim:/tb_top_level_test/tx_dec_expected_left_r
+add wave -radix decimal sim:/tb_top_level_test/tx_dec_expected_right_r
+add wave sim:/tb_top_level_test/tx_dec_matches_expected_r
 
 wave zoom full
 update

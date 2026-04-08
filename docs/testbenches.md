@@ -46,7 +46,7 @@ Current examples in this repository:
 - `tb_aces_audio_to_fft_pipeline` verifies receive-side frontend composition.
 - `tb_fft_tx_i2s_link` verifies burst-to-serial behavior across `fft_tx_bridge_fifo` and `i2s_fft_tx_adapter`, including indexed BFPEXP and indexed FFT bins.
 - `tb_top_level_i2s_fft_tx_diag` verifies the board-facing tagged-I2S diagnostic top-level with a deterministic fixed-pattern source and asserts the expected packet-index values on the wire.
-- `tb_top_level_test` verifies the real ACES end-to-end transmit path with the same indexed transport contract after the FFT pipeline produces output.
+- `tb_top_level_test` verifies the real ACES end-to-end transmit path with the same indexed transport contract after the FFT pipeline produces output, including the decoded FFT bin number after I2S deserialization and wave-visible correlation against the sample accepted by the TX path.
 - `tb_top_level_fft_isolated` verifies the real FFT control/readout path inside the top-level wrapper while isolating it from the rest of the end-to-end bench.
 
 ## Mock vs Real-IP Testbenches

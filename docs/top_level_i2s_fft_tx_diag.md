@@ -170,6 +170,11 @@ Se houver uma GPIO de apoio para marcar `BFPEXP`, acrescente por exemplo:
     --extra-tag-shifts 21
 ```
 
+O bundle gerado agora inclui tambem a telemetria do helper ALSA no
+`channel_capture.index.jsonl`, com eventos `capture_session_start`,
+`capture_chunk`, `capture_recovery` e `capture_final`. Isso permite depurar
+offline se um erro veio do transporte tagged em si ou do lado de captura no Pi.
+
 ### 1. Nivel bruto de palavra
 
 Com o comando tagged acima, o software deve decodificar:
@@ -306,6 +311,33 @@ Se as runs dominantes ficarem muito menores que `512`, suspeite:
 - perda de frames `FFT`,
 - erro no `fft_last_i`,
 - ou decodificacao do host quebrando a run por falso `idle`, `other`, `tag_mismatch` ou `packet_index_mismatch`.
+
+### `capture_xruns`, `capture_recoveries`, `capture_partial_reads`
+
+Esperado: `0` em capturas saudaveis.
+
+Interpretacao:
+
+- valores nao zero indicam que o helper ALSA precisou se recuperar localmente;
+- se esses contadores crescem ao mesmo tempo em que o replay mostra bins
+  faltantes, a causa pode estar no host e nao no serializer da FPGA.
+
+Suspeitas principais:
+
+- pressao do stdout/pipe do helper,
+- Raspberry Pi sem folga de CPU,
+- tamanhos de `read_frames` ou `queue_chunks` inadequados para a carga atual.
+
+### `capture_queue_high_water` e `capture_full_waits`
+
+Esperado: baixos, sem crescimento persistente.
+
+Interpretacao:
+
+- `capture_queue_high_water` alto mostra que o writer thread chegou perto de
+  lotar a fila interna do helper;
+- `capture_full_waits` maior que zero mostra que a thread de captura ficou
+  bloqueada esperando espaco, o que aumenta o risco de `xrun`.
 
 ## Como interpretar o `preview` dos arquivos `.jsonl`
 

@@ -270,8 +270,8 @@ module top_level_test #(
     logic [3:0] hex4_i;
     logic [3:0] hex5_i;
 
-    assign dbg_stage_sel = {gpio_1_d13, gpio_1_d15};
-    assign dbg_page_sel  = {gpio_1_d17, gpio_1_d19};
+    assign dbg_stage_sel = {gpio_1_d15, gpio_1_d13};
+    assign dbg_page_sel  = {gpio_1_d19, gpio_1_d17};
     // Keep the selector inputs dedicated to reads; mirror them on separate spare GPIOs.
 	 assign gpio_0_d12 = dbg_stage_sel[0];
 	 assign gpio_0_d14 = dbg_stage_sel[1];
