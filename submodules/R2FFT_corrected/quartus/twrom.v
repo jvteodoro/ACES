@@ -39,7 +39,7 @@
 // synopsys translate_on
 // Corrected twiddle ROM wrapper. Coefficients remain Q1.15 (16 bits) and are
 // explicitly zero-extended at the R2FFT integration boundary to FFT_DW bits.
-module r2fft_twrom (
+module twrom (
 	address,
 	clock,
 	q);

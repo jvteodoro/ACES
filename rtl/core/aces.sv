@@ -153,7 +153,7 @@ module aces #(
     // -----------------------------
     // núcleo FFT
     // -----------------------------
-    r2fft_tribuf_impl #(
+    r2fft_tribuf_impl_corrected #(
         .FFT_LENGTH(FFT_LENGTH),
         .FFT_DW(FFT_DW),
         .PL_DEPTH(3)

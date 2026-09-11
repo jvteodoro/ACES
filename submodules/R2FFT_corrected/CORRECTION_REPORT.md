@@ -237,7 +237,65 @@ Errors: 0, Warnings: 0
 
 O tempo total simulado foi aproximadamente `51416 ns`.
 
-## 7. Limitações e próximos testes
+## 7. Validação end-to-end do ACES com `R2FFT_corrected`
+
+Após a integração, os seguintes caminhos foram alterados para usar esta
+versão corrigida:
+
+* `rtl/core/aces.sv` instancia `r2fft_tribuf_impl_corrected`;
+* o projeto Quartus DE10-Lite inclui exclusivamente os HDL/IP de
+  `submodules/R2FFT_corrected`;
+* o filelist real do Questa usa o mesmo núcleo corrigido;
+* o wrapper de simulação preserva o modelo de memória de 512 pontos/18 bits,
+  enquanto a síntese usa os IPs MAX 10 de 36 bits e 512 palavras.
+
+### 7.1 Questa integrado
+
+Comando executado:
+
+```bash
+./sim/manifest/scripts/run_questa.sh top_level_fft_isolated real
+```
+
+Resultado:
+
+```text
+tb_top_level_fft_isolated PASSED
+auto   rmse=257.703188 max_abs=743.120580
+manual rmse=257.703188 max_abs=743.120580
+Errors: 0, Warnings: 3498
+```
+
+Os 512 bins foram lidos tanto pelo `fft_dma_reader` quanto por uma leitura
+DMA manual independente. Os resultados automático e manual foram idênticos;
+o erro observado é de quantização fixa em relação ao CSV de referência.
+Os warnings restantes são majoritariamente avisos repetitivos do
+`unique/priority case` no top-level de teste, não erros de compilação ou
+falhas de protocolo.
+
+### 7.2 Quartus DE10-Lite
+
+Foi executado o fluxo completo com Quartus Prime Standard 25.1:
+
+```powershell
+quartus_sh --flow compile quartus/de10lite_audio_fft.qpf
+```
+
+Resultados do projeto `de10lite_audio_fft`:
+
+* Analysis & Synthesis: **successful**, 0 erros;
+* Fitter: **successful**, 0 erros;
+* Timing Analyzer: **successful**, 0 erros;
+* recursos: 7.508/49.760 elementos lógicos (15%) e 160.310/1.677.312 bits
+  de memória (10%);
+* arquivos `.sof` e `.pof` gerados em `quartus/output_files_de10lite/`.
+
+Ainda há avisos de timing (`worst-case slack = -12,386 ns`), de clock SCK
+derivado sem restrição própria e de 27 pinos sem localização exata. A síntese
+foi aprovada, mas o timing não deve ser considerado fechado até que o clock
+de áudio e as restrições de pinos sejam revisados.
+
+## 8. Limitações e próximos testes
 
 Esta etapa validou exaustivamente o gerador de endereços e a referência
 numérica, mas ainda não substitui uma validação end-to-end do núcleo completo.
@@ -257,14 +315,15 @@ Nenhuma correção foi aplicada por supressão de warning. Cada warning deve
 continuar sendo removido somente depois de demonstrada a preservação da
 latência, da escala numérica e da sequência de controle.
 
-## 8. Conclusão
+## 9. Conclusão
 
 A versão `R2FFT_corrected` elimina o defeito funcional mais grave do núcleo
 original: a incompatibilidade entre a largura de 36 bits usada pelo FFT de 18
 bits e a DPRAM de 32 bits. Também remove as principais conversões implícitas
 de largura e documenta uma referência Python para a validação numérica.
 
-O gerador de endereços corrigido foi aprovado no Questa sem erros ou warnings,
-e o projeto isolado foi aceito pelo fluxo Quartus para a MAX 10. A validação
-end-to-end dos valores FFT ainda deve ser executada antes de conectar o núcleo
-ao analisador MFCC definitivo.
+O gerador de endereços, o caminho DMA integrado e a síntese completa do ACES
+foram validados com `R2FFT_corrected`. O bitstream foi gerado para a
+DE10-Lite. Permanecem como trabalho de fechamento a eliminação dos warnings de
+timing/pinos e a validação física com microfone em ambiente ruidoso; esses
+testes não podem ser substituídos por simulação RTL.

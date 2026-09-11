@@ -78,11 +78,14 @@ proc write_absolute_filelist {root local_dir source_path output_path} {
     set staged_signals_rom [normalize_for_hdl [stage_runtime_asset         [file join $root tools signals_rom.mif]         [file join $local_dir signals_rom.mif]]]
     set staged_signals_hex [normalize_for_hdl [stage_runtime_asset         [file join $root tools signals_rom_mirror.hex]         [file join $local_dir signals_rom_mirror.hex]]]
     set staged_twrom_mif [normalize_for_hdl [stage_runtime_asset         [file join $root submodules R2FFT quartus twrom.mif]         [file join $local_dir twrom.mif]]]
+    set staged_corrected_twrom_mif [normalize_for_hdl [stage_runtime_asset         [file join $root submodules R2FFT_corrected quartus twrom.mif]         [file join $local_dir corrected_twrom.mif]]]
     set staged_twrom_512x18_mif [normalize_for_hdl [stage_runtime_asset         [file join $root tb data twrom_512x18.mif]         [file join $local_dir twrom_512x18.mif]]]
 
     set staged_signals_rom_ip [normalize_for_hdl [stage_ip_wrapper         [file join $root rtl ip rom signals_rom_ip.v]         [file join $local_dir staged_ip signals_rom_ip.v]         [list "../../../tools/signals_rom.mif" $staged_signals_rom]]]
 
     set staged_twrom_v [normalize_for_hdl [stage_ip_wrapper         [file join $root submodules R2FFT quartus twrom.v]         [file join $local_dir staged_ip twrom.v]         [list "twrom.mif" $staged_twrom_mif]]]
+    set staged_corrected_sim_dpram_v [normalize_for_hdl [stage_ip_wrapper [file join $root tb real_ip r2fft_dpram_altsyncram.sv] [file join $local_dir staged_ip corrected_sim_dpram.v] [list {module dpram} {module r2fft_dpram}]]]
+    set staged_corrected_sim_twrom_v [normalize_for_hdl [stage_ip_wrapper [file join $root tb real_ip r2fft_twrom_altsyncram.sv] [file join $local_dir staged_ip corrected_sim_twrom.v] [list "__TWROM_512X18_INIT_FILE__" $staged_twrom_512x18_mif]]]
     set staged_twrom_512x18_v [normalize_for_hdl [stage_ip_wrapper         [file join $root tb real_ip r2fft_twrom_altsyncram.sv]         [file join $local_dir staged_ip r2fft_twrom_altsyncram.sv]         [list "__TWROM_512X18_INIT_FILE__" $staged_twrom_512x18_mif]]]
 
     try {
@@ -96,6 +99,10 @@ proc write_absolute_filelist {root local_dir source_path output_path} {
                 puts $out $staged_twrom_512x18_v
             } elseif {$trimmed eq "rtl/ip/fft/twrom.v" || $trimmed eq "submodules/R2FFT/quartus/twrom.v"} {
                 puts $out $staged_twrom_v
+            } elseif {$trimmed eq "submodules/R2FFT_corrected/quartus/twrom.v"} {
+                puts $out $staged_corrected_sim_twrom_v
+            } elseif {$trimmed eq "submodules/R2FFT_corrected/quartus/dpram.v"} {
+                puts $out $staged_corrected_sim_dpram_v
             } elseif {[string match {+*} $trimmed] || [string match {-*} $trimmed]} {
                 puts $out $trimmed
             } elseif {[file pathtype $trimmed] eq "relative"} {
@@ -118,8 +125,15 @@ set local_dir $::env(ACES_LOCAL_DIR)
 set test_name $::env(ACES_TEST_NAME)
 set flow $::env(ACES_FLOW)
 set gui_mode [expr {[info exists ::env(ACES_GUI)] && $::env(ACES_GUI) eq "1"}]
-set extra_filelist [expr {[info exists ::env(EXTRA_FILELIST)] ? $::env(EXTRA_FILELIST) : ""}]
-set sim_plusargs [expr {[info exists ::env(ACES_VSIM_PLUSARGS)] ? [split $::env(ACES_VSIM_PLUSARGS)] : [list]}]
+if {[catch {set extra_filelist $::env(EXTRA_FILELIST)}]} {
+    set extra_filelist ""
+}
+
+if {[catch {set raw_sim_plusargs $::env(ACES_VSIM_PLUSARGS)}] || $raw_sim_plusargs eq ""} {
+    set sim_plusargs [list]
+} else {
+    set sim_plusargs [split $raw_sim_plusargs]
+}
 
 array set filelists {
     hexa7seg                       mock_unit_hexa7seg.f
@@ -165,12 +179,14 @@ array set wave_dos {
     i2s_rx_adapter_24              i2s_rx_adapter_24.do
 }
 
+set real_only_tests [list top_level_test_ex_0 top_level_fft_isolated]
+
 if {$flow eq "real"} {
     if {$test_name ni [list top_level_test top_level_test_ex_0 top_level_fft_isolated]} {
         fail "Real flow is currently defined only for top_level_test, top_level_test_ex_0, and top_level_fft_isolated."
     }
-    if {![file exists [file join $repo_root submodules R2FFT quartus r2fft_tribuf_impl.sv]]} {
-        fail "Real flow requires initialized submodules/R2FFT sources. Run 'git submodule update --init --recursive' before launching the real top-level test."
+    if {![file exists [file join $repo_root submodules R2FFT_corrected quartus r2fft_tribuf_impl.sv]]} {
+        fail "Real flow requires submodules/R2FFT_corrected sources."
     }
     if {$test_name eq "top_level_test"} {
         set filelist_name real_ip_top_level_test.f
@@ -179,8 +195,8 @@ if {$flow eq "real"} {
     } else {
         set filelist_name $filelists($test_name)
     }
-} elseif {$test_name eq "top_level_test_ex_0"} {
-    fail "top_level_test_ex_0 is defined only for the real flow."
+} elseif {$test_name in $real_only_tests} {
+    fail "$test_name is defined only for the real flow."
 } elseif {[info exists filelists($test_name)]} {
     set filelist_name $filelists($test_name)
 } else {
@@ -224,6 +240,7 @@ if {$gui_mode} {
 
     if {[info exists wave_dos($test_name)]} {
         lappend wave_candidates [file join sim manifest waves $wave_dos($test_name)]
+        lappend wave_candidates [file join waves $wave_dos($test_name)]
     }
 
     foreach candidate [list \
@@ -232,6 +249,11 @@ if {$gui_mode} {
         [file join sim manifest waves "${top}.do"] \
         [file join sim manifest waves $top] \
         [file join sim manifest waves legacy_questa $top] \
+        [file join waves "${test_name}.do"] \
+        [file join waves $test_name] \
+        [file join waves "${top}.do"] \
+        [file join waves $top] \
+        [file join waves legacy_questa $top] \
     ] {
         lappend wave_candidates $candidate
     }

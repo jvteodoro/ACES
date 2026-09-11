@@ -13,10 +13,10 @@ module r2fft_tribuf_impl_corrected
    input wire 			   run_i,
    input wire 			   ifft_i,
 
-   output wire 			   done_o,
-   output wire [2:0] 		   status_o,
-   output wire [1:0] 		   input_buffer_status_o,
-   output wire signed [7:0] 	   bfpexp_o,
+   output reg 			   done_o,
+   output reg [2:0] 		   status_o,
+   output reg [1:0] 		   input_buffer_status_o,
+   output reg signed [7:0] 	   bfpexp_o,
 
    // input stream
    input wire 			   sact_istream_i,
@@ -26,8 +26,8 @@ module r2fft_tribuf_impl_corrected
     // output / DMA bus
    input wire 			   dmaact_i,
    input wire [FFT_N-1:0] 	   dmaa_i,
-   output wire signed [FFT_DW-1:0] dmadr_real_o,
-   output wire signed [FFT_DW-1:0] dmadr_imag_o
+   output reg signed [FFT_DW-1:0] dmadr_real_o,
+   output reg signed [FFT_DW-1:0] dmadr_imag_o
    
    );
 
@@ -75,8 +75,11 @@ module r2fft_tribuf_impl_corrected
    end
 
    always @ ( posedge clk ) begin
-      dmadr_real_o <= dmaact ? dmadr_real : {FFT_DW{1'b0}};
-      dmadr_imag_o <= dmaact ? dmadr_imag : {FFT_DW{1'b0}};
+      // Preserve the registered DMA read protocol. dmaact_i is a request
+      // qualifier and is intentionally not used to gate this data register:
+      // fft_dma_reader samples the response after its configured latency.
+      dmadr_real_o <= dmadr_real;
+      dmadr_imag_o <= dmadr_imag;
    end
    
    
@@ -85,8 +88,11 @@ module r2fft_tribuf_impl_corrected
     // twiddle factor rom
    wire 			   twact;
    wire [FFT_N-1-2:0] twa;
-   wire [15:0] 		   twdr_cos_rom;
-   wire [FFT_DW-1:0] 		   twdr_cos = {{(FFT_DW-16){1'b0}}, twdr_cos_rom};
+   // The FFT core consumes FFT_DW bits. The production 16-bit ROM is
+   // zero-extended by Verilog at this boundary; the 512-point Questa model
+   // supplies the equivalent 18-bit table.
+   wire [FFT_DW-1:0] 		   twdr_cos_rom;
+   wire [FFT_DW-1:0] 		   twdr_cos = twdr_cos_rom;
     
    // block ram0
    // bank0
@@ -228,7 +234,7 @@ module r2fft_tribuf_impl_corrected
 
    /////////////////////////////////////////
 
-   r2fft_twrom utwrom
+    twrom utwrom
      (
       .address( twa ),
       .clock( clk ),

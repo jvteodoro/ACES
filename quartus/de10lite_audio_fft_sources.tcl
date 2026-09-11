@@ -24,32 +24,32 @@ foreach relpath {
     rtl/frontend/i2s_rx_adapter_24.sv
     rtl/core/aces_audio_to_fft_pipeline.sv
     rtl/core/aces.sv
-    submodules/R2FFT/hdl/R2FFT.sv
-    submodules/R2FFT/hdl/R2FFT_tribuf.sv
-    submodules/R2FFT/hdl/bfp_Shifter.sv
-    submodules/R2FFT/hdl/bfp_bitWidthAcc.sv
-    submodules/R2FFT/hdl/bfp_bitWidthDetector.sv
-    submodules/R2FFT/hdl/bfp_maxBitWidth.sv
-    submodules/R2FFT/hdl/bitReverseCounter.sv
-    submodules/R2FFT/hdl/butterflyCore.sv
-    submodules/R2FFT/hdl/butterflyUnit.sv
-    submodules/R2FFT/hdl/fftAddressGenerator.sv
-    submodules/R2FFT/hdl/radix2Butterfly.sv
-    submodules/R2FFT/hdl/ramPipelineBridge.sv
-    submodules/R2FFT/hdl/readBusMux.sv
-    submodules/R2FFT/hdl/readBusMux_tribuf.sv
-    submodules/R2FFT/hdl/twiddleFactorRomBridge.sv
-    submodules/R2FFT/hdl/writeBusMux.sv
-    submodules/R2FFT/hdl/writeBusMux_tribuf.sv
-    submodules/R2FFT/quartus/r2fft_tribuf_impl.sv
-    submodules/R2FFT/quartus/twrom.v
-    submodules/R2FFT/quartus/dpram.v
+    submodules/R2FFT_corrected/hdl/R2FFT.sv
+    submodules/R2FFT_corrected/hdl/R2FFT_tribuf.sv
+    submodules/R2FFT_corrected/hdl/bfp_Shifter.sv
+    submodules/R2FFT_corrected/hdl/bfp_bitWidthAcc.sv
+    submodules/R2FFT_corrected/hdl/bfp_bitWidthDetector.sv
+    submodules/R2FFT_corrected/hdl/bfp_maxBitWidth.sv
+    submodules/R2FFT_corrected/hdl/bitReverseCounter.sv
+    submodules/R2FFT_corrected/hdl/butterflyCore.sv
+    submodules/R2FFT_corrected/hdl/butterflyUnit.sv
+    submodules/R2FFT_corrected/hdl/fftAddressGenerator.sv
+    submodules/R2FFT_corrected/hdl/radix2Butterfly.sv
+    submodules/R2FFT_corrected/hdl/ramPipelineBridge.sv
+    submodules/R2FFT_corrected/hdl/readBusMux.sv
+    submodules/R2FFT_corrected/hdl/readBusMux_tribuf.sv
+    submodules/R2FFT_corrected/hdl/twiddleFactorRomBridge.sv
+    submodules/R2FFT_corrected/hdl/writeBusMux.sv
+    submodules/R2FFT_corrected/hdl/writeBusMux_tribuf.sv
+    submodules/R2FFT_corrected/quartus/r2fft_tribuf_impl.sv
+    submodules/R2FFT_corrected/quartus/twrom.v
+    submodules/R2FFT_corrected/quartus/dpram.v
 } {
     add_source $repo_root $relpath SYSTEMVERILOG_FILE
 }
 
-set_global_assignment -name SEARCH_PATH [file normalize [file join $repo_root submodules R2FFT quartus]]
-set_global_assignment -name MIF_FILE [file normalize [file join $repo_root submodules R2FFT quartus twrom.mif]]
+set_global_assignment -name SEARCH_PATH [file normalize [file join $repo_root submodules R2FFT_corrected quartus]]
+set_global_assignment -name MIF_FILE [file normalize [file join $repo_root submodules R2FFT_corrected quartus twrom.mif]]
 set_global_assignment -name SEARCH_PATH [file normalize [file join $repo_root rtl frontend]]
 set_global_assignment -name HEX_FILE [file normalize [file join $repo_root rtl frontend hann_window_q15.hex]]
 set_global_assignment -name HEX_FILE [file normalize [file join $repo_root rtl frontend hann_window_q15_1024.hex]]
