@@ -51,8 +51,9 @@ module de10lite_audio_fft_top #(
     logic signed [FFT_DW-1:0] fft_tx_real, fft_tx_imag;
 
     logic feature_busy, mfcc_valid, feature_frame_done;
-    logic [$clog2(13)-1:0] mfcc_index;
-    logic signed [31:0] mfcc_data;
+    logic mfcc_valid_raw, feature_frame_done_raw;
+    logic [$clog2(13)-1:0] mfcc_index, mfcc_index_raw;
+    logic signed [31:0] mfcc_data, mfcc_data_raw;
     logic [3:0] hex0_value, hex1_value, hex2_value;
 
     assign rst = ~KEY[0];
@@ -113,7 +114,11 @@ module de10lite_audio_fft_top #(
         .FFT_LENGTH(FFT_LENGTH),
         .USEFUL_BINS(FFT_LENGTH / 2),
         .MEL_BANDS(32),
-        .MFCC_COUNT(13)
+        .MFCC_COUNT(13),
+        .USE_MEL_ROM(1'b1),
+        .MEL_ROM_FILE("../rtl/analysis/mel_coeffs_1024_q16.hex"),
+        .USE_LOG_ROM(1'b1),
+        .LOG_ROM_FILE("../rtl/analysis/log_mantissa_q16.hex")
     ) u_feature_analyzer (
         .clk(MAX10_CLK1_50),
         .rst(rst),
@@ -124,6 +129,24 @@ module de10lite_audio_fft_top #(
         .fft_bfpexp_i(bfpexp),
         .fft_bin_last_i(fft_tx_last),
         .busy_o(feature_busy),
+        .result_valid_o(mfcc_valid_raw),
+        .result_index_o(mfcc_index_raw),
+        .result_data_o(mfcc_data_raw),
+        .frame_done_o(feature_frame_done_raw)
+    );
+
+    feature_temporal_stabilizer #(
+        .MFCC_COUNT(13),
+        .DATA_W(32),
+        .ALPHA_SHIFT(2),
+        .ALPHA_Q(1)
+    ) u_feature_stabilizer (
+        .clk(MAX10_CLK1_50),
+        .rst(rst),
+        .result_valid_i(mfcc_valid_raw),
+        .result_index_i(mfcc_index_raw),
+        .result_data_i(mfcc_data_raw),
+        .frame_done_i(feature_frame_done_raw),
         .result_valid_o(mfcc_valid),
         .result_index_o(mfcc_index),
         .result_data_o(mfcc_data),

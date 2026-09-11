@@ -13,6 +13,7 @@ proc add_source {repo_root relpath kind} {
 foreach relpath {
     rtl/top/de10lite_audio_fft_top.sv
     rtl/analysis/fft_feature_analyzer.sv
+    rtl/analysis/feature_temporal_stabilizer.sv
     rtl/common/hexa7seg.v
     rtl/common/sample_width_adapter_24_to_18.sv
     rtl/common/fft_control.sv
@@ -54,3 +55,5 @@ set_global_assignment -name MIF_FILE [file normalize [file join $repo_root submo
 set_global_assignment -name SEARCH_PATH [file normalize [file join $repo_root rtl frontend]]
 set_global_assignment -name HEX_FILE [file normalize [file join $repo_root rtl frontend hann_window_q15.hex]]
 set_global_assignment -name HEX_FILE [file normalize [file join $repo_root rtl frontend hann_window_q15_1024.hex]]
+set_global_assignment -name HEX_FILE [file normalize [file join $repo_root rtl analysis mel_coeffs_1024_q16.hex]]
+set_global_assignment -name HEX_FILE [file normalize [file join $repo_root rtl analysis log_mantissa_q16.hex]]

@@ -16,8 +16,13 @@ module fft_feature_analyzer #(
     parameter int MEL_BANDS = 32,
     parameter int MFCC_COUNT = 13,
     parameter int COEFF_Q = 12,
+    parameter int MEL_COEFF_Q = 16,
     parameter bit NORMALIZE_MEL = 1'b1,
-    parameter int POWER_W = 48
+    parameter int POWER_W = 48,
+    parameter bit USE_MEL_ROM = 1'b0,
+    parameter string MEL_ROM_FILE = "rtl/analysis/mel_coeffs_1024_q16.hex",
+    parameter bit USE_LOG_ROM = 1'b0,
+    parameter string LOG_ROM_FILE = "rtl/analysis/log_mantissa_q16.hex"
 ) (
     input  logic clk,
     input  logic rst,
@@ -44,8 +49,19 @@ module fft_feature_analyzer #(
     // Mel filter breakpoints for sr=48 kHz, n_fft=510, n_mels=32.  These are
     // the same geometry used by librosa.filters.mel in the old receiver.
     (* ramstyle = "M10K" *) logic [POWER_W-1:0] power_ram [0:USEFUL_BINS-1];
+    (* romstyle = "M9K" *) logic [MEL_COEFF_Q:0] mel_coeff_rom [0:MEL_BANDS*USEFUL_BINS-1];
+    (* romstyle = "M9K" *) logic signed [31:0] log_mantissa_rom [0:255];
     logic [POWER_W-1:0] mel_energy [0:MEL_BANDS-1];
     logic signed [31:0] log_energy [0:MEL_BANDS-1];
+
+    generate
+        if (USE_MEL_ROM) begin : gen_mel_rom
+            initial $readmemh(MEL_ROM_FILE, mel_coeff_rom);
+        end
+        if (USE_LOG_ROM) begin : gen_log_rom
+            initial $readmemh(LOG_ROM_FILE, log_mantissa_rom);
+        end
+    endgenerate
 
     typedef enum logic [3:0] {IDLE, MEL_PREP, MEL_ACC, LOG_ACC, DCT_ACC, EMIT} state_t;
     state_t state;
@@ -142,7 +158,7 @@ module fft_feature_analyzer #(
         end
     endfunction
 
-    function automatic [COEFF_Q:0] mel_weight(input integer b, input integer k);
+    function automatic [MEL_COEFF_Q:0] mel_weight(input integer b, input integer k);
         integer left_edge, center_edge, right_edge;
         integer triangle_q, norm_q;
         begin
@@ -151,13 +167,13 @@ module fft_feature_analyzer #(
                 mel_weight = 0;
             else begin
                 if (k < center_edge && center_edge > left_edge)
-                    triangle_q = ((k-left_edge) << COEFF_Q) / (center_edge-left_edge);
+                    triangle_q = ((k-left_edge) << MEL_COEFF_Q) / (center_edge-left_edge);
                 else if (right_edge > center_edge)
-                    triangle_q = ((right_edge-k) << COEFF_Q) / (right_edge-center_edge);
+                    triangle_q = ((right_edge-k) << MEL_COEFF_Q) / (right_edge-center_edge);
                 else
                     triangle_q = 0;
-                norm_q = NORMALIZE_MEL ? ((2 << COEFF_Q) / (right_edge-left_edge)) : (1 << COEFF_Q);
-                mel_weight = (triangle_q * norm_q) >>> COEFF_Q;
+                norm_q = NORMALIZE_MEL ? ((2 << MEL_COEFF_Q) / (right_edge-left_edge)) : (1 << MEL_COEFF_Q);
+                mel_weight = (triangle_q * norm_q) >>> MEL_COEFF_Q;
             end
         end
     endfunction
@@ -175,14 +191,20 @@ module fft_feature_analyzer #(
                 for (i = 0; i < POWER_W; i = i + 1)
                     if (value[i]) msb = i;
                 normalized = value << (POWER_W-1-msb);
-                case (normalized[POWER_W-2 -: 4])
+                if (USE_LOG_ROM) begin
+                    // normalized is in [1,2); the eight bits immediately
+                    // below its leading one select ln(1 + index/256).
+                    natural_log_q16 = (msb * 45426) + log_mantissa_rom[normalized[POWER_W-2 -: 8]];
+                end else case (normalized[POWER_W-2 -: 4])
                     4'd0: frac_log2=0; 4'd1: frac_log2=5732; 4'd2: frac_log2=11136; 4'd3: frac_log2=16248;
                     4'd4: frac_log2=21098; 4'd5: frac_log2=25711; 4'd6: frac_log2=30109; 4'd7: frac_log2=34312;
                     4'd8: frac_log2=38336; 4'd9: frac_log2=42196; 4'd10: frac_log2=45904; 4'd11: frac_log2=49472;
                     4'd12: frac_log2=52911; 4'd13: frac_log2=56229; 4'd14: frac_log2=59434; default: frac_log2=62534;
                 endcase
-                log2_q16 = (msb << 16) + frac_log2;
-                natural_log_q16 = (log2_q16 * 45426) >>> 16; // ln(2) in Q0.16
+                if (!USE_LOG_ROM) begin
+                    log2_q16 = (msb << 16) + frac_log2;
+                    natural_log_q16 = (log2_q16 * 45426) >>> 16; // ln(2) in Q0.16
+                end
             end
         end
     endfunction
@@ -217,10 +239,13 @@ module fft_feature_analyzer #(
                     end
                 end
                 MEL_ACC: begin
-                    product = power_ram[bin] * mel_weight(band, bin);
+                    if (USE_MEL_ROM)
+                        product = power_ram[bin] * mel_coeff_rom[band*USEFUL_BINS + bin];
+                    else
+                        product = power_ram[bin] * mel_weight(band, bin);
                     next_acc = accumulator + product;
                     if (bin >= mel_edge(band+1)-1 || bin == USEFUL_BINS-1) begin
-                        mel_energy[band] <= next_acc >>> COEFF_Q;
+                        mel_energy[band] <= next_acc >>> MEL_COEFF_Q;
                         if (band == MEL_BANDS-1) begin mfcc <= 0; state <= LOG_ACC; end
                         else begin band <= band + 1'b1; state <= MEL_PREP; end
                     end else begin bin <= bin + 1'b1; accumulator <= next_acc; end
