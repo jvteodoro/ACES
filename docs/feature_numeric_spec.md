@@ -9,11 +9,11 @@ Initial quality profile:
 | Stage | Specification |
 |---|---|
 | Sample rate | 48,000 Hz (must be measured on hardware) |
-| Frame | 512 samples |
-| Hop | 256 samples (50% overlap) |
+| Frame | 1024 samples |
+| Hop | 512 samples (50% overlap) |
 | Window | Hann |
 | Pre-emphasis | Disabled initially, configurable |
-| FFT bins | 257 positive-frequency bins, including Nyquist |
+| FFT bins | 513 positive-frequency bins, including Nyquist |
 | Spectrum | Power, `real² + imag²` |
 | Block exponent | `real/imag × 2^bfpexp` before power |
 | Mel bands | 32, Slaney scale, Slaney area normalization |

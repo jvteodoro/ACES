@@ -1,6 +1,8 @@
 module aces_audio_to_fft_pipeline #(
     parameter int SAMPLE_W = 18,
     parameter int FRAME_LENGTH = 512,
+    parameter int HOP_LENGTH = FRAME_LENGTH / 2,
+    parameter bit ENABLE_OVERLAP = 1'b0,
     parameter bit ENABLE_WINDOW = 1'b0,
     // Untyped string parameter keeps compatibility with Quartus and Icarus;
     // both tools accept the path literal while elaborating the ROM instance.
@@ -87,6 +89,14 @@ module aces_audio_to_fft_pipeline #(
     logic [$clog2(FRAME_LENGTH)-1:0] window_sample_index;
     logic signed [SAMPLE_W-1:0] windowed_sample;
     logic windowed_valid;
+    logic analysis_sample_valid;
+    logic signed [SAMPLE_W-1:0] analysis_sample;
+    logic [$clog2(FRAME_LENGTH)-1:0] analysis_sample_index;
+    logic overlap_sample_valid;
+    logic signed [SAMPLE_W-1:0] overlap_sample;
+    logic overlap_frame_start;
+    logic overlap_frame_last;
+    logic [$clog2(FRAME_LENGTH)-1:0] overlap_sample_index;
 
     wire new_sample_clk;
     assign new_sample_clk = (toggle_sync_2 != toggle_seen_clk);
@@ -122,6 +132,48 @@ module aces_audio_to_fft_pipeline #(
     end
 
     generate
+        if (ENABLE_OVERLAP) begin : gen_overlap
+            audio_overlap_frame_buffer #(
+                .SAMPLE_W(SAMPLE_W),
+                .FRAME_LENGTH(FRAME_LENGTH),
+                .HOP_LENGTH(HOP_LENGTH)
+            ) u_overlap_buffer (
+                .clk(clk),
+                .rst(rst),
+                .sample_valid_i(sample_pulse_clk),
+                .sample_i(sample_reg),
+                .frame_sample_valid_o(overlap_sample_valid),
+                .frame_sample_o(overlap_sample),
+                .frame_start_o(overlap_frame_start),
+                .frame_last_o(overlap_frame_last)
+            );
+
+            always_ff @(posedge clk or posedge rst) begin
+                if (rst)
+                    overlap_sample_index <= '0;
+                else if (overlap_sample_valid) begin
+                    if (overlap_sample_index == FRAME_LENGTH-1)
+                        overlap_sample_index <= '0;
+                    else
+                        overlap_sample_index <= overlap_sample_index + 1'b1;
+                end
+            end
+
+            always_comb begin
+                analysis_sample_valid = overlap_sample_valid;
+                analysis_sample = overlap_sample;
+                analysis_sample_index = overlap_sample_index;
+            end
+        end else begin : gen_no_overlap
+            always_comb begin
+                analysis_sample_valid = sample_pulse_clk;
+                analysis_sample = sample_reg;
+                analysis_sample_index = window_sample_index;
+            end
+        end
+    endgenerate
+
+    generate
         if (ENABLE_WINDOW) begin : gen_window
             fft_window_multiplier #(
                 .SAMPLE_W(SAMPLE_W),
@@ -130,16 +182,16 @@ module aces_audio_to_fft_pipeline #(
             ) u_window (
                 .clk(clk),
                 .rst(rst),
-                .sample_valid_i(sample_pulse_clk),
-                .sample_index_i(window_sample_index),
-                .sample_i(sample_reg),
+                .sample_valid_i(analysis_sample_valid),
+                .sample_index_i(analysis_sample_index),
+                .sample_i(analysis_sample),
                 .sample_valid_o(windowed_valid),
                 .sample_o(windowed_sample)
             );
         end else begin : gen_no_window
             always_comb begin
-                windowed_valid = sample_pulse_clk;
-                windowed_sample = sample_reg;
+                windowed_valid = analysis_sample_valid;
+                windowed_sample = analysis_sample;
             end
         end
     endgenerate

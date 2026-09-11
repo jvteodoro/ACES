@@ -16,7 +16,7 @@ class FeatureReferenceTest(unittest.TestCase):
     def test_quality_profile_shapes(self):
         cfg = FeatureConfig()
         result = analyze_audio(np.zeros(cfg.fft_length * 3), cfg)
-        self.assertEqual(result["spectrum"].shape, (5, 257))
+        self.assertEqual(result["spectrum"].shape, (5, 513))
         self.assertEqual(result["mel"].shape, (5, 32))
         self.assertEqual(result["mfcc"].shape, (5, 13))
 
@@ -49,7 +49,7 @@ class FeatureReferenceTest(unittest.TestCase):
 
     def test_mel_filters_are_nonnegative_and_bounded(self):
         filters = mel_filterbank(FeatureConfig())
-        self.assertEqual(filters.shape, (32, 257))
+        self.assertEqual(filters.shape, (32, 513))
         self.assertGreater(np.count_nonzero(filters), 0)
         self.assertGreaterEqual(filters.min(), 0.0)
         self.assertLessEqual(filters.max(), 1.0)

@@ -71,20 +71,27 @@ module fft_feature_analyzer #(
         end
     endfunction
 
-    function automatic integer mel_edge(input integer idx);
+    function automatic integer mel_edge_base(input integer idx);
         begin
             case (idx)
-                0:mel_edge=0; 1:mel_edge=1; 2:mel_edge=2; 3:mel_edge=3;
-                4:mel_edge=4; 5:mel_edge=5; 6:mel_edge=7; 7:mel_edge=8;
-                8:mel_edge=10; 9:mel_edge=12; 10:mel_edge=14; 11:mel_edge=17;
-                12:mel_edge=20; 13:mel_edge=23; 14:mel_edge=26; 15:mel_edge=30;
-                16:mel_edge=34; 17:mel_edge=39; 18:mel_edge=45; 19:mel_edge=50;
-                20:mel_edge=57; 21:mel_edge=64; 22:mel_edge=73; 23:mel_edge=82;
-                24:mel_edge=92; 25:mel_edge=103; 26:mel_edge=116; 27:mel_edge=130;
-                28:mel_edge=146; 29:mel_edge=163; 30:mel_edge=182; 31:mel_edge=204;
-                32:mel_edge=228; default:mel_edge=255;
+                0:mel_edge_base=0; 1:mel_edge_base=1; 2:mel_edge_base=2; 3:mel_edge_base=3;
+                4:mel_edge_base=4; 5:mel_edge_base=5; 6:mel_edge_base=7; 7:mel_edge_base=8;
+                8:mel_edge_base=10; 9:mel_edge_base=12; 10:mel_edge_base=14; 11:mel_edge_base=17;
+                12:mel_edge_base=20; 13:mel_edge_base=23; 14:mel_edge_base=26; 15:mel_edge_base=30;
+                16:mel_edge_base=34; 17:mel_edge_base=39; 18:mel_edge_base=45; 19:mel_edge_base=50;
+                20:mel_edge_base=57; 21:mel_edge_base=64; 22:mel_edge_base=73; 23:mel_edge_base=82;
+                24:mel_edge_base=92; 25:mel_edge_base=103; 26:mel_edge_base=116; 27:mel_edge_base=130;
+                28:mel_edge_base=146; 29:mel_edge_base=163; 30:mel_edge_base=182; 31:mel_edge_base=204;
+                32:mel_edge_base=228; default:mel_edge_base=255;
             endcase
         end
+    endfunction
+
+    // The reference breakpoints are expressed for 512-point FFT / 256
+    // positive bins. Scale them with the configured positive-bin count so the
+    // same 0..Nyquist Mel geometry is retained for 1024-point FFTs.
+    function automatic integer mel_edge(input integer idx);
+        mel_edge = (mel_edge_base(idx) * USEFUL_BINS) / 256;
     endfunction
 
     // A 33-entry quarter-wave cosine ROM avoids a large coefficient matrix.

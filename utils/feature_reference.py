@@ -19,8 +19,8 @@ import numpy as np
 @dataclass(frozen=True)
 class FeatureConfig:
     sample_rate: int = 48_000
-    fft_length: int = 512
-    hop_length: int = 256
+    fft_length: int = 1024
+    hop_length: int = 512
     mel_bands: int = 32
     mfcc_count: int = 13
     fmin: float = 0.0

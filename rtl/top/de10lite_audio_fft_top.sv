@@ -16,7 +16,7 @@
 // HEX2..HEX0 (HEX0 also shows the coefficient index).
 
 module de10lite_audio_fft_top #(
-    parameter int FFT_LENGTH = 512,
+    parameter int FFT_LENGTH = 1024,
     parameter int FFT_DW = 18,
     parameter int I2S_CLOCK_DIV = 8,
     parameter int TX_BRIDGE_FIFO_DEPTH = 2048
@@ -72,7 +72,9 @@ module de10lite_audio_fft_top #(
         .FFT_DW(FFT_DW),
         .I2S_CLOCK_DIV(I2S_CLOCK_DIV),
         .ENABLE_WINDOW(1'b1),
-        .WINDOW_COEFF_FILE("../rtl/frontend/hann_window_q15.hex"),
+        .ENABLE_OVERLAP(1'b1),
+        .HOP_LENGTH(FFT_LENGTH / 2),
+        .WINDOW_COEFF_FILE("../rtl/frontend/hann_window_q15_1024.hex"),
         .TX_BRIDGE_FIFO_DEPTH(TX_BRIDGE_FIFO_DEPTH)
     ) u_aces (
         .clk(MAX10_CLK1_50),
@@ -109,7 +111,7 @@ module de10lite_audio_fft_top #(
 
     fft_feature_analyzer #(
         .FFT_LENGTH(FFT_LENGTH),
-        .USEFUL_BINS(256),
+        .USEFUL_BINS(FFT_LENGTH / 2),
         .MEL_BANDS(32),
         .MFCC_COUNT(13)
     ) u_feature_analyzer (

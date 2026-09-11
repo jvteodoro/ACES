@@ -1,11 +1,13 @@
 module aces #(
-    parameter int FFT_LENGTH   = 512,
+    parameter int FFT_LENGTH   = 1024,
     parameter int FFT_DW       = 18,
     parameter int I2S_CLOCK_DIV = 16,
     parameter bit USE_FRACTIONAL_AUDIO_CLOCK = 1'b1,
     parameter int SYSTEM_CLOCK_HZ = 50_000_000,
     parameter int AUDIO_SAMPLE_RATE_HZ = 48_000,
     parameter bit ENABLE_WINDOW = 1'b0,
+    parameter int HOP_LENGTH = FFT_LENGTH / 2,
+    parameter bit ENABLE_OVERLAP = 1'b0,
     parameter string WINDOW_COEFF_FILE = "rtl/frontend/hann_window_q15.hex",
     parameter int TX_BRIDGE_FIFO_DEPTH = 2048
 )(
@@ -131,6 +133,8 @@ module aces #(
     aces_audio_to_fft_pipeline #(
         .SAMPLE_W(FFT_DW),
         .FRAME_LENGTH(FFT_LENGTH),
+        .HOP_LENGTH(HOP_LENGTH),
+        .ENABLE_OVERLAP(ENABLE_OVERLAP),
         .ENABLE_WINDOW(ENABLE_WINDOW),
         .WINDOW_COEFF_FILE(WINDOW_COEFF_FILE)
     ) u_audio_to_fft_pipeline (
