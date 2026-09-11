@@ -45,5 +45,28 @@ application.
 
 The module deliberately does not alter the legacy Cyclone-V top-level yet:
 the DE10-Lite SystemCD project uses a different MAX 10 device and pinout. The
-next integration step is to instantiate this block in the DE10-Lite top-level
-and expose the 13 results through the chosen GPIO/UART/SPI transport.
+the migrated project is now available as `quartus/de10lite_audio_fft.qpf`.
+
+## DE10-Lite project
+
+Open `quartus/de10lite_audio_fft.qpf` with Quartus Prime Lite 25.1 and compile
+the `de10lite_audio_fft` revision. The board top-level is
+`rtl/top/de10lite_audio_fft_top.sv`; it connects the existing `aces` pipeline
+to `fft_feature_analyzer` and uses the DE10-Lite 50 MHz clock. The external
+I2S microphone/codec connection is assigned as follows:
+
+| DE10-Lite GPIO | Signal |
+|---|---|
+| GPIO[0] | microphone SD input |
+| GPIO[1] | microphone SCK |
+| GPIO[2] | microphone WS/LRCLK |
+| GPIO[3] | microphone L/R select |
+| GPIO[4:6] | optional tagged FFT I2S SCK/WS/SD |
+| GPIO[7] | MFCC result valid |
+| GPIO[8] | MFCC frame done |
+
+`KEY[0]` resets the design and `SW[0]` selects the microphone channel. The
+latest MFCC index and low Q16.16 nibbles are shown on `HEX0..HEX2`; LEDs expose
+the FFT and analyzer status. The generated FFT RAM wrappers remain the
+existing `altsyncram` megafunctions; Quartus retargets them to MAX 10 memory
+blocks when compiling this project.

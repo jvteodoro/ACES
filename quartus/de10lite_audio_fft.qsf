@@ -1,0 +1,45 @@
+set_global_assignment -name FAMILY "MAX 10"
+set_global_assignment -name DEVICE 10M50DAF484C7G
+set_global_assignment -name TOP_LEVEL_ENTITY de10lite_audio_fft_top
+set_global_assignment -name ORIGINAL_QUARTUS_VERSION 25.1
+set_global_assignment -name LAST_QUARTUS_VERSION "25.1std.0 Lite Edition"
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files_de10lite
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+set_global_assignment -name SOURCE_TCL_SCRIPT_FILE de10lite_audio_fft_sources.tcl
+
+# DE10-Lite 50 MHz clock, switches, keys, LEDs and first three 7-segment units.
+set_location_assignment PIN_P11 -to MAX10_CLK1_50
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to MAX10_CLK1_50
+set_location_assignment PIN_B8 -to {KEY[0]}
+set_location_assignment PIN_A7 -to {KEY[1]}
+set_instance_assignment -name IO_STANDARD "3.3 V SCHMITT TRIGGER" -to {KEY[0]}
+set_instance_assignment -name IO_STANDARD "3.3 V SCHMITT TRIGGER" -to {KEY[1]}
+
+set sw_pins {PIN_C10 PIN_C11 PIN_D12 PIN_C12 PIN_A12 PIN_B12 PIN_A13 PIN_A14 PIN_B14 PIN_F15}
+for {set i 0} {$i < 10} {incr i} {
+    set_location_assignment [lindex $sw_pins $i] -to [format {SW[%d]} $i]
+    set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to [format {SW[%d]} $i]
+}
+
+set led_pins {PIN_A8 PIN_A9 PIN_A10 PIN_B10 PIN_D13 PIN_C13 PIN_E14 PIN_D14 PIN_A11 PIN_B11}
+for {set i 0} {$i < 10} {incr i} {
+    set_location_assignment [lindex $led_pins $i] -to [format {LEDR[%d]} $i]
+    set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to [format {LEDR[%d]} $i]
+}
+
+set hex0_pins {PIN_C14 PIN_E15 PIN_C15 PIN_C16 PIN_E16 PIN_D17 PIN_C17 PIN_D15}
+set hex1_pins {PIN_C18 PIN_D18 PIN_E18 PIN_B16 PIN_A17 PIN_A18 PIN_B17 PIN_A16}
+set hex2_pins {PIN_B20 PIN_A20 PIN_B19 PIN_A21 PIN_B21 PIN_C22 PIN_B22 PIN_A19}
+foreach {name pins} [list HEX0 $hex0_pins HEX1 $hex1_pins HEX2 $hex2_pins] {
+    for {set i 0} {$i < 8} {incr i} {
+        set_location_assignment [lindex $pins $i] -to [format {%s[%d]} $name $i]
+        set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to [format {%s[%d]} $name $i]
+    }
+}
+
+# GPIO mapping documented in rtl/top/de10lite_audio_fft_top.sv.
+set gpio_pins {PIN_V10 PIN_W10 PIN_V9 PIN_W9 PIN_V8 PIN_W8 PIN_V7 PIN_W7 PIN_W6}
+for {set i 0} {$i < 9} {incr i} {
+    set_location_assignment [lindex $gpio_pins $i] -to [format {GPIO[%d]} $i]
+    set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to [format {GPIO[%d]} $i]
+}
