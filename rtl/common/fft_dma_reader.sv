@@ -1,5 +1,6 @@
 module fft_dma_reader #(
     parameter int FFT_LENGTH   = 512,
+    parameter int OUTPUT_BINS  = FFT_LENGTH,
     parameter int FFT_DW       = 18,
     parameter int READ_LATENCY = 1
 )(
@@ -100,9 +101,9 @@ module fft_dma_reader #(
                     fft_bin_index_o <= addr;
                     fft_bin_real_o  <= dmadr_real_i;
                     fft_bin_imag_o  <= dmadr_imag_i;
-                    fft_bin_last_o  <= (addr == FFT_LENGTH-1);
+                    fft_bin_last_o  <= (addr == OUTPUT_BINS-1);
 
-                    if (addr == FFT_LENGTH-1) begin
+                    if (addr == OUTPUT_BINS-1) begin
                         dmaact_o <= 1'b0;
                         state    <= IDLE;
                     end else begin

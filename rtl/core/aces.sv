@@ -8,7 +8,7 @@ module aces #(
     parameter bit ENABLE_WINDOW = 1'b0,
     parameter int HOP_LENGTH = FFT_LENGTH / 2,
     parameter bit ENABLE_OVERLAP = 1'b0,
-    parameter string WINDOW_COEFF_FILE = "rtl/frontend/hann_window_q15.hex",
+    parameter WINDOW_COEFF_FILE = "rtl/frontend/hann_window_q15.hex",
     parameter int TX_BRIDGE_FIFO_DEPTH = 2048
 )(
     input  logic clk,
@@ -68,42 +68,24 @@ module aces #(
 
 
     localparam int FFT_N = $clog2(FFT_LENGTH);
-    localparam int TX_FIFO_LEVEL_W = $clog2(TX_BRIDGE_FIFO_DEPTH + 1);
+    // FFT data remains local; no external transport width is needed.
 
     logic dmaact_i;
     logic [FFT_N-1:0] dmaa_i;
     logic signed [FFT_DW-1:0] dmadr_real_o;
     logic signed [FFT_DW-1:0] dmadr_imag_o;
 
-    logic [TX_FIFO_LEVEL_W-1:0] tx_fifo_level_r;
-    logic tx_fifo_wrreq;
-    logic tx_fifo_wrfull;
-    logic tx_fifo_word_valid_r;
-    logic tx_fifo_read_inflight_r;
-    logic tx_fifo_overflow_o;
-
-    logic tx_fft_valid_i;
-    logic signed [FFT_DW-1:0] tx_fft_real_i;
-    logic signed [FFT_DW-1:0] tx_fft_imag_i;
-    logic tx_fft_last_i;
-    logic signed [7:0] tx_bfpexp_i;
-    logic tx_fft_ready_o;
-    logic [FFT_N-1:0] tx_fft_read_index_r;
-
-    logic tx_overflow_from_adapter_o;
-
-    assign tx_fifo_wrreq           = fft_tx_valid_o;
-    assign tx_fifo_word_valid_r    = tx_fft_valid_i;
-    assign tx_fifo_read_inflight_r = 1'b0;
-
-    assign tx_overflow_o  = tx_fifo_overflow_o || tx_overflow_from_adapter_o;
+    // Legacy transport pins are kept quiet; local feature processing uses the
+    // DMA stream directly below.
+    assign tx_i2s_sck_o = 1'b0;
+    assign tx_i2s_ws_o  = 1'b0;
+    assign tx_i2s_sd_o  = 1'b0;
+    assign tx_overflow_o = 1'b0;
 
     // Mantido apenas para compatibilidade de interface externa.
     initial begin
-        if (TX_BRIDGE_FIFO_DEPTH < 2)
-            $error("aces: TX_BRIDGE_FIFO_DEPTH deve ser >= 2.");
         if (FFT_DW != 18)
-            $error("aces: FFT_DW deve ser 18 para casar com a serializacao tagged de 44 bits.");
+            $error("aces: FFT_DW deve ser 18 para casar com o núcleo FFT atual.");
     end
 
     // -----------------------------
@@ -201,6 +183,7 @@ module aces #(
     // -----------------------------
     fft_dma_reader #(
         .FFT_LENGTH(FFT_LENGTH),
+        .OUTPUT_BINS(FFT_LENGTH),
         .FFT_DW(FFT_DW),
         .READ_LATENCY(2)
     ) u_fft_dma_reader (
@@ -220,67 +203,6 @@ module aces #(
         .fft_bin_real_o(fft_tx_real_o),
         .fft_bin_imag_o(fft_tx_imag_o),
         .fft_bin_last_o(fft_tx_last_o)
-    );
-
-    // A FFT e o serializer compartilham o mesmo clk. Uma FIFO sincrona local
-    // evita a latencia de sincronizacao da antiga dcfifo e mantem o handshake
-    // coerente no mesmo dominio de clock.
-    fft_tx_bridge_fifo #(
-        .FFT_DW(FFT_DW),
-        .FFT_INDEX_W(FFT_N),
-        .BFPEXP_W(8),
-        .FIFO_DEPTH(TX_BRIDGE_FIFO_DEPTH)
-    ) u_fft_tx_bridge_fifo (
-        .clk(clk),
-        .rst(rst),
-        .push_i(tx_fifo_wrreq),
-        .fft_index_i(fft_tx_index_o),
-        .fft_real_i(fft_tx_real_o),
-        .fft_imag_i(fft_tx_imag_o),
-        .fft_last_i(fft_tx_last_o),
-        .bfpexp_i(bfpexp_o),
-        .pop_i(tx_fft_valid_i && tx_fft_ready_o),
-        .valid_o(tx_fft_valid_i),
-        .fft_index_o(tx_fft_read_index_r),
-        .fft_real_o(tx_fft_real_i),
-        .fft_imag_o(tx_fft_imag_i),
-        .fft_last_o(tx_fft_last_i),
-        .bfpexp_o(tx_bfpexp_i),
-        .full_o(tx_fifo_wrfull),
-        .empty_o(),
-        .overflow_o(tx_fifo_overflow_o),
-        .level_o(tx_fifo_level_r)
-    );
-
-    // -----------------------------
-    // transmissor I2S tagged para host externo
-    // -----------------------------
-    i2s_fft_tx_adapter #(
-        .FFT_DW(FFT_DW),
-        .FFT_INDEX_W(FFT_N),
-        .BFPEXP_W(8),
-        .I2S_SAMPLE_W(FFT_DW),
-        .I2S_SLOT_W(32),
-        .CLOCK_DIV(I2S_CLOCK_DIV),
-        .FIFO_DEPTH(FFT_LENGTH + 1),
-        .BFPEXP_HOLD_FRAMES(128)
-    ) u_i2s_fft_tx_adapter (
-        .clk(clk),
-        .rst(rst),
-        .fft_valid_i(tx_fft_valid_i),
-        .fft_index_i(tx_fft_read_index_r),
-        .fft_real_i(tx_fft_real_i),
-        .fft_imag_i(tx_fft_imag_i),
-        .fft_last_i(tx_fft_last_i),
-        .bfpexp_i(tx_bfpexp_i),
-        .fft_ready_o(tx_fft_ready_o),
-        .fifo_full_o(),
-        .fifo_empty_o(),
-        .overflow_o(tx_overflow_from_adapter_o),
-        .fifo_level_o(),
-        .i2s_sck_o(tx_i2s_sck_o),
-        .i2s_ws_o(tx_i2s_ws_o),
-        .i2s_sd_o(tx_i2s_sd_o)
     );
 
 endmodule

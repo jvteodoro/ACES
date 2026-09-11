@@ -20,9 +20,9 @@ module fft_feature_analyzer #(
     parameter bit NORMALIZE_MEL = 1'b1,
     parameter int POWER_W = 48,
     parameter bit USE_MEL_ROM = 1'b0,
-    parameter string MEL_ROM_FILE = "rtl/analysis/mel_coeffs_1024_q16.hex",
+    parameter MEL_ROM_FILE = "rtl/analysis/mel_coeffs_1024_q16.hex",
     parameter bit USE_LOG_ROM = 1'b0,
-    parameter string LOG_ROM_FILE = "rtl/analysis/log_mantissa_q16.hex"
+    parameter LOG_ROM_FILE = "rtl/analysis/log_mantissa_q16.hex"
 ) (
     input  logic clk,
     input  logic rst,
@@ -49,7 +49,7 @@ module fft_feature_analyzer #(
     // Mel filter breakpoints for sr=48 kHz, n_fft=510, n_mels=32.  These are
     // the same geometry used by librosa.filters.mel in the old receiver.
     (* ramstyle = "M10K" *) logic [POWER_W-1:0] power_ram [0:USEFUL_BINS-1];
-    (* romstyle = "M9K" *) logic [MEL_COEFF_Q:0] mel_coeff_rom [0:MEL_BANDS*USEFUL_BINS-1];
+    (* romstyle = "M9K" *) logic [MEL_COEFF_Q-1:0] mel_coeff_rom [0:MEL_BANDS*USEFUL_BINS-1];
     (* romstyle = "M9K" *) logic signed [31:0] log_mantissa_rom [0:255];
     logic [POWER_W-1:0] mel_energy [0:MEL_BANDS-1];
     logic signed [31:0] log_energy [0:MEL_BANDS-1];
@@ -158,7 +158,7 @@ module fft_feature_analyzer #(
         end
     endfunction
 
-    function automatic [MEL_COEFF_Q:0] mel_weight(input integer b, input integer k);
+    function automatic [MEL_COEFF_Q-1:0] mel_weight(input integer b, input integer k);
         integer left_edge, center_edge, right_edge;
         integer triangle_q, norm_q;
         begin

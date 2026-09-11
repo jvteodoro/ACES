@@ -18,12 +18,10 @@ foreach relpath {
     rtl/common/sample_width_adapter_24_to_18.sv
     rtl/common/fft_control.sv
     rtl/common/fft_dma_reader.sv
-    rtl/common/fft_tx_bridge_fifo.sv
     rtl/frontend/i2s_master_clock_gen.sv
     rtl/frontend/fft_window_multiplier.sv
     rtl/frontend/audio_overlap_frame_buffer.sv
     rtl/frontend/i2s_rx_adapter_24.sv
-    rtl/frontend/i2s_fft_tx_adapter.sv
     rtl/core/aces_audio_to_fft_pipeline.sv
     rtl/core/aces.sv
     submodules/R2FFT/hdl/R2FFT.sv
