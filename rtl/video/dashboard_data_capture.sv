@@ -99,8 +99,16 @@ module dashboard_data_capture #(
             highest_bit = -1;
             for (int k = 19; k >= 0; k = k - 1)
                 if ((highest_bit < 0) && peak[k]) highest_bit = k;
-            if ((highest_bit < 0) || (raw == 0)) begin
+            if (raw == 0) begin
                 normalized_magnitude = 10'd0;
+            end else if (highest_bit < 0) begin
+                // A frame marker can legally arrive without a captured peak
+                // (for example while the FFT pipeline is being restarted).
+                // Do not turn a nonzero snapshot into a completely blank
+                // dashboard in that transient condition. This fallback is
+                // intentionally equivalent to the former 10-bit saturating
+                // display path; normal frames use peak-based normalization.
+                normalized_magnitude = (raw > 20'd1023) ? 10'h3ff : raw[9:0];
             end else begin
                 shift_amount = highest_bit - 9;
                 if (shift_amount >= 0)
