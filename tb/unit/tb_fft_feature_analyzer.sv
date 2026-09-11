@@ -16,6 +16,7 @@ module tb_fft_feature_analyzer;
         .clk(clk), .rst(rst),
         .fft_bin_valid_i(valid), .fft_bin_index_i(index),
         .fft_bin_real_i(real_i), .fft_bin_imag_i(imag_i),
+        .fft_bfpexp_i(8'sd0),
         .fft_bin_last_i(last), .busy_o(busy),
         .result_valid_o(result_valid), .result_index_o(result_index),
         .result_data_o(result_data), .frame_done_o(frame_done)

@@ -121,6 +121,7 @@ module de10lite_audio_fft_top #(
         .fft_bin_index_i(fft_tx_index),
         .fft_bin_real_i(fft_tx_real),
         .fft_bin_imag_i(fft_tx_imag),
+        .fft_bfpexp_i(bfpexp),
         .fft_bin_last_i(fft_tx_last),
         .busy_o(feature_busy),
         .result_valid_o(mfcc_valid),

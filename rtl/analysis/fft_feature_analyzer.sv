@@ -15,7 +15,9 @@ module fft_feature_analyzer #(
     parameter int USEFUL_BINS = 256,
     parameter int MEL_BANDS = 32,
     parameter int MFCC_COUNT = 13,
-    parameter int COEFF_Q = 12
+    parameter int COEFF_Q = 12,
+    parameter bit NORMALIZE_MEL = 1'b1,
+    parameter int POWER_W = 48
 ) (
     input  logic clk,
     input  logic rst,
@@ -24,6 +26,7 @@ module fft_feature_analyzer #(
     input  logic [$clog2(FFT_LENGTH)-1:0] fft_bin_index_i,
     input  logic signed [17:0] fft_bin_real_i,
     input  logic signed [17:0] fft_bin_imag_i,
+    input  logic signed [7:0] fft_bfpexp_i,
     input  logic fft_bin_last_i,
 
     output logic busy_o,
@@ -36,12 +39,12 @@ module fft_feature_analyzer #(
     localparam int BIN_W = $clog2(USEFUL_BINS);
     localparam int BAND_W = $clog2(MEL_BANDS);
     localparam int MEL_W = $clog2(MEL_BANDS);
-    localparam int ACC_W = 50;
+    localparam int ACC_W = 64;
 
     // Mel filter breakpoints for sr=48 kHz, n_fft=510, n_mels=32.  These are
     // the same geometry used by librosa.filters.mel in the old receiver.
-    (* ramstyle = "M10K" *) logic [31:0] magnitude_ram [0:USEFUL_BINS-1];
-    logic [31:0] mel_energy [0:MEL_BANDS-1];
+    (* ramstyle = "M10K" *) logic [POWER_W-1:0] power_ram [0:USEFUL_BINS-1];
+    logic [POWER_W-1:0] mel_energy [0:MEL_BANDS-1];
     logic signed [31:0] log_energy [0:MEL_BANDS-1];
 
     typedef enum logic [3:0] {IDLE, MEL_PREP, MEL_ACC, LOG_ACC, DCT_ACC, EMIT} state_t;
@@ -60,14 +63,30 @@ module fft_feature_analyzer #(
         end
     endfunction
 
-    function automatic [31:0] magnitude(input logic signed [17:0] re, input logic signed [17:0] im);
-        logic [18:0] are, aim, hi, lo;
+    function automatic [POWER_W-1:0] power_spectrum(
+        input logic signed [17:0] re,
+        input logic signed [17:0] im,
+        input logic signed [7:0] exponent
+    );
+        logic [18:0] are, aim;
+        logic [36:0] raw_power;
+        logic [POWER_W-1:0] max_power;
+        integer shift_amount;
         begin
             are = abs18(re); aim = abs18(im);
-            hi = (are >= aim) ? are : aim;
-            lo = (are >= aim) ? aim : are;
-            // max + min/2 is a low-cost approximation to sqrt(re^2+im^2).
-            magnitude = {13'd0, hi} + {13'd0, (lo >> 1)};
+            raw_power = (are * are) + (aim * aim);
+            max_power = {POWER_W{1'b1}};
+            shift_amount = 2 * exponent;
+            if (shift_amount >= 0) begin
+                if (shift_amount >= POWER_W || raw_power > (max_power >> shift_amount))
+                    power_spectrum = max_power;
+                else
+                    power_spectrum = raw_power << shift_amount;
+            end else if (-shift_amount >= 64) begin
+                power_spectrum = '0;
+            end else begin
+                power_spectrum = raw_power >> (-shift_amount);
+            end
         end
     endfunction
 
@@ -113,29 +132,39 @@ module fft_feature_analyzer #(
                 24:c=1567; 25:c=1380; 26:c=1189; 27:c=995; 28:c=799; 29:c=601;
                 30:c=401; 31:c=201; default:c=0;
             endcase
+            // Orthonormal DCT-II for 32 Mel bands. Q12 scale factors are
+            // sqrt(1/32)*4096 ~= 724 for c0 and sqrt(2/32)*4096 = 1024
+            // for all other coefficients.
+            if (k == 0) c = (c * 724) >>> 12;
+            else c = (c * 1024) >>> 12;
             if (sign < 0) dct_coeff = -c[15:0];
             else dct_coeff = c[15:0];
         end
     endfunction
 
-    function automatic [12:0] mel_weight(input integer b, input integer k);
+    function automatic [COEFF_Q:0] mel_weight(input integer b, input integer k);
         integer left_edge, center_edge, right_edge;
+        integer triangle_q, norm_q;
         begin
             left_edge = mel_edge(b); center_edge = mel_edge(b+1); right_edge = mel_edge(b+2);
             if ((k <= left_edge) || (k >= right_edge) || (right_edge <= left_edge))
                 mel_weight = 0;
-            else if (k < center_edge && center_edge > left_edge)
-                mel_weight = ((k-left_edge) << COEFF_Q) / (center_edge-left_edge);
-            else if (right_edge > center_edge)
-                mel_weight = ((right_edge-k) << COEFF_Q) / (right_edge-center_edge);
-            else
-                mel_weight = 0;
+            else begin
+                if (k < center_edge && center_edge > left_edge)
+                    triangle_q = ((k-left_edge) << COEFF_Q) / (center_edge-left_edge);
+                else if (right_edge > center_edge)
+                    triangle_q = ((right_edge-k) << COEFF_Q) / (right_edge-center_edge);
+                else
+                    triangle_q = 0;
+                norm_q = NORMALIZE_MEL ? ((2 << COEFF_Q) / (right_edge-left_edge)) : (1 << COEFF_Q);
+                mel_weight = (triangle_q * norm_q) >>> COEFF_Q;
+            end
         end
     endfunction
 
-    function automatic signed [31:0] natural_log_q16(input logic [31:0] value);
+    function automatic signed [31:0] natural_log_q16(input logic [POWER_W-1:0] value);
         integer i, msb;
-        logic [31:0] normalized;
+        logic [POWER_W-1:0] normalized;
         integer frac_log2;
         integer log2_q16;
         begin
@@ -143,10 +172,10 @@ module fft_feature_analyzer #(
                 natural_log_q16 = -32'sd1048576; // ln(2^-16), safe floor
             end else begin
                 msb = 0;
-                for (i = 0; i < 32; i = i + 1)
+                for (i = 0; i < POWER_W; i = i + 1)
                     if (value[i]) msb = i;
-                normalized = value << (31-msb);
-                case (normalized[30:27])
+                normalized = value << (POWER_W-1-msb);
+                case (normalized[POWER_W-2 -: 4])
                     4'd0: frac_log2=0; 4'd1: frac_log2=5732; 4'd2: frac_log2=11136; 4'd3: frac_log2=16248;
                     4'd4: frac_log2=21098; 4'd5: frac_log2=25711; 4'd6: frac_log2=30109; 4'd7: frac_log2=34312;
                     4'd8: frac_log2=38336; 4'd9: frac_log2=42196; 4'd10: frac_log2=45904; 4'd11: frac_log2=49472;
@@ -159,7 +188,7 @@ module fft_feature_analyzer #(
     endfunction
 
     always_ff @(posedge clk or posedge rst) begin : analyzer_fsm
-        logic [31:0] product;
+        logic [63:0] product;
         logic signed [ACC_W-1:0] next_acc;
         if (rst) begin
             state <= IDLE; band <= '0; bin <= '0; mfcc <= '0; dct_mel <= '0;
@@ -173,7 +202,7 @@ module fft_feature_analyzer #(
                     busy_o <= 1'b0;
                     if (fft_bin_valid_i) begin
                         if (fft_bin_index_i < USEFUL_BINS)
-                            magnitude_ram[fft_bin_index_i[BIN_W-1:0]] <= magnitude(fft_bin_real_i, fft_bin_imag_i);
+                            power_ram[fft_bin_index_i[BIN_W-1:0]] <= power_spectrum(fft_bin_real_i, fft_bin_imag_i, fft_bfpexp_i);
                         if (fft_bin_last_i) begin
                             busy_o <= 1'b1; band <= '0; state <= MEL_PREP;
                         end
@@ -188,7 +217,7 @@ module fft_feature_analyzer #(
                     end
                 end
                 MEL_ACC: begin
-                    product = magnitude_ram[bin] * mel_weight(band, bin);
+                    product = power_ram[bin] * mel_weight(band, bin);
                     next_acc = accumulator + product;
                     if (bin >= mel_edge(band+1)-1 || bin == USEFUL_BINS-1) begin
                         mel_energy[band] <= next_acc >>> COEFF_Q;
