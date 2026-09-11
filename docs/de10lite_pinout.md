@@ -78,6 +78,21 @@ três displays usados pelo projeto:
 | `HEX1[0..7]` | `C18, D18, E18, B16, A17, A18, B17, A16` |
 | `HEX2[0..7]` | `B20, A20, B19, A21, B21, C22, B22, A19` |
 
+## Saída VGA do dashboard
+
+O dashboard usa saída RGB de 4 bits por componente, com sincronismos ativos em
+nível baixo. O pixel clock interno é 25 MHz, derivado do clock de 50 MHz.
+
+| Sinal | Pino | Sinal | Pino |
+|---|---|---|---|
+| `VGA_HS` | `PIN_N3` | `VGA_VS` | `PIN_N1` |
+| `VGA_R[0..3]` | `AA1, V1, Y2, Y1` | `VGA_G[0..3]` | `W1, T2, R2, R1` |
+| `VGA_B[0..3]` | `P1, T1, P4, N2` | | |
+
+Todos os sinais VGA usam `3.3-V LVTTL`. O formato é 640×480 com timing
+compatível com 60 Hz. O contrato de dados e a estratégia de snapshots estão
+descritos em [`docs/vga_dashboard.md`](vga_dashboard.md).
+
 ## Regras elétricas e de validação
 
 1. O microfone deve compartilhar GND com a DE10-Lite e operar em nível lógico

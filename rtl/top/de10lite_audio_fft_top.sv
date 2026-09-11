@@ -28,6 +28,11 @@ module de10lite_audio_fft_top #(
     output logic [7:0] HEX0,
     output logic [7:0] HEX1,
     output logic [7:0] HEX2,
+    output logic [3:0] VGA_R,
+    output logic [3:0] VGA_G,
+    output logic [3:0] VGA_B,
+    output logic       VGA_HS,
+    output logic       VGA_VS,
     inout logic [35:0] GPIO
 );
 
@@ -55,6 +60,18 @@ module de10lite_audio_fft_top #(
     logic [$clog2(13)-1:0] mfcc_index, mfcc_index_raw;
     logic signed [31:0] mfcc_data, mfcc_data_raw;
     logic [3:0] hex0_value, hex1_value, hex2_value;
+    logic pixel_clk, vga_active, vga_frame_start;
+    logic [9:0] pixel_x, pixel_y;
+    logic [9:0] spectrum_value;
+    logic signed [31:0] mfcc_value;
+    logic [8:0] spectrum_read_index;
+    logic [3:0] mfcc_read_index;
+    logic [7:0] dashboard_bfpexp;
+    logic dashboard_fft_run, dashboard_fft_done, dashboard_feature_busy;
+    logic [2:0] dashboard_fft_status;
+    logic [1:0] dashboard_fft_input_status;
+    logic [31:0] dashboard_frame_count;
+    logic [3:0] dashboard_r, dashboard_g, dashboard_b;
 
     assign rst = ~KEY[0];
     assign mic_sd = GPIO[0];
@@ -152,6 +169,55 @@ module de10lite_audio_fft_top #(
         .result_data_o(mfcc_data),
         .frame_done_o(feature_frame_done)
     );
+
+    vga_pixel_clock_div2 u_vga_clock_div (
+        .clk_50(MAX10_CLK1_50), .rst(rst), .pixel_clk(pixel_clk)
+    );
+
+    vga_timing u_vga_timing (
+        .pixel_clk(pixel_clk), .rst(rst), .pixel_x(pixel_x), .pixel_y(pixel_y),
+        .active_video(vga_active), .frame_start(vga_frame_start),
+        .hsync(VGA_HS), .vsync(VGA_VS)
+    );
+
+    dashboard_data_capture u_dashboard_capture (
+        .clk_50(MAX10_CLK1_50), .pixel_clk(pixel_clk), .rst(rst),
+        .frame_start_i(vga_frame_start),
+        .fft_tx_valid_i(fft_tx_valid), .fft_tx_index_i(fft_tx_index),
+        .fft_tx_real_i(fft_tx_real), .fft_tx_imag_i(fft_tx_imag), .bfpexp_i(bfpexp),
+        .fft_run_i(fft_run), .fft_done_i(fft_done), .fft_status_i(fft_status),
+        .fft_input_status_i(fft_input_status), .feature_busy_i(feature_busy),
+        .mfcc_valid_i(mfcc_valid), .mfcc_index_i(mfcc_index), .mfcc_data_i(mfcc_data),
+        .feature_frame_done_i(feature_frame_done),
+        .spectrum_read_index_i(spectrum_read_index), .mfcc_read_index_i(mfcc_read_index),
+        .spectrum_value_o(spectrum_value), .mfcc_value_o(mfcc_value),
+        .bfpexp_o(dashboard_bfpexp), .fft_run_o(dashboard_fft_run),
+        .fft_done_o(dashboard_fft_done), .fft_status_o(dashboard_fft_status),
+        .fft_input_status_o(dashboard_fft_input_status),
+        .feature_busy_o(dashboard_feature_busy), .frame_count_o(dashboard_frame_count)
+    );
+
+    dashboard_renderer u_dashboard_renderer (
+        .pixel_x(pixel_x), .pixel_y(pixel_y), .active_video(vga_active),
+        .spectrum_value(spectrum_value), .mfcc_value(mfcc_value), .bfpexp(dashboard_bfpexp),
+        .fft_run(dashboard_fft_run), .fft_done(dashboard_fft_done),
+        .fft_status(dashboard_fft_status), .fft_input_status(dashboard_fft_input_status),
+        .feature_busy(dashboard_feature_busy), .frame_count(dashboard_frame_count),
+        .spectrum_read_index(spectrum_read_index), .mfcc_read_index(mfcc_read_index),
+        .red(dashboard_r), .green(dashboard_g), .blue(dashboard_b)
+    );
+
+    always_ff @(posedge pixel_clk or posedge rst) begin
+        if (rst) begin
+            VGA_R <= 4'h0;
+            VGA_G <= 4'h0;
+            VGA_B <= 4'h0;
+        end else begin
+            VGA_R <= dashboard_r;
+            VGA_G <= dashboard_g;
+            VGA_B <= dashboard_b;
+        end
+    end
 
     always_comb begin
         LEDR = '0;

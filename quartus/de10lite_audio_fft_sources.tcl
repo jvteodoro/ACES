@@ -12,6 +12,12 @@ proc add_source {repo_root relpath kind} {
 
 foreach relpath {
     rtl/top/de10lite_audio_fft_top.sv
+    rtl/video/vga_pixel_clock_div2.sv
+    rtl/video/vga_timing.sv
+    rtl/video/font_rom.sv
+    rtl/video/text_renderer.sv
+    rtl/video/dashboard_data_capture.sv
+    rtl/video/dashboard_renderer.sv
     rtl/analysis/fft_feature_analyzer.sv
     rtl/analysis/feature_temporal_stabilizer.sv
     rtl/common/hexa7seg.v
