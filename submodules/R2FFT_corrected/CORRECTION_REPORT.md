@@ -327,3 +327,55 @@ foram validados com `R2FFT_corrected`. O bitstream foi gerado para a
 DE10-Lite. Permanecem como trabalho de fechamento a eliminação dos warnings de
 timing/pinos e a validação física com microfone em ambiente ruidoso; esses
 testes não podem ser substituídos por simulação RTL.
+
+## 10. Fechamento de timing do ACES na DE10-Lite
+
+O caminho crítico inicial não estava no `R2FFT_corrected`, mas no
+`fft_feature_analyzer`: quadratura dos bins, soma, reescala BFP e escrita em
+`power_ram` ocorriam no mesmo ciclo. Depois, os caminhos dominantes eram a
+multiplicação Mel com o acumulador, o cálculo de log entre as RAMs
+`mel_energy`/`log_energy` e a geração combinacional do coeficiente DCT. A pior
+folga inicial chegou a `-12,884 ns`.
+
+Foram aplicadas estas correções no RTL:
+
+* cálculo de potência dividido em captura, quadratura e escala/escrita, com
+  registradores `preserve` para impedir o recolhimento dos estágios;
+* multiplicação Mel separada da soma pelos estados `MEL_MUL` e `MEL_ACC`;
+* leitura de `mel_energy` separada do cálculo/escrita do log pelos estados
+  `LOG_PREP` e `LOG_ACC`;
+* coeficientes DCT pré-calculados em `dct_coeff_rom`, removendo a aritmética de
+  fase do caminho crítico.
+
+A latência aumentou somente entre o último bin e o MFCC; a entrada continua
+aceitando um bin por ciclo e a taxa de áudio não foi reduzida.
+
+O `sck_o` era detectado como clock pelo TimeQuest, mas não possuía clock
+associado. Foi adicionada uma restrição `create_generated_clock` chamada
+`I2S_SCK` em `quartus/de10lite_audio_fft.sdc`, derivada de
+`MAX10_CLK1_50`. Como o Quartus exige divisor inteiro, foi usado
+`-divide_by 16` (3,125 MHz), uma restrição conservadora em relação à média de
+3,072 MHz do NCO. A tentativa fracionária foi removida porque era rejeitada
+pelo fitter.
+
+Após as mudanças, o Questa continuou passando:
+
+```text
+tb_top_level_fft_isolated PASSED
+auto   rmse=257.703188 max_abs=743.120580
+manual rmse=257.703188 max_abs=743.120580
+max_abs(auto-manual)=0.000000
+Errors: 0, Warnings: 3498
+```
+
+O TimeQuest final do projeto `de10lite_audio_fft` apresentou:
+
+| Canto | Setup | Hold |
+|---|---:|---:|
+| Slow 1200 mV, 85 °C | **+0,780 ns** | +0,256 ns |
+| Slow 1200 mV, 0 °C | **+2,408 ns** | +0,255 ns |
+| Fast 1200 mV, 0 °C | **+11,786 ns** | +0,095 ns |
+
+O `I2S_SCK` também ficou positivo em setup e hold. O TimeQuest terminou com
+`0 errors, 0 warnings`; portanto, a violação de timing foi fechada sem falsos
+caminhos ou relaxamento artificial do clock.

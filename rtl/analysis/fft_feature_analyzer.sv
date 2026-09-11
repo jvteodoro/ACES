@@ -63,7 +63,7 @@ module fft_feature_analyzer #(
         end
     endgenerate
 
-    typedef enum logic [3:0] {IDLE, MEL_PREP, MEL_ACC, LOG_ACC, DCT_ACC, EMIT} state_t;
+    typedef enum logic [3:0] {IDLE, MEL_PREP, MEL_MUL, MEL_ACC, LOG_PREP, LOG_ACC, DCT_PREP, DCT_MUL, DCT_ACC, EMIT} state_t;
     state_t state;
     logic [BAND_W-1:0] band;
     logic [BIN_W-1:0] bin;
@@ -72,10 +72,53 @@ module fft_feature_analyzer #(
     logic [MEL_W-1:0] mfcc;
     logic [MEL_W-1:0] dct_mel;
     logic signed [ACC_W-1:0] accumulator;
+    (* preserve *) logic [POWER_W-1:0] log_input_value;
+    (* preserve *) logic [63:0] mel_product_reg;
+    // Pipeline register separating the DCT coefficient/multiplier cone from
+    // the 64-bit accumulation adder. This is the critical timing boundary
+    // for the DE10-Lite implementation.
+    logic signed [47:0] dct_product;
+    logic signed [31:0] dct_log_value;
+    logic signed [15:0] dct_coeff_value;
+    // Preserve the explicit boundaries: without them physical synthesis can
+    // legally collapse the arithmetic back into the RAM write cone.
+    (* preserve *) logic power_input_valid, power_input_last;
+    (* preserve *) logic [BIN_W-1:0] power_input_index;
+    (* preserve *) logic signed [7:0] power_input_exponent;
+    (* preserve *) logic [18:0] power_input_re_abs, power_input_im_abs;
+    (* preserve *) logic power_pipe_valid, power_pipe_last;
+    (* preserve *) logic [BIN_W-1:0] power_pipe_index;
+    (* preserve *) logic signed [7:0] power_pipe_exponent;
+    (* preserve *) logic [37:0] power_pipe_re_sq, power_pipe_im_sq;
 
     function automatic [18:0] abs18(input logic signed [17:0] value);
         begin
             abs18 = value[17] ? {1'b0, (~value + 1'b1)} : {1'b0, value};
+        end
+    endfunction
+
+    function automatic [POWER_W-1:0] power_spectrum_sq(
+        input logic [37:0] re_sq,
+        input logic [37:0] im_sq,
+        input logic signed [7:0] exponent
+    );
+        logic [36:0] raw_power;
+        logic [POWER_W-1:0] max_power;
+        integer shift_amount;
+        begin
+            raw_power = re_sq + im_sq;
+            max_power = {POWER_W{1'b1}};
+            shift_amount = 2 * exponent;
+            if (shift_amount >= 0) begin
+                if (shift_amount >= POWER_W || raw_power > (max_power >> shift_amount))
+                    power_spectrum_sq = max_power;
+                else
+                    power_spectrum_sq = raw_power << shift_amount;
+            end else if (-shift_amount >= 64) begin
+                power_spectrum_sq = '0;
+            end else begin
+                power_spectrum_sq = raw_power >> (-shift_amount);
+            end
         end
     endfunction
 
@@ -158,6 +201,13 @@ module fft_feature_analyzer #(
         end
     endfunction
 
+    (* romstyle = "M9K" *) logic signed [15:0] dct_coeff_rom [0:MFCC_COUNT-1][0:MEL_BANDS-1];
+    initial begin : init_dct_coeff_rom
+        for (int k = 0; k < MFCC_COUNT; k = k + 1)
+            for (int n = 0; n < MEL_BANDS; n = n + 1)
+                dct_coeff_rom[k][n] = dct_coeff(k, n);
+    end
+
     function automatic [MEL_COEFF_Q-1:0] mel_weight(input integer b, input integer k);
         integer left_edge, center_edge, right_edge;
         integer triangle_q, norm_q;
@@ -214,49 +264,94 @@ module fft_feature_analyzer #(
         logic signed [ACC_W-1:0] next_acc;
         if (rst) begin
             state <= IDLE; band <= '0; bin <= '0; mfcc <= '0; dct_mel <= '0;
-            accumulator <= '0; busy_o <= 1'b0; result_valid_o <= 1'b0;
+            accumulator <= '0; log_input_value <= '0; mel_product_reg <= '0;
+            dct_product <= '0; dct_log_value <= '0; dct_coeff_value <= '0;
+            busy_o <= 1'b0; result_valid_o <= 1'b0;
             result_index_o <= '0; result_data_o <= '0; frame_done_o <= 1'b0;
+            power_input_valid <= 1'b0; power_input_last <= 1'b0;
+            power_input_index <= '0; power_input_exponent <= '0;
+            power_input_re_abs <= '0; power_input_im_abs <= '0;
+            power_pipe_valid <= 1'b0; power_pipe_last <= 1'b0;
+            power_pipe_index <= '0; power_pipe_exponent <= '0;
+            power_pipe_re_sq <= '0; power_pipe_im_sq <= '0;
         end else begin
             result_valid_o <= 1'b0;
             frame_done_o <= 1'b0;
             case (state)
                 IDLE: begin
                     busy_o <= 1'b0;
-                    if (fft_bin_valid_i) begin
-                        if (fft_bin_index_i < USEFUL_BINS)
-                            power_ram[fft_bin_index_i[BIN_W-1:0]] <= power_spectrum(fft_bin_real_i, fft_bin_imag_i, fft_bfpexp_i);
-                        if (fft_bin_last_i) begin
+                    if (power_pipe_valid) begin
+                        power_ram[power_pipe_index] <= power_spectrum_sq(
+                            power_pipe_re_sq, power_pipe_im_sq, power_pipe_exponent);
+                        if (power_pipe_last) begin
                             busy_o <= 1'b1; band <= '0; state <= MEL_PREP;
                         end
                     end
+                    power_pipe_valid <= power_input_valid;
+                    power_pipe_last <= power_input_last;
+                    if (power_input_valid) begin
+                        power_pipe_index <= power_input_index;
+                        power_pipe_exponent <= power_input_exponent;
+                        power_pipe_re_sq <= power_input_re_abs * power_input_re_abs;
+                        power_pipe_im_sq <= power_input_im_abs * power_input_im_abs;
+                    end
+                    power_input_valid <= fft_bin_valid_i && (fft_bin_index_i < USEFUL_BINS);
+                    power_input_last <= fft_bin_valid_i && (fft_bin_index_i < USEFUL_BINS) && fft_bin_last_i;
+                    if (fft_bin_valid_i && (fft_bin_index_i < USEFUL_BINS)) begin
+                        power_input_index <= fft_bin_index_i[BIN_W-1:0];
+                        power_input_exponent <= fft_bfpexp_i;
+                        power_input_re_abs <= abs18(fft_bin_real_i);
+                        power_input_im_abs <= abs18(fft_bin_imag_i);
+                    end
                 end
                 MEL_PREP: begin
-                    accumulator <= '0; bin <= mel_edge(band); state <= MEL_ACC;
+                    accumulator <= '0; bin <= mel_edge(band); state <= MEL_MUL;
                     if (mel_edge(band+1) <= mel_edge(band+0)) begin
                         mel_energy[band] <= 0;
-                        if (band == MEL_BANDS-1) begin mfcc <= 0; state <= LOG_ACC; end
+                        if (band == MEL_BANDS-1) begin mfcc <= 0; state <= LOG_PREP; end
                         else band <= band + 1'b1;
                     end
                 end
-                MEL_ACC: begin
+                MEL_MUL: begin
                     if (USE_MEL_ROM)
-                        product = power_ram[bin] * mel_coeff_rom[band*USEFUL_BINS + bin];
+                        mel_product_reg <= power_ram[bin] * mel_coeff_rom[band*USEFUL_BINS + bin];
                     else
-                        product = power_ram[bin] * mel_weight(band, bin);
+                        mel_product_reg <= power_ram[bin] * mel_weight(band, bin);
+                    state <= MEL_ACC;
+                end
+                MEL_ACC: begin
+                    product = mel_product_reg;
                     next_acc = accumulator + product;
                     if (bin >= mel_edge(band+1)-1 || bin == USEFUL_BINS-1) begin
                         mel_energy[band] <= next_acc >>> MEL_COEFF_Q;
-                        if (band == MEL_BANDS-1) begin mfcc <= 0; state <= LOG_ACC; end
+                        if (band == MEL_BANDS-1) begin mfcc <= 0; state <= LOG_PREP; end
                         else begin band <= band + 1'b1; state <= MEL_PREP; end
-                    end else begin bin <= bin + 1'b1; accumulator <= next_acc; end
+                    end else begin bin <= bin + 1'b1; accumulator <= next_acc; state <= MEL_MUL; end
+                end
+                LOG_PREP: begin
+                    // Explicit RAM-read cycle before the logarithm cone.
+                    log_input_value <= mel_energy[mfcc];
+                    state <= LOG_ACC;
                 end
                 LOG_ACC: begin
-                    log_energy[mfcc] <= natural_log_q16(mel_energy[mfcc]);
-                    if (mfcc == MEL_BANDS-1) begin mfcc <= 0; dct_mel <= 0; accumulator <= 0; state <= DCT_ACC; end
-                    else mfcc <= mfcc + 1'b1;
+                    log_energy[mfcc] <= natural_log_q16(log_input_value);
+                    if (mfcc == MEL_BANDS-1) begin mfcc <= 0; dct_mel <= 0; accumulator <= 0; state <= DCT_PREP; end
+                    else begin mfcc <= mfcc + 1'b1; state <= LOG_PREP; end
+                end
+                DCT_PREP: begin
+                    // Register the ROM lookup and coefficient generation
+                    // before entering the multiplier cone.
+                    dct_log_value <= log_energy[dct_mel];
+                    dct_coeff_value <= dct_coeff_rom[mfcc][dct_mel];
+                    state <= DCT_MUL;
+                end
+                DCT_MUL: begin
+                    // Calculate the 32x16-bit DCT product in its own cycle.
+                    dct_product <= dct_log_value * dct_coeff_value;
+                    state <= DCT_ACC;
                 end
                 DCT_ACC: begin
-                    next_acc = accumulator + (log_energy[dct_mel] * dct_coeff(mfcc, dct_mel));
+                    next_acc = accumulator + dct_product;
                     if (dct_mel == MEL_BANDS-1) begin
                         result_data_o <= next_acc >>> COEFF_Q;
                         result_index_o <= mfcc; result_valid_o <= 1'b1;
