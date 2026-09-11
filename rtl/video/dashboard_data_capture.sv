@@ -75,7 +75,7 @@ module dashboard_data_capture #(
                 scaled = sum << shift_left;
             else
                 scaled = sum >> shift_right;
-            if (scaled > 1023)
+            if (scaled > 20'hfffff)
                 raw_magnitude = 20'hfffff;
             else
                 raw_magnitude = scaled[19:0];
@@ -144,7 +144,13 @@ module dashboard_data_capture #(
                 feature_busy_bank[write_bank] <= feature_busy_i;
                 fft_status_bank[write_bank] <= fft_status_i;
                 fft_input_status_bank[write_bank] <= fft_input_status_i;
-                peak_bank[write_bank] <= peak_work;
+                // Include a possible last FFT bin on the same cycle as the
+                // frame marker instead of losing it to nonblocking ordering.
+                if (fft_tx_valid_i && (fft_tx_index_i < FFT_BINS) &&
+                    (raw_magnitude(fft_tx_real_i, fft_tx_imag_i, bfpexp_i) > peak_work))
+                    peak_bank[write_bank] <= raw_magnitude(fft_tx_real_i, fft_tx_imag_i, bfpexp_i);
+                else
+                    peak_bank[write_bank] <= peak_work;
                 ready_bank_50 <= write_bank;
                 ready_toggle_50 <= ~ready_toggle_50;
                 write_bank <= ~write_bank;
