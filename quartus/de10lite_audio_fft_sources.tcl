@@ -19,6 +19,7 @@ foreach relpath {
     rtl/common/fft_dma_reader.sv
     rtl/common/fft_tx_bridge_fifo.sv
     rtl/frontend/i2s_master_clock_gen.sv
+    rtl/frontend/fft_window_multiplier.sv
     rtl/frontend/i2s_rx_adapter_24.sv
     rtl/frontend/i2s_fft_tx_adapter.sv
     rtl/core/aces_audio_to_fft_pipeline.sv
@@ -49,3 +50,5 @@ foreach relpath {
 
 set_global_assignment -name SEARCH_PATH [file normalize [file join $repo_root submodules R2FFT quartus]]
 set_global_assignment -name MIF_FILE [file normalize [file join $repo_root submodules R2FFT quartus twrom.mif]]
+set_global_assignment -name SEARCH_PATH [file normalize [file join $repo_root rtl frontend]]
+set_global_assignment -name HEX_FILE [file normalize [file join $repo_root rtl frontend hann_window_q15.hex]]

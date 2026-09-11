@@ -26,6 +26,10 @@ module tb_aces_audio_to_fft_pipeline;
     logic signed [SAMPLE_W-1:0] sdw_istream_real_o;
     logic signed [SAMPLE_W-1:0] sdw_istream_imag_o;
 
+    logic window_valid;
+    logic signed [SAMPLE_W-1:0] window_sample;
+    integer window_observed_count;
+
     logic signed [23:0] expected24 [0:N_SAMPLES-1];
     logic signed [17:0] expected18 [0:N_SAMPLES-1];
 
@@ -110,9 +114,33 @@ module tb_aces_audio_to_fft_pipeline;
         .sdw_istream_imag_o(sdw_istream_imag_o)
     );
 
+    // Second instance validates the integrated Hann path with the same
+    // already-proven I2S stimulus as the raw pipeline regression.
+    aces_audio_to_fft_pipeline #(
+        .SAMPLE_W(SAMPLE_W),
+        .ENABLE_WINDOW(1'b1),
+        .WINDOW_COEFF_FILE("rtl/frontend/hann_window_q15.hex")
+    ) dut_window (
+        .rst(rst),
+        .mic_sck_i(mic_sck_i),
+        .mic_ws_i(mic_ws_i),
+        .mic_sd_i(mic_sd_i),
+        .mic_lr_i(mic_lr_i),
+        .clk(clk),
+        .sample_valid_mic_o(),
+        .sample_mic_o(),
+        .sample_24_dbg_o(),
+        .fft_sample_valid_o(window_valid),
+        .fft_sample_o(window_sample),
+        .sact_istream_o(),
+        .sdw_istream_real_o(),
+        .sdw_istream_imag_o()
+    );
+
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             observed_count = 0;
+            window_observed_count = 0;
             sact_prev      = 1'b0;
         end else begin
             assert (sample_valid_mic_o === fft_sample_valid_o)
@@ -152,6 +180,15 @@ module tb_aces_audio_to_fft_pipeline;
             end
 
             sact_prev = sact_istream_o;
+
+            if (window_valid) begin
+                assert (window_observed_count < N_SAMPLES)
+                    else $fatal(1, "Mais outputs Hann do que o esperado");
+                if (window_observed_count == 0)
+                    assert (window_sample == 0)
+                        else $fatal(1, "primeira amostra não foi anulada pela Hann");
+                window_observed_count = window_observed_count + 1;
+            end
         end
     end
 
@@ -187,7 +224,9 @@ module tb_aces_audio_to_fft_pipeline;
         repeat (60) @(posedge clk);
 
         assert (observed_count == N_SAMPLES)
-        else $fatal(1, "Esperado %0d samples, obtido %0d", N_SAMPLES, observed_count);
+            else $fatal(1, "Esperado %0d samples, obtido %0d", N_SAMPLES, observed_count);
+        assert (window_observed_count == N_SAMPLES)
+            else $fatal(1, "Esperados %0d outputs Hann, obtidos %0d", N_SAMPLES, window_observed_count);
 
         $display("tb_aces_audio_to_fft_pipeline PASSED");
         $finish;

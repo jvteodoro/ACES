@@ -1,5 +1,10 @@
 module aces_audio_to_fft_pipeline #(
-    parameter int SAMPLE_W = 18
+    parameter int SAMPLE_W = 18,
+    parameter int FRAME_LENGTH = 512,
+    parameter bit ENABLE_WINDOW = 1'b0,
+    // Untyped string parameter keeps compatibility with Quartus and Icarus;
+    // both tools accept the path literal while elaborating the ROM instance.
+    parameter WINDOW_COEFF_FILE = "rtl/frontend/hann_window_q15.hex"
 )(
     input  logic rst,
 
@@ -78,6 +83,10 @@ module aces_audio_to_fft_pipeline #(
     logic toggle_sync_1, toggle_sync_2, toggle_seen_clk;
     logic signed [SAMPLE_W-1:0] sample_reg;
     logic                       sample_pulse_clk;
+    logic [$clog2(FRAME_LENGTH)-1:0] frame_sample_index;
+    logic [$clog2(FRAME_LENGTH)-1:0] window_sample_index;
+    logic signed [SAMPLE_W-1:0] windowed_sample;
+    logic windowed_valid;
 
     wire new_sample_clk;
     assign new_sample_clk = (toggle_sync_2 != toggle_seen_clk);
@@ -89,6 +98,8 @@ module aces_audio_to_fft_pipeline #(
             toggle_seen_clk <= 1'b0;
             sample_reg     <= '0;
             sample_pulse_clk <= 1'b0;
+            frame_sample_index <= '0;
+            window_sample_index <= '0;
         end else begin
             toggle_sync_1   <= sample_toggle_mic;
             toggle_sync_2   <= toggle_sync_1;
@@ -98,9 +109,40 @@ module aces_audio_to_fft_pipeline #(
                 sample_reg      <= sample_hold_mic;
                 sample_pulse_clk <= 1'b1;
                 toggle_seen_clk <= toggle_sync_2;
+                // Keep the index aligned with sample_reg/sample_pulse_clk;
+                // the window block consumes these registered values one
+                // system-clock later.
+                window_sample_index <= frame_sample_index;
+                if (frame_sample_index == FRAME_LENGTH-1)
+                    frame_sample_index <= '0;
+                else
+                    frame_sample_index <= frame_sample_index + 1'b1;
             end
         end
     end
+
+    generate
+        if (ENABLE_WINDOW) begin : gen_window
+            fft_window_multiplier #(
+                .SAMPLE_W(SAMPLE_W),
+                .FRAME_LENGTH(FRAME_LENGTH),
+                .COEFF_FILE(WINDOW_COEFF_FILE)
+            ) u_window (
+                .clk(clk),
+                .rst(rst),
+                .sample_valid_i(sample_pulse_clk),
+                .sample_index_i(window_sample_index),
+                .sample_i(sample_reg),
+                .sample_valid_o(windowed_valid),
+                .sample_o(windowed_sample)
+            );
+        end else begin : gen_no_window
+            always_comb begin
+                windowed_valid = sample_pulse_clk;
+                windowed_sample = sample_reg;
+            end
+        end
+    endgenerate
 
     // -------------------------------------------------------------------------
     // saídas
@@ -109,11 +151,11 @@ module aces_audio_to_fft_pipeline #(
     assign sample_valid_mic_o = sample_pulse_clk;
     assign sample_mic_o       = sample_reg;
 
-    assign fft_sample_valid_o = sample_pulse_clk;
-    assign fft_sample_o       = sample_reg;
+    assign fft_sample_valid_o = windowed_valid;
+    assign fft_sample_o       = windowed_sample;
 
-    assign sact_istream_o     = sample_pulse_clk;
-    assign sdw_istream_real_o = sample_reg;
+    assign sact_istream_o     = windowed_valid;
+    assign sdw_istream_real_o = windowed_sample;
     assign sdw_istream_imag_o = '0;
 
 endmodule

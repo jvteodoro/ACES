@@ -71,6 +71,8 @@ module de10lite_audio_fft_top #(
         .FFT_LENGTH(FFT_LENGTH),
         .FFT_DW(FFT_DW),
         .I2S_CLOCK_DIV(I2S_CLOCK_DIV),
+        .ENABLE_WINDOW(1'b1),
+        .WINDOW_COEFF_FILE("../rtl/frontend/hann_window_q15.hex"),
         .TX_BRIDGE_FIFO_DEPTH(TX_BRIDGE_FIFO_DEPTH)
     ) u_aces (
         .clk(MAX10_CLK1_50),

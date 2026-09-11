@@ -2,6 +2,11 @@ module aces #(
     parameter int FFT_LENGTH   = 512,
     parameter int FFT_DW       = 18,
     parameter int I2S_CLOCK_DIV = 16,
+    parameter bit USE_FRACTIONAL_AUDIO_CLOCK = 1'b1,
+    parameter int SYSTEM_CLOCK_HZ = 50_000_000,
+    parameter int AUDIO_SAMPLE_RATE_HZ = 48_000,
+    parameter bit ENABLE_WINDOW = 1'b0,
+    parameter string WINDOW_COEFF_FILE = "rtl/frontend/hann_window_q15.hex",
     parameter int TX_BRIDGE_FIFO_DEPTH = 2048
 )(
     input  logic clk,
@@ -109,7 +114,10 @@ module aces #(
     // gerador SCK / WS
     // -----------------------------
     i2s_master_clock_gen #(
-        .CLOCK_DIV(I2S_CLOCK_DIV)
+        .CLOCK_DIV(I2S_CLOCK_DIV),
+        .USE_FRACTIONAL_CLOCK(USE_FRACTIONAL_AUDIO_CLOCK),
+        .SYSTEM_CLOCK_HZ(SYSTEM_CLOCK_HZ),
+        .AUDIO_SAMPLE_RATE_HZ(AUDIO_SAMPLE_RATE_HZ)
     ) u_i2s_master_clock_gen (
         .clk(clk),
         .rst(rst),
@@ -121,7 +129,10 @@ module aces #(
     // pipeline microfone -> FFT stream
     // -----------------------------
     aces_audio_to_fft_pipeline #(
-        .SAMPLE_W(FFT_DW)
+        .SAMPLE_W(FFT_DW),
+        .FRAME_LENGTH(FFT_LENGTH),
+        .ENABLE_WINDOW(ENABLE_WINDOW),
+        .WINDOW_COEFF_FILE(WINDOW_COEFF_FILE)
     ) u_audio_to_fft_pipeline (
         .rst(rst),
         .mic_sck_i(mic_sck_o),

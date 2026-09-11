@@ -10,7 +10,8 @@ module tb_i2s_master_clock_gen;
     logic sck_o;
     logic ws_o;
 
-    int clk_edges_since_toggle;
+    int system_cycle;
+    int last_toggle_cycle;
     int sck_toggle_count;
     int ws_transition_count;
     logic prev_sck;
@@ -29,19 +30,21 @@ module tb_i2s_master_clock_gen;
 
     always @(posedge clk) begin
         if (rst) begin
-            clk_edges_since_toggle <= 0;
+            system_cycle           <= 0;
+            last_toggle_cycle      <= -1;
             sck_toggle_count       <= 0;
             ws_transition_count    <= 0;
             prev_sck               <= 1'b0;
             prev_ws                <= 1'b1;
         end else begin
-            clk_edges_since_toggle <= clk_edges_since_toggle + 1;
+            system_cycle <= system_cycle + 1;
 
             if (sck_o != prev_sck) begin
-                assert (clk_edges_since_toggle == CLOCK_DIV)
-                else $fatal(1, "SCK mudou fora do divisor esperado: %0d", clk_edges_since_toggle);
-
-                clk_edges_since_toggle <= 0;
+                if (last_toggle_cycle >= 0) begin
+                    assert (system_cycle - last_toggle_cycle == CLOCK_DIV)
+                    else $fatal(1, "SCK mudou fora do divisor esperado: %0d", system_cycle - last_toggle_cycle);
+                end
+                last_toggle_cycle      <= system_cycle;
                 sck_toggle_count       <= sck_toggle_count + 1;
                 prev_sck               <= sck_o;
             end
@@ -58,6 +61,7 @@ module tb_i2s_master_clock_gen;
         rst = 1'b1;
 
         repeat (4) @(posedge clk);
+        @(negedge clk);
         rst = 1'b0;
 
         repeat (HALF_FRAME_BITS * 2 * CLOCK_DIV * 2 + 8) @(posedge clk);
