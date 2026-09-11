@@ -71,6 +71,15 @@ estável e o toggle ter sido sincronizado.
 
 ## Layout e renderização
 
+### Fronteira do frame para MFCC
+
+O leitor DMA da FFT percorre os 1024 bins e sinaliza `fft_tx_last` no bin
+1023. O analisador de características processa somente os 512 bins úteis
+(`0..511`). Por isso o top-level gera `feature_bin_last` no bin 511 e o usa
+exclusivamente na entrada do analisador MFCC. Sem essa adaptação, as etapas
+Mel/log/DCT não eram iniciadas e `feature_frame_done` permanecia em zero,
+impedindo a atualização de MFCC e do contador de frames do dashboard.
+
 - espectro: x=64..575, y=72..280, com escala de frequência logarítmica;
 - MFCC: x=60..319, centro em y=405, barras assinadas;
 - status: indicadores em x=430..449;

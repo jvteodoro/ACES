@@ -57,6 +57,7 @@ module de10lite_audio_fft_top #(
 
     logic feature_busy, mfcc_valid, feature_frame_done;
     logic mfcc_valid_raw, feature_frame_done_raw;
+    logic feature_bin_last;
     logic [$clog2(13)-1:0] mfcc_index, mfcc_index_raw;
     logic signed [31:0] mfcc_data, mfcc_data_raw;
     logic [3:0] hex0_value, hex1_value, hex2_value;
@@ -84,6 +85,12 @@ module de10lite_audio_fft_top #(
     assign GPIO[6] = tx_i2s_sd;
     assign GPIO[7] = mfcc_valid;
     assign GPIO[8] = feature_frame_done;
+
+    // The DMA reader emits all 1024 FFT bins and asserts fft_tx_last on bin
+    // 1023. The feature analyzer intentionally consumes only bins 0..511,
+    // so its frame boundary must be generated at the last useful bin.
+    assign feature_bin_last = fft_tx_valid &&
+                              (fft_tx_last || (fft_tx_index == (FFT_LENGTH / 2 - 1)));
 
     aces #(
         .FFT_LENGTH(FFT_LENGTH),
@@ -144,7 +151,7 @@ module de10lite_audio_fft_top #(
         .fft_bin_real_i(fft_tx_real),
         .fft_bin_imag_i(fft_tx_imag),
         .fft_bfpexp_i(bfpexp),
-        .fft_bin_last_i(fft_tx_last),
+        .fft_bin_last_i(feature_bin_last),
         .busy_o(feature_busy),
         .result_valid_o(mfcc_valid_raw),
         .result_index_o(mfcc_index_raw),
