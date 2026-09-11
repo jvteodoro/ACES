@@ -100,14 +100,14 @@ module text_renderer (
             character = label_char(10, cell_x - 8);
         else if ((cell_y == 36) && (cell_x >= 8) && (cell_x < 10))
             character = label_char(5, cell_x - 8);
-        else if ((cell_y == 36) && (cell_x >= 24) && (cell_x < 26))
-            character = label_char(6, cell_x - 24);
-        else if ((cell_y == 36) && (cell_x >= 44) && (cell_x < 46))
-            character = label_char(7, cell_x - 44);
-        else if ((cell_y == 36) && (cell_x >= 56) && (cell_x < 59))
-            character = label_char(8, cell_x - 56);
-        else if ((cell_y == 36) && (cell_x >= 69) && (cell_x < 72))
-            character = label_char(9, cell_x - 69);
+        else if ((cell_y == 36) && (cell_x >= 32) && (cell_x < 35))
+            character = label_char(6, cell_x - 32);
+        else if ((cell_y == 36) && (cell_x >= 53) && (cell_x < 55))
+            character = label_char(7, cell_x - 53);
+        else if ((cell_y == 36) && (cell_x >= 64) && (cell_x < 67))
+            character = label_char(8, cell_x - 64);
+        else if ((cell_y == 36) && (cell_x >= 71) && (cell_x < 74))
+            character = label_char(9, cell_x - 71);
         else if ((cell_y == 43) && (cell_x >= 57) && (cell_x < 60))
             character = label_char(11, cell_x - 57);
         else if ((cell_y == 45) && (cell_x >= 57) && (cell_x < 61))
