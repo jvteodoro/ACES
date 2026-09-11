@@ -40,6 +40,7 @@ module tb_dashboard_data_capture;
         fft_valid=0; frame_done=0; fft_run=1; fft_done=0; feature_busy=0;
         mfcc_valid=0; fft_index=0; re=0; im=0; expn=0; fft_status=0;
         input_status=0; mfcc_index=0; mfcc_data=0; spectrum_index=0; read_mfcc_index=0;
+        expn=4;
         #50 rst=0;
         write_frame(10);
         repeat (3) @(posedge pclk);

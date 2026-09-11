@@ -71,10 +71,14 @@ module dashboard_data_capture #(
             magnitude_shift = -shift_amount;
             shift_left = (shift_amount > 24) ? 6'd24 : shift_amount[5:0];
             shift_right = (magnitude_shift > 20) ? 6'd20 : magnitude_shift[5:0];
+            // Extend before shifting. In SystemVerilog the width of a shift
+            // expression is the width of its left operand; shifting the
+            // 20-bit sum directly would discard the high bits before the
+            // 48-bit assignment.
             if (shift_amount >= 0)
-                scaled = sum << shift_left;
+                scaled = {28'd0, sum} << shift_left;
             else
-                scaled = sum >> shift_right;
+                scaled = {28'd0, sum} >> shift_right;
             if (scaled > 20'hfffff)
                 raw_magnitude = 20'hfffff;
             else
