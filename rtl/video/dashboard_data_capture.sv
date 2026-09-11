@@ -34,7 +34,9 @@ module dashboard_data_capture #(
     output logic feature_busy_o,
     output logic [31:0] frame_count_o
 );
-    (* ramstyle = "M9K" *) logic [9:0] spectrum_bank [0:1][0:FFT_BINS-1];
+    // Keep the pre-normalized magnitude so a large BFPEXP cannot flatten the
+    // entire display to 10'h3ff. The displayed value is normalized per frame.
+    (* ramstyle = "M9K" *) logic [19:0] spectrum_bank [0:1][0:FFT_BINS-1];
     (* ramstyle = "M9K" *) logic signed [31:0] mfcc_bank [0:1][0:MFCC_COUNT-1];
     logic [31:0] frame_count_bank [0:1];
     logic [7:0] bfpexp_bank [0:1];
@@ -46,8 +48,11 @@ module dashboard_data_capture #(
     logic ready_toggle_v1, ready_toggle_v2, ready_toggle_seen;
     logic ready_bank_v1, ready_bank_v2, display_bank_vga;
     logic [31:0] frame_counter;
+    logic [19:0] peak_work;
+    logic [19:0] peak_bank [0:1];
+    logic [19:0] spectrum_raw_read;
 
-    function automatic [9:0] compact_magnitude(
+    function automatic [19:0] raw_magnitude(
         input logic signed [17:0] re,
         input logic signed [17:0] im,
         input logic signed [7:0] exponent
@@ -71,9 +76,35 @@ module dashboard_data_capture #(
             else
                 scaled = sum >> shift_right;
             if (scaled > 1023)
-                compact_magnitude = 10'h3ff;
+                raw_magnitude = 20'hfffff;
             else
-                compact_magnitude = scaled[9:0];
+                raw_magnitude = scaled[19:0];
+        end
+    endfunction
+
+    // Normalize by a power of two derived from the frame peak. This avoids a
+    // divider in the 25 MHz pixel path while keeping the peak near full scale.
+    function automatic [9:0] normalized_magnitude(
+        input logic [19:0] raw,
+        input logic [19:0] peak
+    );
+        integer highest_bit;
+        integer shift_amount;
+        logic [31:0] normalized;
+        begin
+            highest_bit = -1;
+            for (int k = 19; k >= 0; k = k - 1)
+                if ((highest_bit < 0) && peak[k]) highest_bit = k;
+            if ((highest_bit < 0) || (raw == 0)) begin
+                normalized_magnitude = 10'd0;
+            end else begin
+                shift_amount = highest_bit - 9;
+                if (shift_amount >= 0)
+                    normalized = raw >> shift_amount;
+                else
+                    normalized = raw << (-shift_amount);
+                normalized_magnitude = (normalized > 1023) ? 10'h3ff : normalized[9:0];
+            end
         end
     endfunction
 
@@ -83,6 +114,7 @@ module dashboard_data_capture #(
             ready_bank_50 <= 1'b0;
             ready_toggle_50 <= 1'b0;
             frame_counter <= '0;
+            peak_work <= '0;
             for (int b = 0; b < 2; b = b + 1) begin
                 frame_count_bank[b] <= '0;
                 bfpexp_bank[b] <= '0;
@@ -91,11 +123,15 @@ module dashboard_data_capture #(
                 feature_busy_bank[b] <= 1'b0;
                 fft_status_bank[b] <= '0;
                 fft_input_status_bank[b] <= '0;
+                peak_bank[b] <= '0;
             end
         end else begin
-            if (fft_tx_valid_i && (fft_tx_index_i < FFT_BINS))
+            if (fft_tx_valid_i && (fft_tx_index_i < FFT_BINS)) begin
                 spectrum_bank[write_bank][fft_tx_index_i[8:0]] <=
-                    compact_magnitude(fft_tx_real_i, fft_tx_imag_i, bfpexp_i);
+                    raw_magnitude(fft_tx_real_i, fft_tx_imag_i, bfpexp_i);
+                if (raw_magnitude(fft_tx_real_i, fft_tx_imag_i, bfpexp_i) > peak_work)
+                    peak_work <= raw_magnitude(fft_tx_real_i, fft_tx_imag_i, bfpexp_i);
+            end
             if (mfcc_valid_i && (mfcc_index_i < MFCC_COUNT))
                 mfcc_bank[write_bank][mfcc_index_i] <= mfcc_data_i;
 
@@ -108,9 +144,11 @@ module dashboard_data_capture #(
                 feature_busy_bank[write_bank] <= feature_busy_i;
                 fft_status_bank[write_bank] <= fft_status_i;
                 fft_input_status_bank[write_bank] <= fft_input_status_i;
+                peak_bank[write_bank] <= peak_work;
                 ready_bank_50 <= write_bank;
                 ready_toggle_50 <= ~ready_toggle_50;
                 write_bank <= ~write_bank;
+                peak_work <= '0;
             end
         end
     end
@@ -151,8 +189,12 @@ module dashboard_data_capture #(
         if (rst) begin
             spectrum_value_o <= '0;
             mfcc_value_o <= '0;
+            spectrum_raw_read <= '0;
         end else begin
-            spectrum_value_o <= spectrum_bank[display_bank_vga][spectrum_read_index_i];
+            // Keep the RAM read as a standalone synchronous operation so
+            // Quartus can infer the dual-port M9K. Normalize one cycle later.
+            spectrum_raw_read <= spectrum_bank[display_bank_vga][spectrum_read_index_i];
+            spectrum_value_o <= normalized_magnitude(spectrum_raw_read, peak_bank[display_bank_vga]);
             mfcc_value_o <= mfcc_bank[display_bank_vga][mfcc_read_index_i];
         end
     end

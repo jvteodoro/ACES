@@ -34,6 +34,7 @@ module dashboard_renderer (
 
     spectrum_log_lut u_spectrum_log_lut (
         .x_segment(spectrum_slot[8:3]),
+        .x_subpixel(spectrum_slot[2:0]),
         .bin_index(log_bin_index)
     );
 

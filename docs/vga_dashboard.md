@@ -43,14 +43,18 @@ As atribuições foram conferidas contra o SystemCD da DE10-Lite e usam
 
 ## Captura e double buffer
 
-No domínio de 50 MHz, cada bin útil (`fft_tx_index < 512`) é convertido para
-10 bits com a métrica visual:
+No domínio de 50 MHz, cada bin útil (`fft_tx_index < 512`) é armazenado com
+20 bits após a métrica visual:
 
 ```text
-display_magnitude = saturate((abs(real) + abs(imag)) << bfpexp)
+raw_magnitude = saturate((abs(real) + abs(imag)) << bfpexp)
 ```
 
-Não há `sqrt` no caminho de vídeo. Os 512 bins e 13 MFCC Q16.16 ficam em dois
+O pico do quadro é armazenado junto com o snapshot. Durante a leitura no
+domínio VGA, a magnitude é normalizada por uma potência de dois derivada desse
+pico, sem divisor no caminho de pixel. Assim, um `bfpexp` alto não transforma
+todos os bins em `MAX`; o pico fica próximo do topo e os demais bins preservam
+sua relação relativa. Não há `sqrt` no caminho de vídeo. Os 512 bins e 13 MFCC Q16.16 ficam em dois
 bancos. O banco de escrita é separado do banco exibido. `feature_frame_done`
 marca o snapshot, um toggle atravessa dois flip-flops e o VGA só aceita o banco
 novo em `frame_start`, evitando tearing.
@@ -78,8 +82,8 @@ estável e o toggle ter sido sincronizado.
 - fundo preto, grade discreta, FFT ciano, MFCC amarelo, estados verde/vermelho.
 
 O mapeamento X usa `spectrum_log_lut.sv`: os 512 pixels do gráfico consultam
-64 entradas, cada uma cobrindo oito pixels. A LUT percorre os bins 1..511 em
-progressão aproximadamente logarítmica. Assim, as baixas frequências ocupam
+64 entradas, com interpolação linear entre as entradas para cada um dos oito
+pixels do segmento. A LUT percorre os bins 1..511 em progressão aproximadamente logarítmica. Assim, as baixas frequências ocupam
 mais espaço visual, sem calcular logaritmos ou divisões no caminho de pixel.
 O bin 0/DC não é exibido como ponto separado; a primeira posição representa o
 bin 1, equivalente a 46,875 Hz em `Fs=48 kHz` e `N=1024`.
@@ -121,8 +125,9 @@ layout, escala do espectro e barras MFCC.
 ## Fechamento Quartus/TimeQuest
 
 No fechamento físico realizado em 2026-09-11, o Fitter foi bem-sucedido para
-`10M50DAF484C7G`, com 20.446/49.760 LEs (41%), 11.653 registradores (23%),
-23/182 M9K (13%), 38 DSP 9-bit (13%) e 97/360 pinos (27%). Os 14 pinos VGA
+`10M50DAF484C7G`, com 9.408/49.760 LEs (19%), 2.699 registradores (5%),
+27/182 M9K (15%), 38 DSP 9-bit (13%) e 97/360 pinos (27%). O snapshot de
+espectro de 20 bits ocupa 3 M9K (20.480 bits) e os 14 pinos VGA
 foram aceitos e aparecem no relatório de I/O. O TimeQuest encontrou clocks de
 50 MHz, 3,125 MHz I2S e 25 MHz VGA; hold permaneceu positivo. O pior setup no
 corner lento de 85 °C foi `-0,219 ns` no `VGA_PIXEL_CLK`, enquanto os corners

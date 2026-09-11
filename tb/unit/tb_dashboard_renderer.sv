@@ -28,6 +28,8 @@ module tb_dashboard_renderer;
         x = 10'd448; y = 10'd280; #1;
         if (b != 4'hf || g != 4'hc) $fatal(1, "spectrum pixel missing: %h%h%h", r,g,b);
         if (spectrum_index != 9'd116) $fatal(1, "wrong log bin index=%0d", spectrum_index);
+        x = 10'd455; #1;
+        if (spectrum_index != 9'd127) $fatal(1, "interpolation did not refine bin index=%0d", spectrum_index);
         x = 10'd64; #1;
         if (spectrum_index != 9'd1) $fatal(1, "wrong low-frequency bin=%0d", spectrum_index);
         x = 10'd575; #1;
