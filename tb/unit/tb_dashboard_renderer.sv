@@ -24,10 +24,14 @@ module tb_dashboard_renderer;
         spectrum = 10'd255; mfcc = 32'sd0; bfp = 0;
         fft_run = 1; fft_done = 0; busy = 0; fft_status = 0;
         input_status = 0; frame = 32'd7;
-        // Bin 100 maps to x=64+100 and a nonzero bar reaches the graph bottom.
-        x = 10'd164; y = 10'd280; #1;
+        // The log LUT maps the segment at x=448 to bin 116.
+        x = 10'd448; y = 10'd280; #1;
         if (b != 4'hf || g != 4'hc) $fatal(1, "spectrum pixel missing: %h%h%h", r,g,b);
-        if (spectrum_index != 9'd100) $fatal(1, "wrong bin index=%0d", spectrum_index);
+        if (spectrum_index != 9'd116) $fatal(1, "wrong log bin index=%0d", spectrum_index);
+        x = 10'd64; #1;
+        if (spectrum_index != 9'd1) $fatal(1, "wrong low-frequency bin=%0d", spectrum_index);
+        x = 10'd575; #1;
+        if (spectrum_index != 9'd511) $fatal(1, "wrong high-frequency bin=%0d", spectrum_index);
         // Positive Q16.16 MFCC produces a bar above the zero line.
         mfcc = 32'sh0010_0000; x = 10'd70; y = 10'd404; #1;
         if (r != 4'hf || g != 4'hf) $fatal(1, "MFCC pixel missing: %h%h%h", r,g,b);

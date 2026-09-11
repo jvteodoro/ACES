@@ -30,6 +30,35 @@ module text_renderer (
         end
     endfunction
 
+    // Fixed labels are decoded as characters so no framebuffer or string
+    // storage is required. The graph uses a logarithmic frequency axis and a
+    // normalized magnitude axis; the labels deliberately expose that fact.
+    function automatic [7:0] label_char(input integer line, input integer p);
+        begin
+            label_char = " ";
+            case (line)
+                0: case (p) 0: label_char="M"; 1: label_char="A"; 2: label_char="X"; endcase
+                1: case (p) 0: label_char="3"; 1: label_char="/"; 2: label_char="4"; endcase
+                2: case (p) 0: label_char="1"; 1: label_char="/"; 2: label_char="2"; endcase
+                3: case (p) 0: label_char="1"; 1: label_char="/"; 2: label_char="4"; endcase
+                4: case (p) 0: label_char="0"; endcase
+                5: case (p) 0: label_char="5"; 1: label_char="0"; endcase
+                6: case (p) 0: label_char="5"; 1: label_char="0"; 2: label_char="0"; endcase
+                7: case (p) 0: label_char="4"; 1: label_char="K"; endcase
+                8: case (p) 0: label_char="1"; 1: label_char="2"; 2: label_char="K"; endcase
+                9: case (p) 0: label_char="2"; 1: label_char="4"; 2: label_char="K"; endcase
+                10: case (p) 0: label_char="F"; 1: label_char="R"; 2: label_char="E"; 3: label_char="Q"; 5: label_char="L"; 6: label_char="O"; 7: label_char="G"; endcase
+                11: case (p) 0: label_char="R"; 1: label_char="U"; 2: label_char="N"; endcase
+                12: case (p) 0: label_char="B"; 1: label_char="U"; 2: label_char="S"; 3: label_char="Y"; endcase
+                13: case (p) 0: label_char="D"; 1: label_char="O"; 2: label_char="N"; 3: label_char="E"; endcase
+                14: case (p) 0: label_char="E"; 1: label_char="R"; 2: label_char="R"; endcase
+                15: case (p) 0: label_char="F"; 1: label_char="R"; 2: label_char="A"; 3: label_char="M"; 4: label_char="E"; endcase
+                16: case (p) 0: label_char="B"; 1: label_char="F"; 2: label_char="P"; endcase
+                default: label_char = " ";
+            endcase
+        end
+    endfunction
+
     always_comb begin
         cell_x = pixel_x[9:3];
         cell_y = pixel_y[9:3];
@@ -57,9 +86,43 @@ module text_renderer (
                 3: character = "T"; 4: character = "U"; 5: character = "S";
                 default: character = " ";
             endcase
-        end else if ((cell_y == 43) && (cell_x >= 51) && (cell_x < 59))
+        end else if ((cell_y == 8) && (cell_x >= 1) && (cell_x < 4))
+            character = label_char(0, cell_x - 1);
+        else if ((cell_y == 13) && (cell_x >= 1) && (cell_x < 4))
+            character = label_char(1, cell_x - 1);
+        else if ((cell_y == 18) && (cell_x >= 1) && (cell_x < 4))
+            character = label_char(2, cell_x - 1);
+        else if ((cell_y == 23) && (cell_x >= 1) && (cell_x < 4))
+            character = label_char(3, cell_x - 1);
+        else if ((cell_y == 35) && (cell_x >= 1) && (cell_x < 2))
+            character = label_char(4, cell_x - 1);
+        else if ((cell_y == 34) && (cell_x >= 8) && (cell_x < 16))
+            character = label_char(10, cell_x - 8);
+        else if ((cell_y == 36) && (cell_x >= 8) && (cell_x < 10))
+            character = label_char(5, cell_x - 8);
+        else if ((cell_y == 36) && (cell_x >= 24) && (cell_x < 26))
+            character = label_char(6, cell_x - 24);
+        else if ((cell_y == 36) && (cell_x >= 44) && (cell_x < 46))
+            character = label_char(7, cell_x - 44);
+        else if ((cell_y == 36) && (cell_x >= 56) && (cell_x < 59))
+            character = label_char(8, cell_x - 56);
+        else if ((cell_y == 36) && (cell_x >= 69) && (cell_x < 72))
+            character = label_char(9, cell_x - 69);
+        else if ((cell_y == 43) && (cell_x >= 57) && (cell_x < 60))
+            character = label_char(11, cell_x - 57);
+        else if ((cell_y == 45) && (cell_x >= 57) && (cell_x < 61))
+            character = label_char(12, cell_x - 57);
+        else if ((cell_y == 47) && (cell_x >= 57) && (cell_x < 61))
+            character = label_char(13, cell_x - 57);
+        else if ((cell_y == 49) && (cell_x >= 57) && (cell_x < 60))
+            character = label_char(14, cell_x - 57);
+        else if ((cell_y == 52) && (cell_x >= 51) && (cell_x < 56))
+            character = label_char(15, cell_x - 51);
+        else if ((cell_y == 53) && (cell_x >= 51) && (cell_x < 59))
             character = hex_char(frame_count[(59-cell_x)*4 +: 4]);
-        else if ((cell_y == 44) && (cell_x >= 51) && (cell_x < 53))
+        else if ((cell_y == 55) && (cell_x >= 51) && (cell_x < 54))
+            character = label_char(16, cell_x - 51);
+        else if ((cell_y == 56) && (cell_x >= 51) && (cell_x < 53))
             character = hex_char(bfpexp[(52-cell_x)*4 +: 4]);
     end
 

@@ -67,13 +67,22 @@ estável e o toggle ter sido sincronizado.
 
 ## Layout e renderização
 
-- espectro: x=64..575, y=72..280, um pixel por bin;
+- espectro: x=64..575, y=72..280, com escala de frequência logarítmica;
 - MFCC: x=60..319, centro em y=405, barras assinadas;
 - status: indicadores em x=430..449;
+- eixo X: aproximadamente 50 Hz, 500 Hz, 4 kHz, 12 kHz e 24 kHz;
+- eixo Y: magnitude relativa normalizada (`MAX`, `3/4`, `1/2`, `1/4`, `0`), não dB;
+- indicadores de status identificados como `RUN`, `BUSY`, `DONE` e `ERR`, além de
+  `FRAME` e `BFP`;
 - fonte procedural 8×8 em `font_rom.sv`;
 - fundo preto, grade discreta, FFT ciano, MFCC amarelo, estados verde/vermelho.
 
-O mapeamento X está isolado no renderer para permitir escala logarítmica futura.
+O mapeamento X usa `spectrum_log_lut.sv`: os 512 pixels do gráfico consultam
+64 entradas, cada uma cobrindo oito pixels. A LUT percorre os bins 1..511 em
+progressão aproximadamente logarítmica. Assim, as baixas frequências ocupam
+mais espaço visual, sem calcular logaritmos ou divisões no caminho de pixel.
+O bin 0/DC não é exibido como ponto separado; a primeira posição representa o
+bin 1, equivalente a 46,875 Hz em `Fs=48 kHz` e `N=1024`.
 
 ## Módulos
 
@@ -129,6 +138,5 @@ atual, o Quartus reporta os bancos de snapshot como lógica devido ao acesso
 dual-clock e não como M9K; isso usa 20.446 LEs (41%) e 11.653 registradores
 (23%), ainda dentro da DE10-Lite, mas é uma otimização pendente para uma
 versão posterior com `altsyncram` explícito.
-Como extensões, podem ser adicionados waveform circular, escala logarítmica,
-labels numéricos, waterfall e PLL próximo de 25,175 MHz sem alterar o contrato
-de telemetria.
+Como extensões, podem ser adicionados waveform circular, escala dB calibrada,
+waterfall e PLL próximo de 25,175 MHz sem alterar o contrato de telemetria.

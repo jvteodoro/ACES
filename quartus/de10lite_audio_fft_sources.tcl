@@ -17,6 +17,7 @@ foreach relpath {
     rtl/video/font_rom.sv
     rtl/video/text_renderer.sv
     rtl/video/dashboard_data_capture.sv
+    rtl/video/spectrum_log_lut.sv
     rtl/video/dashboard_renderer.sv
     rtl/analysis/fft_feature_analyzer.sv
     rtl/analysis/feature_temporal_stabilizer.sv

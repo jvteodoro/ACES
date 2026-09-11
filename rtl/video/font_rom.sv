@@ -20,6 +20,19 @@ module font_rom (
             "L": case(row) 0,1,2,3,4:row_bits=8'h40;5:row_bits=8'h7e;default:row_bits=0; endcase
             "P": case(row) 0:row_bits=8'h7c;1:row_bits=8'h42;2:row_bits=8'h42;3:row_bits=8'h7c;4,5:row_bits=8'h40;default:row_bits=0; endcase
             "R": case(row) 0:row_bits=8'h7c;1:row_bits=8'h42;2:row_bits=8'h42;3:row_bits=8'h7c;4:row_bits=8'h48;5:row_bits=8'h46;default:row_bits=0; endcase
+            "B": case(row) 0:row_bits=8'h7c;1:row_bits=8'h42;2:row_bits=8'h7c;3:row_bits=8'h42;4:row_bits=8'h42;5:row_bits=8'h7c;default:row_bits=0; endcase
+            "D": case(row) 0:row_bits=8'h78;1:row_bits=8'h44;2:row_bits=8'h42;3:row_bits=8'h42;4:row_bits=8'h44;5:row_bits=8'h78;default:row_bits=0; endcase
+            "G": case(row) 0:row_bits=8'h3c;1:row_bits=8'h42;2:row_bits=8'h40;3:row_bits=8'h4e;4:row_bits=8'h42;5:row_bits=8'h3c;default:row_bits=0; endcase
+            "H": case(row) 0:row_bits=8'h42;1:row_bits=8'h42;2:row_bits=8'h7e;3:row_bits=8'h42;4:row_bits=8'h42;5:row_bits=8'h42;default:row_bits=0; endcase
+            "K": case(row) 0:row_bits=8'h42;1:row_bits=8'h44;2:row_bits=8'h78;3:row_bits=8'h48;4:row_bits=8'h44;5:row_bits=8'h42;default:row_bits=0; endcase
+            "N": case(row) 0:row_bits=8'h42;1:row_bits=8'h62;2:row_bits=8'h52;3:row_bits=8'h4a;4:row_bits=8'h46;5:row_bits=8'h42;default:row_bits=0; endcase
+            "O": case(row) 0:row_bits=8'h3c;1:row_bits=8'h42;2:row_bits=8'h42;3:row_bits=8'h42;4:row_bits=8'h42;5:row_bits=8'h3c;default:row_bits=0; endcase
+            "Q": case(row) 0:row_bits=8'h3c;1:row_bits=8'h42;2:row_bits=8'h42;3:row_bits=8'h4a;4:row_bits=8'h44;5:row_bits=8'h3a;default:row_bits=0; endcase
+            "V": case(row) 0:row_bits=8'h42;1:row_bits=8'h42;2:row_bits=8'h42;3:row_bits=8'h24;4:row_bits=8'h24;5:row_bits=8'h18;default:row_bits=0; endcase
+            "X": case(row) 0:row_bits=8'h42;1:row_bits=8'h24;2:row_bits=8'h18;3:row_bits=8'h18;4:row_bits=8'h24;5:row_bits=8'h42;default:row_bits=0; endcase
+            "Y": case(row) 0:row_bits=8'h42;1:row_bits=8'h24;2:row_bits=8'h18;3:row_bits=8'h18;4:row_bits=8'h18;5:row_bits=8'h18;default:row_bits=0; endcase
+            "Z": case(row) 0:row_bits=8'h7e;1:row_bits=8'h04;2:row_bits=8'h08;3:row_bits=8'h10;4:row_bits=8'h20;5:row_bits=8'h7e;default:row_bits=0; endcase
+            "/": case(row) 0:row_bits=8'h02;1:row_bits=8'h04;2:row_bits=8'h08;3:row_bits=8'h10;4:row_bits=8'h20;default:row_bits=0; endcase
             "0": case(row) 0:row_bits=8'h3c;1:row_bits=8'h46;2:row_bits=8'h4a;3:row_bits=8'h52;4:row_bits=8'h62;5:row_bits=8'h3c;default:row_bits=0; endcase
             "1": case(row) 0:row_bits=8'h18;1:row_bits=8'h38;2:row_bits=8'h18;3:row_bits=8'h18;4:row_bits=8'h18;5:row_bits=8'h7e;default:row_bits=0; endcase
             "2": case(row) 0:row_bits=8'h3c;1:row_bits=8'h42;2:row_bits=8'h04;3:row_bits=8'h18;4:row_bits=8'h20;5:row_bits=8'h7e;default:row_bits=0; endcase

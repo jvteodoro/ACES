@@ -23,6 +23,7 @@ module dashboard_renderer (
     logic text_pixel;
     logic [11:0] pixel_color;
     logic [9:0] spectrum_slot;
+    logic [8:0] log_bin_index;
     integer spectrum_height, mfcc_height, mfcc_mag, mfcc_slot;
 
     text_renderer u_text (
@@ -31,10 +32,15 @@ module dashboard_renderer (
         .text_pixel(text_pixel)
     );
 
+    spectrum_log_lut u_spectrum_log_lut (
+        .x_segment(spectrum_slot[8:3]),
+        .bin_index(log_bin_index)
+    );
+
     always_comb begin
         spectrum_slot = (pixel_x >= 64 && pixel_x <= 575) ?
                         (pixel_x - 10'd64) : 10'd0;
-        spectrum_read_index = spectrum_slot[8:0];
+        spectrum_read_index = log_bin_index;
         mfcc_slot = 0;
         // Constant range comparisons synthesize smaller/faster than a divider.
         if (pixel_x >= 80)  mfcc_slot = 1;
