@@ -75,3 +75,8 @@ quartus/**/*.qsf.bak
 
 # Legacy / local-only bundles
 aces_i2s_fft_verilog_bundle/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
