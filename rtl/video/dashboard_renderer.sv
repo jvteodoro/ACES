@@ -26,6 +26,36 @@ module dashboard_renderer (
     logic [8:0] log_bin_index;
     integer spectrum_height, mfcc_height, mfcc_mag, mfcc_slot;
 
+    // spectrum_value is peak-normalized (0..1023). Map it to a relative
+    // dB display without placing a logarithm or divider in the pixel path.
+    // Thresholds are approximately 3 dB apart; the visible range is 0 to
+    // -60 dB over the 208-pixel spectrum area.
+    function automatic integer db_spectrum_height(input logic [9:0] magnitude);
+        begin
+            if      (magnitude >= 10'd1023) db_spectrum_height = 208;
+            else if (magnitude >= 10'd724)  db_spectrum_height = 198;
+            else if (magnitude >= 10'd513)  db_spectrum_height = 187;
+            else if (magnitude >= 10'd363)  db_spectrum_height = 177;
+            else if (magnitude >= 10'd257)  db_spectrum_height = 166;
+            else if (magnitude >= 10'd182)  db_spectrum_height = 156;
+            else if (magnitude >= 10'd129)  db_spectrum_height = 146;
+            else if (magnitude >= 10'd91)   db_spectrum_height = 135;
+            else if (magnitude >= 10'd65)   db_spectrum_height = 125;
+            else if (magnitude >= 10'd46)   db_spectrum_height = 114;
+            else if (magnitude >= 10'd32)   db_spectrum_height = 104;
+            else if (magnitude >= 10'd23)   db_spectrum_height = 94;
+            else if (magnitude >= 10'd16)   db_spectrum_height = 83;
+            else if (magnitude >= 10'd11)   db_spectrum_height = 73;
+            else if (magnitude >= 10'd8)    db_spectrum_height = 62;
+            else if (magnitude >= 10'd6)    db_spectrum_height = 52;
+            else if (magnitude >= 10'd4)    db_spectrum_height = 42;
+            else if (magnitude >= 10'd3)    db_spectrum_height = 31;
+            else if (magnitude >= 10'd2)    db_spectrum_height = 21;
+            else if (magnitude >= 10'd1)    db_spectrum_height = 10;
+            else                            db_spectrum_height = 0;
+        end
+    endfunction
+
     text_renderer u_text (
         .pixel_x(pixel_x), .pixel_y(pixel_y), .active_video(active_video),
         .frame_count(frame_count), .bfpexp(bfpexp),
@@ -58,8 +88,7 @@ module dashboard_renderer (
         if (pixel_x >= 300) mfcc_slot = 12;
         if (pixel_x < 60 || pixel_x >= 320) mfcc_slot = 0;
         mfcc_read_index = mfcc_slot[3:0];
-        spectrum_height = spectrum_value[9:2];
-        if (spectrum_height > 208) spectrum_height = 208;
+        spectrum_height = db_spectrum_height(spectrum_value);
         mfcc_mag = mfcc_value[31] ? -mfcc_value : mfcc_value;
         mfcc_height = mfcc_mag >>> 20;
         if (mfcc_height > 45) mfcc_height = 45;

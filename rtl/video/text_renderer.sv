@@ -32,16 +32,16 @@ module text_renderer (
 
     // Fixed labels are decoded as characters so no framebuffer or string
     // storage is required. The graph uses a logarithmic frequency axis and a
-    // normalized magnitude axis; the labels deliberately expose that fact.
+    // dB-relative magnitude axis; the labels deliberately expose that fact.
     function automatic [7:0] label_char(input integer line, input integer p);
         begin
             label_char = " ";
             case (line)
-                0: case (p) 0: label_char="M"; 1: label_char="A"; 2: label_char="X"; endcase
-                1: case (p) 0: label_char="3"; 1: label_char="/"; 2: label_char="4"; endcase
-                2: case (p) 0: label_char="1"; 1: label_char="/"; 2: label_char="2"; endcase
-                3: case (p) 0: label_char="1"; 1: label_char="/"; 2: label_char="4"; endcase
-                4: case (p) 0: label_char="0"; endcase
+                0: case (p) 0: label_char="0"; 1: label_char="D"; 2: label_char="B"; endcase
+                1: case (p) 0: label_char="-"; 1: label_char="1"; 2: label_char="5"; endcase
+                2: case (p) 0: label_char="-"; 1: label_char="3"; 2: label_char="0"; endcase
+                3: case (p) 0: label_char="-"; 1: label_char="4"; 2: label_char="5"; endcase
+                4: case (p) 0: label_char="-"; 1: label_char="6"; 2: label_char="0"; endcase
                 5: case (p) 0: label_char="5"; 1: label_char="0"; endcase
                 6: case (p) 0: label_char="5"; 1: label_char="0"; 2: label_char="0"; endcase
                 7: case (p) 0: label_char="4"; 1: label_char="K"; endcase
@@ -94,7 +94,7 @@ module text_renderer (
             character = label_char(2, cell_x - 1);
         else if ((cell_y == 23) && (cell_x >= 1) && (cell_x < 4))
             character = label_char(3, cell_x - 1);
-        else if ((cell_y == 35) && (cell_x >= 1) && (cell_x < 2))
+        else if ((cell_y == 35) && (cell_x >= 1) && (cell_x < 4))
             character = label_char(4, cell_x - 1);
         else if ((cell_y == 34) && (cell_x >= 8) && (cell_x < 16))
             character = label_char(10, cell_x - 8);

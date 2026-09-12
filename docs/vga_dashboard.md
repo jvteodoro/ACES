@@ -84,7 +84,9 @@ impedindo a atualização de MFCC e do contador de frames do dashboard.
 - MFCC: x=60..319, centro em y=405, barras assinadas;
 - status: indicadores em x=430..449;
 - eixo X: aproximadamente 50 Hz, 500 Hz, 4 kHz, 12 kHz e 24 kHz;
-- eixo Y: magnitude relativa normalizada (`MAX`, `3/4`, `1/2`, `1/4`, `0`), não dB;
+- eixo Y: magnitude relativa em dB (`0`, `-15`, `-30`, `-45`, `-60 dB`).
+  O valor de referência é o maior pico mantido pelo `peak_hold`; portanto a
+  escala é dB relativa ao pico observado, não dB SPL calibrado.
 - indicadores de status identificados como `RUN`, `BUSY`, `DONE` e `ERR`, além de
   `FRAME` e `BFP`;
 - fonte procedural 8×8 em `font_rom.sv`;
