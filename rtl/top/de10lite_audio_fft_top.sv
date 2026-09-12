@@ -63,7 +63,7 @@ module de10lite_audio_fft_top #(
     logic [3:0] hex0_value, hex1_value, hex2_value;
     logic pixel_clk, vga_active, vga_frame_start;
     logic [9:0] pixel_x, pixel_y;
-    logic [9:0] spectrum_value;
+    logic [19:0] spectrum_value;
     logic signed [31:0] mfcc_value;
     logic [8:0] spectrum_read_index;
     logic [3:0] mfcc_read_index;

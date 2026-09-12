@@ -44,7 +44,7 @@ As atribuições foram conferidas contra o SystemCD da DE10-Lite e usam
 ## Captura e double buffer
 
 No domínio de 50 MHz, cada bin útil (`fft_tx_index < 512`) é armazenado com
-20 bits após a métrica visual:
+24 bits após a métrica de magnitude de amplitude:
 
 ```text
 raw_magnitude = saturate((abs(real) + abs(imag)) << bfpexp)
@@ -84,7 +84,7 @@ impedindo a atualização de MFCC e do contador de frames do dashboard.
 - MFCC: x=60..319, centro em y=405, barras assinadas;
 - status: indicadores em x=430..449;
 - eixo X: aproximadamente 50 Hz, 500 Hz, 4 kHz, 12 kHz e 24 kHz;
-- eixo Y: magnitude relativa em dB (`0`, `-15`, `-30`, `-45`, `-60 dB`).
+- eixo Y: magnitude de amplitude relativa em dB (`0`, `-15`, `-30`, `-45`, `-60 dB`).
   O valor de referência é o maior pico mantido pelo `peak_hold`; portanto a
   escala é dB relativa ao pico observado, não dB SPL calibrado.
 - indicadores de status identificados como `RUN`, `BUSY`, `DONE` e `ERR`, além de
@@ -120,9 +120,14 @@ alterar significativamente sinais na faixa de kHz.
 O espectro visual não é mais normalizado pelo pico de cada frame. O módulo de
 captura mantém `peak_hold`, que só aumenta quando um novo frame apresenta uma
 magnitude maior que o máximo histórico. O valor é mantido até o reset `KEY0`.
-Assim, a altura das barras permanece comparável entre frames; uma redução do
-nível do sinal aparece como barras menores, em vez de provocar uma expansão
-automática da escala.
+Assim, a referência permanece comparável entre frames. A captura publica a
+potência de cada frame sem média temporal, preservando a inferência dos bancos
+como RAM dual-clock e o timing do projeto. A média temporal será adicionada em
+uma etapa posterior com RAM multiporta explícita; uma leitura variável do banco
+anterior dentro do mesmo processo faz o Quartus expandir a memória em uma
+matriz combinacional muito grande. O renderer converte a potência normalizada
+para dB relativo e desenha uma linha de dois pixels, em vez de barras
+preenchidas.
 
 ## Módulos
 
@@ -160,24 +165,23 @@ layout, escala do espectro e barras MFCC.
 
 ## Fechamento Quartus/TimeQuest
 
-No fechamento físico realizado em 2026-09-11, o Fitter foi bem-sucedido para
-`10M50DAF484C7G`, com 9.408/49.760 LEs (19%), 2.699 registradores (5%),
-27/182 M9K (15%), 38 DSP 9-bit (13%) e 97/360 pinos (27%). O snapshot de
-espectro de 20 bits ocupa 3 M9K (20.480 bits) e os 14 pinos VGA
-foram aceitos e aparecem no relatório de I/O. O TimeQuest encontrou clocks de
-50 MHz, 3,125 MHz I2S e 25 MHz VGA; hold permaneceu positivo. O pior setup no
-corner lento de 85 °C foi `-0,219 ns` no `VGA_PIXEL_CLK`, enquanto os corners
-de 0 °C e rápido passaram. Portanto, o dashboard está funcional em simulação
-e sintetiza, mas esse pequeno déficit de setup precisa ser fechado antes de
-classificar o bitstream como produção.
+No fechamento físico realizado em 2026-09-12, o Fitter foi bem-sucedido para
+`10M50DAF484C7G`, com 10.914 células lógicas, 459 segmentos RAM, 40 DSPs e
+48 pinos de entrada/saída implementados. Os bancos de espectro de 24 bits são
+inferidos como RAM dual-clock. O TimeQuest encontrou clocks de 50 MHz,
+3,125 MHz I2S e 25 MHz VGA; hold permaneceu positivo. O pior setup no corner
+lento de 85 °C foi `-0,611 ns` no clock principal, enquanto o VGA passou com
+`5,284 ns`. Portanto, o bitstream é gerado e o dashboard passa a validação
+funcional, mas o pequeno déficit do clock principal ainda deve ser fechado
+antes de classificar o bitstream como produção.
 
 ## Limitações e extensões
 
-O clock atual é 25 MHz; o valor FFT é uma magnitude visual aproximada, não dB;
+O clock atual é 25 MHz; o valor FFT é magnitude relativa em dB, não dB SPL;
 waveform e waterfall ainda não fazem parte da primeira versão. No fechamento
-atual, o Quartus reporta os bancos de snapshot como lógica devido ao acesso
-dual-clock e não como M9K; isso usa 20.446 LEs (41%) e 11.653 registradores
-(23%), ainda dentro da DE10-Lite, mas é uma otimização pendente para uma
-versão posterior com `altsyncram` explícito.
+atual, os bancos de snapshot são inferidos como RAM dual-clock. A média
+temporal ainda não está habilitada: uma implementação ingênua com leitura do
+banco anterior expandiu a RAM para lógica e falhou o limite de recursos; ela
+deve ser feita em RAM multiporta explícita em uma etapa posterior.
 Como extensões, podem ser adicionados waveform circular, escala dB calibrada,
 waterfall e PLL próximo de 25,175 MHz sem alterar o contrato de telemetria.

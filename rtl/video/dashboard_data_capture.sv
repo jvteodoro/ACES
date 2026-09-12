@@ -24,7 +24,7 @@ module dashboard_data_capture #(
 
     input  logic [8:0] spectrum_read_index_i,
     input  logic [3:0] mfcc_read_index_i,
-    output logic [9:0] spectrum_value_o,
+    output logic [19:0] spectrum_value_o,
     output logic signed [31:0] mfcc_value_o,
     output logic [7:0] bfpexp_o,
     output logic fft_run_o,
@@ -34,10 +34,9 @@ module dashboard_data_capture #(
     output logic feature_busy_o,
     output logic [31:0] frame_count_o
 );
-    // Keep the pre-normalized magnitude so a large BFPEXP cannot flatten the
-    // entire display to 10'h3ff. The display reference is a peak hold: it only
-    // increases when a new frame exceeds the historical maximum.
-    (* ramstyle = "M9K" *) logic [19:0] spectrum_bank [0:1][0:FFT_BINS-1];
+    // Keep the pre-normalized 24-bit magnitude so a large BFPEXP cannot flatten
+    // the display. The display reference is a peak hold.
+    (* ramstyle = "M9K" *) logic [23:0] spectrum_bank [0:1][0:FFT_BINS-1];
     (* ramstyle = "M9K" *) logic signed [31:0] mfcc_bank [0:1][0:MFCC_COUNT-1];
     logic [31:0] frame_count_bank [0:1];
     logic [7:0] bfpexp_bank [0:1];
@@ -49,52 +48,51 @@ module dashboard_data_capture #(
     logic ready_toggle_v1, ready_toggle_v2, ready_toggle_seen;
     logic ready_bank_v1, ready_bank_v2, display_bank_vga;
     logic [31:0] frame_counter;
-    logic [19:0] peak_work;
-    logic [19:0] peak_hold;
-    logic [19:0] peak_bank [0:1];
-    logic [19:0] spectrum_raw_read;
-    logic [19:0] current_bin_magnitude;
-    logic [19:0] completed_peak_value;
+    logic [23:0] peak_work;
+    logic [23:0] peak_hold;
+    logic [23:0] peak_bank [0:1];
+    logic [23:0] spectrum_raw_read;
+    logic [23:0] current_bin_magnitude;
+    logic [23:0] completed_peak_value;
     logic current_bin_valid;
 
-    function automatic [19:0] raw_magnitude(
+    // L1 complex magnitude, scaled by the FFT block exponent. This is the
+    // amplitude magnitude used by the dB display; it avoids a multiplier in
+    // the 50 MHz capture path while preserving spectral shape and resolution.
+    function automatic [23:0] raw_magnitude(
         input logic signed [17:0] re,
         input logic signed [17:0] im,
         input logic signed [7:0] exponent
     );
         logic [18:0] are, aim;
-        logic [19:0] sum;
-        logic [47:0] scaled;
+        logic [18:0] l1_magnitude;
+        logic [63:0] scaled;
         integer shift_amount;
         logic [5:0] shift_left, shift_right;
         integer magnitude_shift;
         begin
             are = re[17] ? {1'b0, (~re + 1'b1)} : {1'b0, re};
             aim = im[17] ? {1'b0, (~im + 1'b1)} : {1'b0, im};
-            sum = are + aim;
+            l1_magnitude = are + aim;
             shift_amount = $signed(exponent);
             magnitude_shift = -shift_amount;
-            shift_left = (shift_amount > 24) ? 6'd24 : shift_amount[5:0];
-            shift_right = (magnitude_shift > 20) ? 6'd20 : magnitude_shift[5:0];
-            // Extend before shifting. In SystemVerilog the width of a shift
-            // expression is the width of its left operand; shifting the
-            // 20-bit sum directly would discard the high bits before the
-            // 48-bit assignment.
+            shift_left = (shift_amount > 40) ? 6'd40 : shift_amount[5:0];
+            shift_right = (magnitude_shift > 40) ? 6'd40 : magnitude_shift[5:0];
             if (shift_amount >= 0)
-                scaled = {28'd0, sum} << shift_left;
+                scaled = {45'd0, l1_magnitude} << shift_left;
             else
-                scaled = {28'd0, sum} >> shift_right;
-            if (scaled > 20'hfffff)
-                raw_magnitude = 20'hfffff;
+                scaled = {45'd0, l1_magnitude} >> shift_right;
+            if (scaled > 24'hffffff)
+                raw_magnitude = 24'hffffff;
             else
-                raw_magnitude = scaled[19:0];
+                raw_magnitude = scaled[23:0];
         end
     endfunction
 
-    function automatic [19:0] completed_peak(
-        input logic [19:0] accumulated_peak,
+    function automatic [23:0] completed_peak(
+        input logic [23:0] accumulated_peak,
         input logic        last_valid,
-        input logic [19:0] last_magnitude
+        input logic [23:0] last_magnitude
     );
         begin
             if (last_valid && (last_magnitude > accumulated_peak))
@@ -112,35 +110,34 @@ module dashboard_data_capture #(
     end
 
     // Normalize by a power of two derived from the frame peak. This avoids a
-    // divider in the 25 MHz pixel path while keeping the peak near full scale.
-    function automatic [9:0] normalized_magnitude(
-        input logic [19:0] raw,
-        input logic [19:0] peak
+    // divider in the 25 MHz pixel path while retaining 20 display bits.
+    function automatic [19:0] normalized_magnitude(
+        input logic [23:0] raw,
+        input logic [23:0] peak
     );
         integer highest_bit;
         integer shift_amount;
         logic [31:0] normalized;
         begin
             highest_bit = -1;
-            for (int k = 19; k >= 0; k = k - 1)
+            for (int k = 23; k >= 0; k = k - 1)
                 if ((highest_bit < 0) && peak[k]) highest_bit = k;
             if (raw == 0) begin
-                normalized_magnitude = 10'd0;
+                normalized_magnitude = 20'd0;
             end else if (highest_bit < 0) begin
                 // A frame marker can legally arrive without a captured peak
                 // (for example while the FFT pipeline is being restarted).
                 // Do not turn a nonzero snapshot into a completely blank
                 // dashboard in that transient condition. This fallback is
-                // intentionally equivalent to the former 10-bit saturating
-                // display path; normal frames use peak-based normalization.
-                normalized_magnitude = (raw > 20'd1023) ? 10'h3ff : raw[9:0];
+                // Normal frames use peak-based normalization.
+                normalized_magnitude = (raw > 24'd1048575) ? 20'hfffff : raw[19:0];
             end else begin
-                shift_amount = highest_bit - 9;
+                shift_amount = highest_bit - 19;
                 if (shift_amount >= 0)
                     normalized = raw >> shift_amount;
                 else
                     normalized = raw << (-shift_amount);
-                normalized_magnitude = (normalized > 1023) ? 10'h3ff : normalized[9:0];
+                normalized_magnitude = (normalized > 1048575) ? 20'hfffff : normalized[19:0];
             end
         end
     endfunction
@@ -165,8 +162,11 @@ module dashboard_data_capture #(
             end
         end else begin
             if (fft_tx_valid_i && (fft_tx_index_i < FFT_BINS)) begin
-                spectrum_bank[write_bank][fft_tx_index_i[8:0]] <=
-                    raw_magnitude(fft_tx_real_i, fft_tx_imag_i, bfpexp_i);
+                // Publish the full-width amplitude metric directly. Temporal averaging
+                // must use an explicit multi-port RAM implementation; reading
+                // the other bank here would make Quartus expand the 512-word
+                // snapshot into a very large asynchronous mux.
+                spectrum_bank[write_bank][fft_tx_index_i[8:0]] <= current_bin_magnitude;
                 if (raw_magnitude(fft_tx_real_i, fft_tx_imag_i, bfpexp_i) > peak_work)
                     peak_work <= raw_magnitude(fft_tx_real_i, fft_tx_imag_i, bfpexp_i);
             end

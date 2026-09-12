@@ -8,7 +8,7 @@ module tb_dashboard_data_capture;
     logic signed [7:0] expn; logic [2:0] fft_status; logic [1:0] input_status;
     logic [3:0] mfcc_index; logic signed [31:0] mfcc_data;
     logic [8:0] spectrum_index; logic [3:0] read_mfcc_index;
-    logic [9:0] spectrum; logic signed [31:0] read_mfcc;
+    logic [19:0] spectrum; logic signed [31:0] read_mfcc;
     logic [7:0] out_exp; logic out_run, out_done, out_busy;
     logic [2:0] out_status; logic [1:0] out_input_status; logic [31:0] frame_count;
 
@@ -54,17 +54,17 @@ module tb_dashboard_data_capture;
         repeat (3) @(posedge pclk);
         // Before the next swap, bank A remains visible and cannot be mixed.
         #1;
-        if (spectrum < 10'd512 || spectrum >= 10'd900 || read_mfcc !== 1000)
+        if (spectrum < 20'd512 || spectrum >= 20'd900000 || read_mfcc !== 1000)
             $fatal(1, "tearing before swap");
         @(negedge pclk); frame_start=1;
         @(negedge pclk); frame_start=0; @(posedge pclk); @(posedge pclk); #1;
-        if (spectrum < 10'd512 || read_mfcc !== 3000 || frame_count !== 2)
+        if (spectrum < 20'd512 || read_mfcc !== 3000 || frame_count !== 2)
             $fatal(1, "incomplete frame B: spectrum=%0d mfcc=%0d frame=%0d", spectrum, read_mfcc, frame_count);
         write_frame(5);
         repeat (3) @(posedge pclk);
         @(negedge pclk); frame_start=1;
         @(negedge pclk); frame_start=0; @(posedge pclk); @(posedge pclk); #1;
-        if (spectrum >= 10'd512)
+        if (spectrum >= 20'd300000)
             $fatal(1, "peak hold rescaled a quieter frame: spectrum=%0d", spectrum);
         $display("PASS: dashboard double-buffer snapshot isolation");
         $finish;

@@ -2,7 +2,7 @@ module dashboard_renderer (
     input  logic [9:0] pixel_x,
     input  logic [9:0] pixel_y,
     input  logic       active_video,
-    input  logic [9:0] spectrum_value,
+    input  logic [19:0] spectrum_value,
     input  logic signed [31:0] mfcc_value,
     input  logic [7:0] bfpexp,
     input  logic       fft_run,
@@ -26,32 +26,25 @@ module dashboard_renderer (
     logic [8:0] log_bin_index;
     integer spectrum_height, mfcc_height, mfcc_mag, mfcc_slot;
 
-    // spectrum_value is peak-normalized (0..1023). Map it to a relative
-    // dB display without placing a logarithm or divider in the pixel path.
-    // Thresholds are approximately 3 dB apart; the visible range is 0 to
+    // spectrum_value is peak-normalized (0..1048575). Map amplitude magnitude
+    // to a relative dB display without placing a logarithm or divider in the
+    // pixel path. The visible range is 0 to
     // -60 dB over the 208-pixel spectrum area.
-    function automatic integer db_spectrum_height(input logic [9:0] magnitude);
+    function automatic integer db_spectrum_height(input logic [19:0] magnitude);
         begin
-            if      (magnitude >= 10'd1023) db_spectrum_height = 208;
-            else if (magnitude >= 10'd724)  db_spectrum_height = 198;
-            else if (magnitude >= 10'd513)  db_spectrum_height = 187;
-            else if (magnitude >= 10'd363)  db_spectrum_height = 177;
-            else if (magnitude >= 10'd257)  db_spectrum_height = 166;
-            else if (magnitude >= 10'd182)  db_spectrum_height = 156;
-            else if (magnitude >= 10'd129)  db_spectrum_height = 146;
-            else if (magnitude >= 10'd91)   db_spectrum_height = 135;
-            else if (magnitude >= 10'd65)   db_spectrum_height = 125;
-            else if (magnitude >= 10'd46)   db_spectrum_height = 114;
-            else if (magnitude >= 10'd32)   db_spectrum_height = 104;
-            else if (magnitude >= 10'd23)   db_spectrum_height = 94;
-            else if (magnitude >= 10'd16)   db_spectrum_height = 83;
-            else if (magnitude >= 10'd11)   db_spectrum_height = 73;
-            else if (magnitude >= 10'd8)    db_spectrum_height = 62;
-            else if (magnitude >= 10'd6)    db_spectrum_height = 52;
-            else if (magnitude >= 10'd4)    db_spectrum_height = 42;
-            else if (magnitude >= 10'd3)    db_spectrum_height = 31;
-            else if (magnitude >= 10'd2)    db_spectrum_height = 21;
-            else if (magnitude >= 10'd1)    db_spectrum_height = 10;
+            if      (magnitude >= 20'd1048575) db_spectrum_height = 208; //   0 dB
+            else if (magnitude >= 20'd589000)  db_spectrum_height = 195; //  -5 dB
+            else if (magnitude >= 20'd331000)  db_spectrum_height = 182; // -10 dB
+            else if (magnitude >= 20'd186000)  db_spectrum_height = 169; // -15 dB
+            else if (magnitude >= 20'd104800)  db_spectrum_height = 156; // -20 dB
+            else if (magnitude >= 20'd58900)   db_spectrum_height = 143; // -25 dB
+            else if (magnitude >= 20'd33100)   db_spectrum_height = 130; // -30 dB
+            else if (magnitude >= 20'd18600)   db_spectrum_height = 117; // -35 dB
+            else if (magnitude >= 20'd10480)   db_spectrum_height = 104; // -40 dB
+            else if (magnitude >= 20'd5890)    db_spectrum_height = 91;  // -45 dB
+            else if (magnitude >= 20'd3310)    db_spectrum_height = 78;  // -50 dB
+            else if (magnitude >= 20'd1860)    db_spectrum_height = 65;  // -55 dB
+            else if (magnitude >= 20'd1048)    db_spectrum_height = 52;  // -60 dB
             else                            db_spectrum_height = 0;
         end
     endfunction
@@ -101,9 +94,13 @@ module dashboard_renderer (
                  (pixel_y == 192) || (pixel_y == 232) || (pixel_y == 272)))
                 pixel_color = GRID;
 
+            // Draw a continuous 2-pixel trace. Temporal averaging is done in
+            // the capture block; this avoids the old solid bars that hid the
+            // relative shape of the spectrum.
             if ((pixel_x >= 64) && (pixel_x <= 575) && (pixel_y >= 72) &&
                 (pixel_y <= 280) && (spectrum_height > 0) &&
-                (pixel_y >= (280 - spectrum_height)))
+                ((pixel_y == (280 - spectrum_height)) ||
+                 (pixel_y == (279 - spectrum_height))))
                 pixel_color = CYAN;
 
             if ((pixel_x >= 60) && (pixel_x < 320) && (pixel_y >= 350) &&

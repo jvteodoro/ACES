@@ -2,7 +2,7 @@
 module tb_dashboard_renderer;
     logic [9:0] x, y;
     logic active = 1'b1;
-    logic [9:0] spectrum;
+    logic [19:0] spectrum;
     logic signed [31:0] mfcc;
     logic [7:0] bfp;
     logic fft_run, fft_done, busy;
@@ -21,11 +21,11 @@ module tb_dashboard_renderer;
         .mfcc_read_index(mfcc_index), .red(r), .green(g), .blue(b));
 
     initial begin
-        spectrum = 10'd1023; mfcc = 32'sd0; bfp = 0;
+        spectrum = 20'd1048575; mfcc = 32'sd0; bfp = 0;
         fft_run = 1; fft_done = 0; busy = 0; fft_status = 0;
         input_status = 0; frame = 32'd7;
         // The log LUT maps the segment at x=448 to bin 116.
-        x = 10'd448; y = 10'd200; #1;
+        x = 10'd448; y = 10'd72; #1;
         if (b != 4'hf || g != 4'hc) $fatal(1, "spectrum pixel missing: %h%h%h", r,g,b);
         if (spectrum_index != 9'd116) $fatal(1, "wrong log bin index=%0d", spectrum_index);
         x = 10'd455; #1;
@@ -34,7 +34,7 @@ module tb_dashboard_renderer;
         if (spectrum_index != 9'd1) $fatal(1, "wrong low-frequency bin=%0d", spectrum_index);
         x = 10'd575; #1;
         if (spectrum_index != 9'd511) $fatal(1, "wrong high-frequency bin=%0d", spectrum_index);
-        spectrum = 10'd1; x = 10'd448; y = 10'd275; #1;
+        spectrum = 20'd1048; x = 10'd448; y = 10'd228; #1;
         if (b != 4'hf || g != 4'hc) $fatal(1, "low dB spectrum pixel missing: %h%h%h", r,g,b);
         spectrum = 10'd0; #1;
         if (b == 4'hf && g == 4'hc) $fatal(1, "zero magnitude rendered as spectrum");
