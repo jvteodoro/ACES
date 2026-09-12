@@ -44,7 +44,7 @@ As atribuições foram conferidas contra o SystemCD da DE10-Lite e usam
 ## Captura e double buffer
 
 No domínio de 50 MHz, cada bin útil (`fft_tx_index < 512`) é armazenado com
-24 bits após a métrica de magnitude de amplitude:
+20 bits após a métrica de magnitude de amplitude:
 
 ```text
 raw_magnitude = saturate((abs(real) + abs(imag)) << bfpexp)
@@ -167,7 +167,7 @@ layout, escala do espectro e barras MFCC.
 
 No fechamento físico realizado em 2026-09-12, o Fitter foi bem-sucedido para
 `10M50DAF484C7G`, com 10.914 células lógicas, 459 segmentos RAM, 40 DSPs e
-48 pinos de entrada/saída implementados. Os bancos de espectro de 24 bits são
+48 pinos de entrada/saída implementados. Os bancos de espectro de 20 bits são
 inferidos como RAM dual-clock. O TimeQuest encontrou clocks de 50 MHz,
 3,125 MHz I2S e 25 MHz VGA; hold permaneceu positivo. O pior setup no corner
 lento de 85 °C foi `-0,611 ns` no clock principal, enquanto o VGA passou com

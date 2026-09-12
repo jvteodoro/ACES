@@ -34,9 +34,9 @@ module dashboard_data_capture #(
     output logic feature_busy_o,
     output logic [31:0] frame_count_o
 );
-    // Keep the pre-normalized 24-bit magnitude so a large BFPEXP cannot flatten
+    // Keep a 20-bit pre-normalized magnitude so a large BFPEXP cannot flatten
     // the display. The display reference is a peak hold.
-    (* ramstyle = "M9K" *) logic [23:0] spectrum_bank [0:1][0:FFT_BINS-1];
+    (* ramstyle = "M9K" *) logic [19:0] spectrum_bank [0:1][0:FFT_BINS-1];
     (* ramstyle = "M9K" *) logic signed [31:0] mfcc_bank [0:1][0:MFCC_COUNT-1];
     logic [31:0] frame_count_bank [0:1];
     logic [7:0] bfpexp_bank [0:1];
@@ -48,25 +48,25 @@ module dashboard_data_capture #(
     logic ready_toggle_v1, ready_toggle_v2, ready_toggle_seen;
     logic ready_bank_v1, ready_bank_v2, display_bank_vga;
     logic [31:0] frame_counter;
-    logic [23:0] peak_work;
-    logic [23:0] peak_hold;
-    logic [23:0] peak_bank [0:1];
-    logic [23:0] spectrum_raw_read;
-    logic [23:0] current_bin_magnitude;
-    logic [23:0] completed_peak_value;
+    logic [19:0] peak_work;
+    logic [19:0] peak_hold;
+    logic [19:0] peak_bank [0:1];
+    logic [19:0] spectrum_raw_read;
+    logic [19:0] current_bin_magnitude;
+    logic [19:0] completed_peak_value;
     logic current_bin_valid;
 
     // L1 complex magnitude, scaled by the FFT block exponent. This is the
     // amplitude magnitude used by the dB display; it avoids a multiplier in
     // the 50 MHz capture path while preserving spectral shape and resolution.
-    function automatic [23:0] raw_magnitude(
+    function automatic [19:0] raw_magnitude(
         input logic signed [17:0] re,
         input logic signed [17:0] im,
         input logic signed [7:0] exponent
     );
         logic [18:0] are, aim;
         logic [18:0] l1_magnitude;
-        logic [63:0] scaled;
+        logic [47:0] scaled;
         integer shift_amount;
         logic [5:0] shift_left, shift_right;
         integer magnitude_shift;
@@ -79,20 +79,20 @@ module dashboard_data_capture #(
             shift_left = (shift_amount > 40) ? 6'd40 : shift_amount[5:0];
             shift_right = (magnitude_shift > 40) ? 6'd40 : magnitude_shift[5:0];
             if (shift_amount >= 0)
-                scaled = {45'd0, l1_magnitude} << shift_left;
+                scaled = {28'd0, l1_magnitude} << shift_left;
             else
-                scaled = {45'd0, l1_magnitude} >> shift_right;
-            if (scaled > 24'hffffff)
-                raw_magnitude = 24'hffffff;
+                scaled = {28'd0, l1_magnitude} >> shift_right;
+            if (scaled > 20'hfffff)
+                raw_magnitude = 20'hfffff;
             else
-                raw_magnitude = scaled[23:0];
+                raw_magnitude = scaled[19:0];
         end
     endfunction
 
-    function automatic [23:0] completed_peak(
-        input logic [23:0] accumulated_peak,
+    function automatic [19:0] completed_peak(
+        input logic [19:0] accumulated_peak,
         input logic        last_valid,
-        input logic [23:0] last_magnitude
+        input logic [19:0] last_magnitude
     );
         begin
             if (last_valid && (last_magnitude > accumulated_peak))
@@ -112,15 +112,15 @@ module dashboard_data_capture #(
     // Normalize by a power of two derived from the frame peak. This avoids a
     // divider in the 25 MHz pixel path while retaining 20 display bits.
     function automatic [19:0] normalized_magnitude(
-        input logic [23:0] raw,
-        input logic [23:0] peak
+        input logic [19:0] raw,
+        input logic [19:0] peak
     );
         integer highest_bit;
         integer shift_amount;
         logic [31:0] normalized;
         begin
             highest_bit = -1;
-            for (int k = 23; k >= 0; k = k - 1)
+            for (int k = 19; k >= 0; k = k - 1)
                 if ((highest_bit < 0) && peak[k]) highest_bit = k;
             if (raw == 0) begin
                 normalized_magnitude = 20'd0;
@@ -130,7 +130,7 @@ module dashboard_data_capture #(
                 // Do not turn a nonzero snapshot into a completely blank
                 // dashboard in that transient condition. This fallback is
                 // Normal frames use peak-based normalization.
-                normalized_magnitude = (raw > 24'd1048575) ? 20'hfffff : raw[19:0];
+                normalized_magnitude = (raw > 20'd1048575) ? 20'hfffff : raw[19:0];
             end else begin
                 shift_amount = highest_bit - 19;
                 if (shift_amount >= 0)
