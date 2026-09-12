@@ -113,6 +113,15 @@ aproximadamente 50 Hz. O mesmo sinal filtrado alimenta a janela Hann, a FFT e o
 MFCC. Isso remove offset DC, deriva lenta e parte do ruído de 50/60 Hz sem
 alterar significativamente sinais na faixa de kHz.
 
+## Escala vertical e peak hold
+
+O espectro visual não é mais normalizado pelo pico de cada frame. O módulo de
+captura mantém `peak_hold`, que só aumenta quando um novo frame apresenta uma
+magnitude maior que o máximo histórico. O valor é mantido até o reset `KEY0`.
+Assim, a altura das barras permanece comparável entre frames; uma redução do
+nível do sinal aparece como barras menores, em vez de provocar uma expansão
+automática da escala.
+
 ## Módulos
 
 ```text

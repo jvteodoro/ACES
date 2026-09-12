@@ -60,6 +60,12 @@ module tb_dashboard_data_capture;
         @(negedge pclk); frame_start=0; @(posedge pclk); @(posedge pclk); #1;
         if (spectrum < 10'd512 || read_mfcc !== 3000 || frame_count !== 2)
             $fatal(1, "incomplete frame B: spectrum=%0d mfcc=%0d frame=%0d", spectrum, read_mfcc, frame_count);
+        write_frame(5);
+        repeat (3) @(posedge pclk);
+        @(negedge pclk); frame_start=1;
+        @(negedge pclk); frame_start=0; @(posedge pclk); @(posedge pclk); #1;
+        if (spectrum >= 10'd512)
+            $fatal(1, "peak hold rescaled a quieter frame: spectrum=%0d", spectrum);
         $display("PASS: dashboard double-buffer snapshot isolation");
         $finish;
     end

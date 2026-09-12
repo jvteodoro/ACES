@@ -35,7 +35,8 @@ module dashboard_data_capture #(
     output logic [31:0] frame_count_o
 );
     // Keep the pre-normalized magnitude so a large BFPEXP cannot flatten the
-    // entire display to 10'h3ff. The displayed value is normalized per frame.
+    // entire display to 10'h3ff. The display reference is a peak hold: it only
+    // increases when a new frame exceeds the historical maximum.
     (* ramstyle = "M9K" *) logic [19:0] spectrum_bank [0:1][0:FFT_BINS-1];
     (* ramstyle = "M9K" *) logic signed [31:0] mfcc_bank [0:1][0:MFCC_COUNT-1];
     logic [31:0] frame_count_bank [0:1];
@@ -49,8 +50,12 @@ module dashboard_data_capture #(
     logic ready_bank_v1, ready_bank_v2, display_bank_vga;
     logic [31:0] frame_counter;
     logic [19:0] peak_work;
+    logic [19:0] peak_hold;
     logic [19:0] peak_bank [0:1];
     logic [19:0] spectrum_raw_read;
+    logic [19:0] current_bin_magnitude;
+    logic [19:0] completed_peak_value;
+    logic current_bin_valid;
 
     function automatic [19:0] raw_magnitude(
         input logic signed [17:0] re,
@@ -85,6 +90,26 @@ module dashboard_data_capture #(
                 raw_magnitude = scaled[19:0];
         end
     endfunction
+
+    function automatic [19:0] completed_peak(
+        input logic [19:0] accumulated_peak,
+        input logic        last_valid,
+        input logic [19:0] last_magnitude
+    );
+        begin
+            if (last_valid && (last_magnitude > accumulated_peak))
+                completed_peak = last_magnitude;
+            else
+                completed_peak = accumulated_peak;
+        end
+    endfunction
+
+    always_comb begin
+        current_bin_valid = fft_tx_valid_i && (fft_tx_index_i < FFT_BINS);
+        current_bin_magnitude = raw_magnitude(fft_tx_real_i, fft_tx_imag_i, bfpexp_i);
+        completed_peak_value = completed_peak(
+            peak_work, current_bin_valid, current_bin_magnitude);
+    end
 
     // Normalize by a power of two derived from the frame peak. This avoids a
     // divider in the 25 MHz pixel path while keeping the peak near full scale.
@@ -127,6 +152,7 @@ module dashboard_data_capture #(
             ready_toggle_50 <= 1'b0;
             frame_counter <= '0;
             peak_work <= '0;
+            peak_hold <= '0;
             for (int b = 0; b < 2; b = b + 1) begin
                 frame_count_bank[b] <= '0;
                 bfpexp_bank[b] <= '0;
@@ -158,11 +184,11 @@ module dashboard_data_capture #(
                 fft_input_status_bank[write_bank] <= fft_input_status_i;
                 // Include a possible last FFT bin on the same cycle as the
                 // frame marker instead of losing it to nonblocking ordering.
-                if (fft_tx_valid_i && (fft_tx_index_i < FFT_BINS) &&
-                    (raw_magnitude(fft_tx_real_i, fft_tx_imag_i, bfpexp_i) > peak_work))
-                    peak_bank[write_bank] <= raw_magnitude(fft_tx_real_i, fft_tx_imag_i, bfpexp_i);
-                else
-                    peak_bank[write_bank] <= peak_work;
+                // Retain the largest completed-frame peak for stable scaling.
+                if (completed_peak_value > peak_hold)
+                    peak_hold <= completed_peak_value;
+                peak_bank[write_bank] <= (completed_peak_value > peak_hold) ?
+                    completed_peak_value : peak_hold;
                 ready_bank_50 <= write_bank;
                 ready_toggle_50 <= ~ready_toggle_50;
                 write_bank <= ~write_bank;
