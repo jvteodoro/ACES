@@ -85,6 +85,8 @@ module aces_audio_to_fft_pipeline #(
     logic toggle_sync_1, toggle_sync_2, toggle_seen_clk;
     logic signed [SAMPLE_W-1:0] sample_reg;
     logic                       sample_pulse_clk;
+    logic                       filtered_sample_valid;
+    logic signed [SAMPLE_W-1:0] filtered_sample;
     logic [$clog2(FRAME_LENGTH)-1:0] frame_sample_index;
     logic [$clog2(FRAME_LENGTH)-1:0] window_sample_index;
     logic signed [SAMPLE_W-1:0] windowed_sample;
@@ -100,6 +102,19 @@ module aces_audio_to_fft_pipeline #(
 
     wire new_sample_clk;
     assign new_sample_clk = (toggle_sync_2 != toggle_seen_clk);
+
+    audio_dc_blocker #(
+        .SAMPLE_W(SAMPLE_W),
+        .ALPHA_Q(16),
+        .ALPHA(16'sd65109)
+    ) u_audio_dc_blocker (
+        .clk(clk),
+        .rst(rst),
+        .sample_valid_i(sample_pulse_clk),
+        .sample_i(sample_reg),
+        .sample_valid_o(filtered_sample_valid),
+        .sample_o(filtered_sample)
+    );
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -140,8 +155,8 @@ module aces_audio_to_fft_pipeline #(
             ) u_overlap_buffer (
                 .clk(clk),
                 .rst(rst),
-                .sample_valid_i(sample_pulse_clk),
-                .sample_i(sample_reg),
+                .sample_valid_i(filtered_sample_valid),
+                .sample_i(filtered_sample),
                 .frame_sample_valid_o(overlap_sample_valid),
                 .frame_sample_o(overlap_sample),
                 .frame_start_o(overlap_frame_start),
@@ -166,8 +181,8 @@ module aces_audio_to_fft_pipeline #(
             end
         end else begin : gen_no_overlap
             always_comb begin
-                analysis_sample_valid = sample_pulse_clk;
-                analysis_sample = sample_reg;
+                analysis_sample_valid = filtered_sample_valid;
+                analysis_sample = filtered_sample;
                 analysis_sample_index = window_sample_index;
             end
         end

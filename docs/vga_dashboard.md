@@ -97,6 +97,22 @@ mais espaço visual, sem calcular logaritmos ou divisões no caminho de pixel.
 O bin 0/DC não é exibido como ponto separado; a primeira posição representa o
 bin 1, equivalente a 46,875 Hz em `Fs=48 kHz` e `N=1024`.
 
+## Pré-processamento de áudio
+
+O caminho de análise inclui `rtl/frontend/audio_dc_blocker.sv` entre o CDC das
+amostras I2S e o buffer de overlap. Ele implementa um passa-altas IIR de primeira
+ordem:
+
+```text
+y[n] = x[n] - x[n-1] + alpha*y[n-1]
+alpha = 65109 / 65536
+```
+
+Para `Fs=48 kHz`, o coeficiente corresponde a uma frequência de corte de
+aproximadamente 50 Hz. O mesmo sinal filtrado alimenta a janela Hann, a FFT e o
+MFCC. Isso remove offset DC, deriva lenta e parte do ruído de 50/60 Hz sem
+alterar significativamente sinais na faixa de kHz.
+
 ## Módulos
 
 ```text

@@ -26,6 +26,7 @@ foreach relpath {
     rtl/common/fft_control.sv
     rtl/common/fft_dma_reader.sv
     rtl/frontend/i2s_master_clock_gen.sv
+    rtl/frontend/audio_dc_blocker.sv
     rtl/frontend/fft_window_multiplier.sv
     rtl/frontend/audio_overlap_frame_buffer.sv
     rtl/frontend/i2s_rx_adapter_24.sv
